@@ -1,0 +1,60 @@
+{
+  "buildDigest": "sha256:c9a04ed59aeafd299274275179a59aae5ac7175d9a992659ef3b52b8f06c77a5",
+  "catalogDigest": "sha256:846dcc17957d283482e241ed117d4d61060b1a37930c85f2a799e3de717ba092",
+  "components": [
+    "temporal-ui-image"
+  ],
+  "executionGraph": {
+    "nodes": [
+      {
+        "artifact": "temporalio/ui:2.48.1",
+        "component": "temporal-ui-image",
+        "digest": "sha256:6734b3988aa3615286ac8edc83f4d40f10fba587b7109570702efe09478807f9",
+        "id": "pull-temporal-ui-image",
+        "imageParentDigest": "sha256:edb5dd1b3e0ddb35611939dde9b573533afd6fbafbbf077b73c7131a30ca91ff",
+        "kind": "pull",
+        "network": "default",
+        "outputType": "oci-image",
+        "platform": "linux/amd64",
+        "version": "0.23.0"
+      },
+      {
+        "id": "verify",
+        "kind": "verify",
+        "needs": [
+          "pull-temporal-ui-image"
+        ]
+      }
+    ],
+    "platform": "linux/amd64",
+    "schemaVersion": "nvkr.dev/ir/v4"
+  },
+  "name": "temporal-ui-image",
+  "platform": "linux/amd64",
+  "resolvedComponents": [
+    {
+      "Name": "temporal-ui-image",
+      "commit": "2cfd00081b468d85a4894ec17e9deac13c9d8169",
+      "fromSource": false,
+      "outputType": "oci-image",
+      "platforms": [
+        "linux/amd64",
+        "linux/arm64"
+      ],
+      "prebuilt": {
+        "digests": {
+          "amd64": "sha256:6734b3988aa3615286ac8edc83f4d40f10fba587b7109570702efe09478807f9",
+          "arm64": "sha256:0e7478fad0eebac6d135a9c1efcc21f50f5026e017064b32f034585b13674788"
+        },
+        "evidence": {
+          "none": true
+        },
+        "image": "temporalio/ui:2.48.1",
+        "imageParentDigest": "sha256:edb5dd1b3e0ddb35611939dde9b573533afd6fbafbbf077b73c7131a30ca91ff"
+      },
+      "repo": "https://github.com/dsx-ai-factory/nvke",
+      "sourceDateEpoch": 1793236039,
+      "tag": "v0.23.0"
+    }
+  ]
+}

@@ -3,11 +3,11 @@
 
 apiVersion: nvkr.dev/definition/v5
 catalog:
-  base: ../../../inputs/catalogs/nvke/release
+  base: ../../../inputs/catalogs/nvke
 cosignTool: cosign
 kind: Definition
 metadata:
-  description: Build Linux AMD64/ARM64 CWE and fixture profiles images as OCI indexes, the controller chart and CLI binaries;
+  description: Build Linux AMD64/ARM64 nvke-controller and fixture profiles images as OCI indexes, the controller chart and CLI binaries;
     acquire the four external charts selected by NVKE v0.23.0.
   name: nvke-deploy
 outputs:
@@ -16,7 +16,7 @@ outputs:
   format: helm-oci
   helm:
     images:
-      controller: cwe
+      controller: nvke-controller
   name: controller-chart
   platform: linux/amd64
 - components:
@@ -29,7 +29,7 @@ outputs:
 - components:
   - nvke-controller
   format: oci
-  name: cwe
+  name: nvke-controller
   platforms:
   - linux/amd64
   - linux/arm64

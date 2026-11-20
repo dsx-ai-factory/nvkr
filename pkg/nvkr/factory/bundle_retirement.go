@@ -39,7 +39,7 @@ func priorGeneratedMembers(ctx context.Context, root string, bundle *GeneratedBu
 		}
 		var prior GeneratedManifest
 		if err := canonical.UnmarshalExact(bytes.TrimSuffix(raw, []byte{'\n'}), &prior); err != nil {
-			return nil, e.Wrap(e.CodePipelineDrift, err, "decoding prior generated Run manifest")
+			return nil, e.Wrap(e.CodePipelineDrift, err, "decoding prior generated Run manifest %q; restore it from version control or remove that bundle's generated directory and workflow closure, then regenerate", bundle.ManifestPath)
 		}
 		if prior.SchemaVersion != generatedManifestSchema || prior.Engine != bundle.Engine || prior.WorkflowPath != bundle.WorkflowPath || len(prior.Members) > maxGeneratedDirEntries {
 			return nil, e.New(e.CodePipelineDrift, "prior generated Run manifest has an unsupported layout")
@@ -68,8 +68,13 @@ func retiredGeneratedMembers(ctx context.Context, root string, bundle *Generated
 	}
 	var retired []GeneratedMember
 	for _, member := range prior {
-		union.Files[member.Path] = nil
+		// Shared objects are swept only after the new manifest is published.
+		// Its union with every other manifest decides whether an object survives.
+		if isPlanStorePath(member.Path) {
+			continue
+		}
 		if _, retained := bundle.Files[member.Path]; !retained {
+			union.Files[member.Path] = nil
 			retired = append(retired, member)
 		}
 	}

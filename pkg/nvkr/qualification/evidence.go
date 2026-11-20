@@ -152,17 +152,26 @@ func (evidence Evidence) validate() error {
 		if err := validateOutputSubjects(output); err != nil {
 			return err
 		}
-		if len(output.Checks) != len(requiredArtifactChecks) {
+		required := requiredArtifactChecks
+		if output.Derived != nil {
+			required = append([]string{"derived-inventory"}, requiredArtifactChecks...)
+			sort.Strings(required)
+		}
+		if len(output.Checks) != len(required) {
 			return e.New(e.CodeGateUnmet, "qualification omits artifact checks")
 		}
 		for i, check := range output.Checks {
 			allowed := check.Status == "pass" || ((check.Name == "embedded-declarations" || check.Name == "payload-pins") && check.Status == "not-applicable")
-			if check.Name != requiredArtifactChecks[i] || !allowed || check.Code != "" {
+			if check.Name != required[i] || !allowed || check.Code != "" {
 				return e.New(e.CodeGateUnmet, "qualification contains missing or failing artifact checks")
 			}
 		}
-		if output.Kind == lifecycle.OutputDiskImage && output.DiskEvidence != "producer-only; content inspection not performed" {
-			return e.New(e.CodeVerifyFailed, "qualification cannot claim disk inspection")
+		if output.Kind == lifecycle.OutputDiskImage {
+			switch output.DiskEvidence {
+			case lifecycle.DiskEvidenceDescriptionBuildProvenance, lifecycle.DiskEvidenceDescriptionPackages, lifecycle.DiskEvidenceDescriptionStrict:
+			default:
+				return e.New(e.CodeVerifyFailed, "qualification has an unknown disk evidence description")
+			}
 		}
 		if output.Kind != lifecycle.OutputDiskImage && output.DiskEvidence != "" {
 			return e.New(e.CodeVerifyFailed, "non-disk output claims disk evidence")
@@ -220,6 +229,12 @@ func validateOutputSubjects(output lifecycle.ArtifactCheckOutput) error {
 	}
 	if err := delivery.ValidatePublicationReference(output.Reference); err != nil {
 		return err
+	}
+	if output.Derived != nil {
+		if output.ImageIndex != nil || len(output.BuildSubjects) != 0 || output.Platform != "" {
+			return e.New(e.CodeVerifyFailed, "derived inventory cannot claim native producer subjects or an aggregate image")
+		}
+		return output.Derived.ValidateOutput(output.Name, output.Kind, output.BuildDigest, nil)
 	}
 	if output.ImageIndex != nil {
 		if output.Kind != lifecycle.OutputOCI || output.Platform != "" || len(output.BuildSubjects) != 0 {

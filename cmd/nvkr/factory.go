@@ -22,7 +22,7 @@ func cmdFactory() *cli.Command {
 	return &cli.Command{
 		Name:  "factory",
 		Usage: "execute generated internal plan nodes",
-		Subcommands: []*cli.Command{cmdLocalToolchainPreparation(), cmdToolchainMaintenance(), cmdRegistryCheck(), {
+		Subcommands: []*cli.Command{cmdFactoryGitLab(), cmdLocalToolchainPreparation(), cmdToolchainMaintenance(), cmdRegistryCheck(), {
 			Name:   "execute-node",
 			Hidden: true,
 			Usage:  "execute one node from an exact generated plan",
@@ -197,8 +197,11 @@ func cmdFactoryGitHub() *cli.Command {
 		cmdFactoryCIUpload(),
 		cmdFactoryCIFetchLocators(),
 		cmdFactoryCIDownload(),
-		githubFactoryCommand("check-runtime-inputs", "", func(c *cli.Context, plan *factory.Plan, _ factory.GitHubStepOptions) error {
-			return factory.CheckGitHubRuntimeInputs(c.Context, plan, ".")
+		githubFactoryCommand("stage-runtime-inputs", "", func(c *cli.Context, plan *factory.Plan, _ factory.GitHubStepOptions) error {
+			return factory.StageGitHubRuntimeInputs(c.Context, plan, ".")
+		}),
+		githubFactoryCommand("install-stage-runtime-inputs", "", func(c *cli.Context, plan *factory.Plan, _ factory.GitHubStepOptions) error {
+			return factory.InstallGitHubStageRuntimeInputs(c.Context, plan, ".")
 		}),
 		githubFactoryCommand("install-runtime-inputs", "", func(c *cli.Context, plan *factory.Plan, _ factory.GitHubStepOptions) error {
 			return factory.InstallGitHubRuntimeInputs(c.Context, plan, ".")

@@ -8,7 +8,7 @@ vocabulary preserves the distinctions needed to authenticate them.
 
 **Definition**:
 Authored product intent declaring named outputs, their exact catalog producers, target platforms and packaging
-intent. An output directly selects components. Packaging intent may bind catalog-declared Helm image slots to named image outputs; the resulting digest is content, while its
+intent. An ordinary output directly selects components. Packaging intent may bind catalog-declared Helm image slots to named image outputs; the resulting digest is content, while its
 deployment repository remains transport configuration. Catalog-owned digest representation
 may retain the full OCI digest or supply SHA-256 hex to a template that owns the algorithm prefix;
 this does not change the authenticated image identity or rewrite templates.
@@ -19,6 +19,8 @@ _Avoid_: Factory, FactoryDefinition, cluster definition
 Separately selected execution settings, required publication transports and namespace, credential references,
 and signing identity policy. Container execution defaults to Docker; local Runs inherit the Environment
 runtime and reject conflicting executable overrides before work. Podman is an explicit alternative.
+Local execution may resolve a versioned build-only default instead of an authored Environment; the exact
+policy bytes and digest are frozen with the Plan and Run. This grants no signing, publication or VM capability.
 Selecting an unavailable transport fails before work; a supported sibling cannot
 substitute for it. An explicit OCI representation selects construction before packaging and signing;
 it changes Environment and Plan identity, not logical Build identity or existing publication bytes.
@@ -62,6 +64,8 @@ _Avoid_: Producer, expected output, release
 
 **OCI bundle**:
 A generic archive artifact carrying a pinned producer's rendered files, including AICR deployment bundles.
+A release-derived inventory bundle may instead be owned by a composite and describe named member outputs
+after their packaging. Its declaration and composite attribution are identity-bound.
 The OCI manifest identifies the output; the archive and its file inventory retain separate exact byte bindings.
 Rendering and file integrity do not establish deployed dependency closure or hardware compatibility.
 _Avoid_: Native Helm chart, container image, cluster topology, new lifecycle object
@@ -98,12 +102,15 @@ releases their named outputs through one Plan, Run and Release.
 units U1–U8, including complete-composite hosted qualification with independent policies, are implemented
 and contract-tested. The [evidence ledger](docs/adr/reconciliation/adr-26.md#hosted-gpu-site-publication)
 owns hosted publication, qualification and independent consumer-acceptance status.
+The composite supplies all maintained NVKE production, development and floating-source nightly bundles.
+The explicit ADR-26 U10 maintainer cutover supersedes the former retirement prerequisites; it does not
+establish independent consumer acceptance or change member Build identities.
 _Avoid_: Recipe, selection group, parent Release, association file, include
 
 **Effective Definition**:
 The derived ordinary Definition that composite admission produces by merging its members, with every output's
-catalog stack made explicit. It is an internal record, recorded by digest in the composite's Plan; it is never
-authored or selected as input.
+catalog locator rebased and its shared ordered catalog candidates preserved. It is an internal record,
+recorded by digest in the composite's Plan; it is never authored or selected as input.
 _Avoid_: Flattened file, combined candidate, authored Definition
 
 **Declared variant**:
@@ -116,6 +123,13 @@ _Avoid_: Override, pin exception, allowlist
 A Definition's declaration of exact selected producers, concrete target platform or explicit aggregate image
 platform set, and the artifact format they must produce. Each named output is an independent required use, even when two outputs share a Build Digest.
 _Avoid_: Observed artifact, delivery route
+
+**Release-derived output**:
+An explicitly selected packaging derivation from authenticated named sibling results. The first admitted
+encoding is an AICR inventory in a bundle. Its logical identity binds the publication prefix, encoding and
+sibling Build identities; runtime package digests enter the payload. It is re-derived for a new destination
+and becomes an ordinary required, signed Release member. Topology and installation remain downstream.
+_Avoid_: Release readback, unsigned description, source producer
 
 **Disk-image output**:
 A named output containing exactly one disk-producing catalog root plus every explicitly selected component in
@@ -153,7 +167,8 @@ _Avoid_: Authored selection group, artifact, release
 **Build Digest**:
 The typed identity of a generated build graph's transport-independent logical content under `nvkr.build`.
 Output names and execution settings are bound by their
-owning records and excluded from this identity. Equal Build Digests do not merge required output uses or their evidence.
+owning records and excluded from ordinary producer identity. Release-derived outputs use the distinct
+tagged derivation projection under the same typed family (ADR-20), including the publication prefix. Equal Build Digests do not merge required output uses or their evidence.
 `nvkr.recipe` is reserved and never minted. Historical `nkd.recipe` signed bytes are not renamed or converted.
 _Avoid_: Artifact digest, graph-file hash
 
@@ -167,7 +182,10 @@ The complete generated closure of admitted Definition and Environment values, in
 packaging, routes and executable dependencies for a Run. Producer operations reference the single executable
 build instruction; observations are recorded separately. There is no authored compiler-handoff document.
 Readable views, linked graph exports and semantic comparisons describe the validated Plan; they do not replace
-its canonical stored bytes or grant execution or evidence authority.
+its canonical identity bytes or grant execution or evidence authority. GitHub bundle storage splits
+the Plan into a per-bundle index and shared frozen records and command files under
+[ADR-21's storage contract](docs/adr/0021-generated-pipeline-maintenance-and-lifecycle.md#1-the-emitted-pipeline-is-a-generated-artifact-not-an-owned-scaffold).
+The loader reconstructs the same canonical bytes before execution. Shared Plan records use stable names; environment bindings live in per-bundle targets records, and manifests verify exact bytes. Updating a shared record coordinates all its owners. Packed canonical bytes remain the wire and Tekton form.
 An opted-in dispatch-frozen Plan records an explicit repository/main allowlist's exact
 commits, trees and source timestamps together with captured authored inputs. Workers,
 retries and qualification reuse that selection; independent dependency and toolchain pins
@@ -178,6 +196,10 @@ _Avoid_: Authored definition, execution observation
 The exact generated files and commit manifest that carry an execution plan to a selected execution engine.
 GitHub uses hosted workflow identity; Tekton uses ADR-18's explicit cluster-authenticated execution and
 independent signer keys. No separate qualified renderer or authored transport-plan model is retained.
+The proposed GitLab ordinary unsigned profile uses explicit native runner policy and authenticates current jobs and
+original artifact carriers through its selected provider API. Its complete Plan, required outputs and shared
+lifecycle owners remain unchanged; provider authentication grants no signing or stronger evidence lane.
+Its generated include has a fixed ownership namespace, separate from the operator-owned root pipeline.
 The GitHub entry workflow, Plan and shared composite templates share one ownership manifest and
 byte-exact drift gate. Actions expose fixed semantic interfaces for Plan operations; grouped work repeats those
 interfaces without generating group-size or output-count variants. Named invocation parameters are recomputed
@@ -206,11 +228,19 @@ explicit cross-Run transfers remain exact-attempt. Qualification independently c
 The workflow can remain byte-identical across routine pin updates when scheduling, labels/interfaces and
 visible policy and required inline action pins stay unchanged. Stable provider scheduling keys do not replace exact executable Plan IDs;
 the complete bundle still requires regeneration and checking.
-Edit locality additionally preserves existing output jobs when an independent output is added. A GitHub
-job is one authority class on one runner for one Build target or publication route. Source fetch, build,
-observation, SBOM and packaging share a producer job; attestation, publication, signing and remote
+Edit locality preserves ordinary output jobs when an independent output is added; shared source selection
+and image publication batches can change membership. A GitHub job is one authority class on one runner,
+normally for one Build target or publication route. Eligible non-owner source fetches, build,
+observation, SBOM and packaging may share a producer job. Shared source owners always run in source-only
+jobs before producer work. Attestation, publication, signing and remote
 verification share a release job with step-scoped credentials. An operation joins a job only when it adds
-no prerequisite. A shared pinned root tool may be an additional prerequisite for a job,
+no prerequisite, except bounded single-platform image publication batches and same-target source-fetch groups.
+Image batches admit acyclic cross-output dependencies and at most two output routes per batch.
+Source-fetch groups may combine acyclic dependencies on different source owners; the job waits for all
+those owners and shares their failure coupling. Each image operation retains its timeout, evidence, signing and credential scope.
+Same-Run source seeds share exact repository/commit/tree acquisition and matching vendor/platform closures;
+every consumer still authenticates its own inputs and waits for the selected owner's vendor operation. Shared source owners finish before producer work.
+A shared pinned root tool may be an additional prerequisite for a job,
 which waits for its acquisition and restoration first. Required aggregate accounting changes,
 and an identical YAML anchor may gain an earlier owner without changing expanded execution. The current Plan determines this projection; previous
 generated files do not supply scheduling state.
@@ -266,6 +296,14 @@ S3 is the first provider. The transport inventory locates original bytes and pro
 and complete verification establish acceptance. It changes neither Build identity nor the original signature
 subject and grants no destination authorization, boot, installation or qualification claim.
 _Avoid_: New signed release, successful upload flag, mutable channel, atomic bucket transaction
+
+**Selective boot-asset publication**:
+Opt-in copy of named QCOW2/EFI bytes and original proofs, with complete OCI Release membership and separate preliminary, completion and selected-artifact receipts. Core APIs are implemented; generated execution and external acceptance remain deferred. [ADR-20](docs/adr/0020-artifact-publication-and-target-configuration.md#selective-boot-asset-publication-and-machineimage-binding) owns the contract.
+_Avoid_: Partial mirror success, new Release, checksum as membership
+
+**MachineImage render artifact**:
+Proposed signed CR artifact for declared disk/architecture/destination pairs. The NVKE catalog owns a separate Go module/template candidate validated against the CRD from pinned NVKE source; NVKR's root module stays agnostic. Production rendering remains unavailable pending authenticated integration and boot acceptance. Its own Build includes byte-affecting serving configuration; its eventual aggregate/content/inventory digests are excluded. Downstream NVKE owns deployment; the artifact grants no registration, placement or disk-selection authority.
+_Avoid_: Final Release root, selected-verification receipt, installed machine
 
 ## Evidence and authority
 
@@ -340,8 +378,15 @@ _Avoid_: Transitive reproduction, majority evidence, semantic reproduction
 
 **Disk inspection scope**:
 The signed statement of whether the exact disk's installed contents were inspected. Producer-provenance
-documents report `nvkr:diskInspection: not-performed`; this supplies no installed inventory. M2 and the M3 MVP
-retain producer-only disk evidence. Strict inspection and material reconciliation are deferred hardening.
+documents report `nvkr:diskInspection: not-performed`; this supplies no installed inventory.
+The implemented `installed-packages-v1` mode binds observed Debian names, versions,
+architectures, vendor and purls to the exact final disk. Maintained NVKE Environments
+retain producer-only evidence until refreshed AMD64/ARM64 appliances preserve vendor
+and their measured pins are recorded. Activation selects package mode for plain disks
+with explicit producer-only FDE overrides. The consumer `packages` floor admits
+package or strict evidence and rejects producer-only members; a mixed FDE Release
+does not meet it. Strict inspection and material reconciliation remain separate
+hardening; package evidence asserts neither file integrity nor material correspondence.
 Embedded-component declarations are optional: omission is not applicable, while any authored declaration must
 match its referenced pinned upstream metadata. That comparison does not establish effective customized or
 installed composition; exact source, patch, configuration and material bindings remain required.

@@ -16,6 +16,7 @@ import (
 	"testing"
 
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/catalog"
+	authored "github.com/dsx-ai-factory/nvkr/pkg/nvkr/definition"
 	e "github.com/dsx-ai-factory/nvkr/pkg/nvkr/errors"
 )
 
@@ -26,7 +27,7 @@ func TestPrepareLocalNVKESourceFreezesCapturedAMD64Graph(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	fixture, commit := controllerCatalogFixture(t, "../../../inputs/catalogs/nvke/release")
+	fixture, commit := controllerCatalogFixture(t, "../../../inputs/catalogs/nvke")
 	source := strings.TrimSuffix(strings.TrimPrefix(os.Getenv("GIT_CONFIG_KEY_0"), "url."), ".insteadOf")
 	if err := os.Symlink(source, source+".git"); err != nil {
 		t.Fatal(err)
@@ -39,22 +40,27 @@ func TestPrepareLocalNVKESourceFreezesCapturedAMD64Graph(t *testing.T) {
 	if err := os.CopyFS(filepath.Join(root, "inputs"), os.DirFS("../../../inputs")); err != nil {
 		t.Fatal(err)
 	}
-	directory := filepath.Join(root, "inputs/catalogs/nvke/native-site")
+	directory := filepath.Join(root, "inputs/catalogs/nvke")
 	lock, err := catalog.LoadLockContext(t.Context(), directory)
 	if err != nil {
 		t.Fatal(err)
 	}
 	originalCommit := lock.Pins["nvke-deploy"].Commit
-	for name := range lock.Pins {
-		pin, err := fixture.SourcePin("nvke")
-		if err != nil {
-			t.Fatal(err)
+	fixturePin, err := fixture.SourcePin("nvke")
+	if err != nil {
+		t.Fatal(err)
+	}
+	for name, pin := range lock.Pins {
+		if strings.TrimSuffix(fixture.Sources[name].Repo, ".git") != localNVKERepository {
+			continue
 		}
+		pin.Commit, pin.TreeHash, pin.SourceDateEpoch = fixturePin.Commit, fixturePin.TreeHash, fixturePin.SourceDateEpoch
 		lock.Pins[name] = pin
 	}
 	for name, pin := range lock.Artifacts {
-		if pin.DerivedFrom == "nvke-deploy@"+originalCommit {
-			pin.DerivedFrom = "nvke-deploy@" + commit
+		owner, old, ok := strings.Cut(pin.DerivedFrom, "@")
+		if ok && (owner == "nvke" || owner == "nvke-deploy") && old == originalCommit {
+			pin.DerivedFrom = owner + "@" + commit
 			lock.Artifacts[name] = pin
 		}
 	}
@@ -99,6 +105,18 @@ func TestPrepareLocalNVKESourceFreezesCapturedAMD64Graph(t *testing.T) {
 	if err := os.WriteFile(overlayPath, rawOverlay, 0600); err != nil {
 		t.Fatal(err)
 	}
+	// Exercise an implicit candidate from a stack different from the shared tools.
+	definition, err := authored.LoadDefinition(t.Context(), definitionPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for i := range definition.Outputs {
+		if definition.Outputs[i].Name == "nvke-controller" {
+			definition.Catalogs = []authored.Catalog{*definition.Outputs[i].Catalog}
+			definition.Outputs[i].Catalog = nil
+		}
+	}
+	writeSnapshotFixtureDocument(t, root, definitionPath, definition)
 	original, err := os.ReadFile(definitionPath)
 	if err != nil {
 		t.Fatal(err)
@@ -135,10 +153,11 @@ func TestPrepareLocalNVKESourceFreezesCapturedAMD64Graph(t *testing.T) {
 			catalogFetches++
 		}
 	}
-	// Nine site outputs share the same pinned metadata catalog. Preparation must
-	// authenticate that stack once, rather than fetch it again for each output.
-	if catalogFetches != 1 {
-		t.Fatalf("shared catalog fetched %d times, want once per preparation", catalogFetches)
+	// The shared NVKE domain has two pin-set owners and two admitted stacks:
+	// the profile output selects the base, while site outputs select the nightly
+	// overlay. Authenticate each owner once per stack, not per selecting output.
+	if catalogFetches != 4 {
+		t.Fatalf("shared catalog fetched %d times, want two pin-set owners per admitted stack", catalogFetches)
 	}
 	after, _, err := CaptureCompileFiles(t.Context(), root, prepared.Definition, prepared.Environment, "source-test")
 	if err != nil {

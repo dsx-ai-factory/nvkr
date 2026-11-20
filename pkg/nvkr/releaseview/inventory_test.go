@@ -4,8 +4,11 @@
 package releaseview
 
 import (
+	"bytes"
 	"encoding/json"
 	"errors"
+	"os"
+	"slices"
 	"strings"
 	"testing"
 
@@ -69,6 +72,76 @@ func TestArtifactInventory(t *testing.T) {
 				if strings.Contains(item.Reference, "@") || !strings.HasPrefix(item.Reference, "oci://") {
 					t.Fatal(item)
 				}
+			}
+		})
+	}
+}
+
+func TestArtifactInventorySelection(t *testing.T) {
+	description, err := Describe(descriptionFixture(), Options{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	full, err := ArtifactInventory(description)
+	if err != nil {
+		t.Fatal(err)
+	}
+	golden, err := os.ReadFile("testdata/artifact-inventory.json")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !bytes.Equal(full, golden) {
+		t.Fatal("unfiltered inventory changed")
+	}
+	var original struct {
+		Artifacts []json.RawMessage `json:"artifacts"`
+	}
+	if err := json.Unmarshal(full, &original); err != nil {
+		t.Fatal(err)
+	}
+	for _, tc := range []struct {
+		name           string
+		selected, want []string
+		code           e.Code
+	}{
+		{"single", []string{"image"}, []string{"image"}, ""},
+		{"multiple sorted", []string{"multi", "chart"}, []string{"chart", "multi"}, ""},
+		{"duplicate", []string{"image", "image"}, []string{"image"}, ""},
+		{"unknown", []string{"image", "missing"}, nil, e.CodeUsage},
+		{"empty name", []string{""}, nil, e.CodeUsage},
+		{"unsupported", []string{"tools"}, nil, e.CodeEngineCapability},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			raw, err := ArtifactInventory(description, tc.selected...)
+			if tc.code != "" {
+				var coded *e.Error
+				if !errors.As(err, &coded) || coded.Code != tc.code || len(raw) != 0 || !strings.Contains(err.Error(), tc.selected[len(tc.selected)-1]) {
+					t.Fatalf("output=%s err=%v", raw, err)
+				}
+				return
+			}
+			if err != nil {
+				t.Fatal(err)
+			}
+			var got struct {
+				Artifacts []json.RawMessage `json:"artifacts"`
+			}
+			if err := json.Unmarshal(raw, &got); err != nil {
+				t.Fatal(err)
+			}
+			var names []string
+			for _, entry := range got.Artifacts {
+				var item inventoryIdentity
+				if err := json.Unmarshal(entry, &item); err != nil {
+					t.Fatal(err)
+				}
+				names = append(names, item.Name)
+				if !slices.ContainsFunc(original.Artifacts, func(candidate json.RawMessage) bool { return bytes.Equal(entry, candidate) }) {
+					t.Fatalf("entry changed: %s", entry)
+				}
+			}
+			if !slices.Equal(names, tc.want) {
+				t.Fatalf("names=%v want=%v", names, tc.want)
 			}
 		})
 	}

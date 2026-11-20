@@ -238,18 +238,64 @@ SBOM inputs. Missing payloads, missing scanner pins, unsupported formats, mismat
 empty inventories fail closed. Without `sbomTool`, ordinary non-bundle declaration-only documents provide source
 metadata; they do not claim dependency inspection. The separate full-disk profile pins its own scanner
 and does not require a second catalog scanner selection; when both select the same native platform their
-pins must agree. A catalog scanner for another platform does not replace the native inspection-profile pin.
+pins must agree for strict content inspection. Package-only inspection retains the
+complete frozen appliance profile but does not invoke its full-content scanner or
+require that scanner to match the Definition scanner. A catalog scanner for another
+platform does not replace the native inspection-profile pin.
 
-The pipeline-attested M2 producer-provenance route explicitly selects `Environment.diskEvidence: build-provenance-v1`.
+The pipeline-attested NVKE producer-provenance route explicitly selects `Environment.diskEvidence: build-provenance-v1`.
 It retains the original held disk, exact producer results and authenticated transitive material handoffs,
 and publishes source-bound per-component CycloneDX producer documents under the existing signed evidence
 closure. These documents have no inspected dependency inventory and explicitly bind `nvkr:diskEvidence`
 to `build-provenance-v1` and `nvkr:diskInspection` to `not-performed`. The signed release disk binding carries
 the same evidence mode. Producer integrity, provenance, every component slot and release completeness remain
 mandatory. This is pipeline-attested producer evidence, not an inspected inventory or qualified evidence.
-The approved initial scope
-retains this producer-only disk evidence. Deep disk/content inspection and material-to-filesystem reconciliation
-are deferred hardening.
+This remains the maintained evidence contract until the appliance refresh below. The plain-disk extension
+adds installed-package inventory; deep content/material reconciliation remains separate.
+
+The pipeline-attested `installed-packages-v1` mode inventories the package database of
+the exact final, unencrypted QCOW2 through the existing pinned, offline, non-root
+inspection appliance. Factory retains the original live producer and named-output
+binding through inspection and the existing no-replace package/evidence transaction.
+Empty inventories, missing names/versions/architectures, conflicting package identities,
+changed subject/tool bytes and inspection failures fail closed. This mode does not
+require material content scans or acquisition-to-package correspondence.
+
+Its deterministic CycloneDX root is an `operating-system` bound to the QCOW2 digest,
+Build and source subject. Components carry the observed Debian name, version and
+architecture, with a deb purl and `nvkr:packageArchitecture`/`nvkr:packageFormat`/`nvkr:packageVendor`
+properties. The vendor comes from the inspected OS's distro field, never a catalog or package-version guess.
+Purls use `pkg:deb/<vendor>/<name>@<version>?arch=<arch>`, retaining the epoch colon
+and percent-encoding literal plus signs. Missing vendor fails publication. No distro-release
+qualifier is emitted because this projection does not observe a canonical release identifier.
+The reader's separate epoch/version/release fields are rejoined without
+discarding revision suffixes; epoch zero is implicit. Metadata binds
+`nvkr:diskEvidence=installed-packages-v1`, `nvkr:diskInspection=installed-packages`,
+`nvkr:dependencyInspection=disk-installed-packages/v1`, inspector/codec executable
+digests and the observed appliance image identity. The inspection method's scanner
+pin is the inspector executable. A selected produced helper retains its exact
+component, Build and executable identity. Other material documents retain explicit
+producer-only scope. The existing `attest-sboms` path signs these exact subjects.
+This is package-database inventory, not file coverage, package-file integrity,
+embedded-container coverage, material reconciliation, vulnerability clearance or
+qualified reproduction.
+
+`Environment.diskEvidence` selects the default; `diskEvidenceOverrides` maps exact
+resolved disk output names to explicit modes. Unknown/non-disk override names fail
+admission. An empty mode retains strict inspection. Maintained NVKE Environments
+retain `build-provenance-v1`: their currently pinned appliances embed a helper that
+does not report the observed distro. Activation requires publishing refreshed AMD64
+and ARM64 appliances through an authorized toolchain route, recording their measured
+pins in development, production and nightly Environments, selecting `installed-packages-v1`,
+and explicitly overriding each LUKS2 output with `build-provenance-v1`. Until then,
+requesting package evidence from an old helper fails closed rather than publishing
+vendor-less purls. Requesting package or strict inspection for LUKS2 fails before
+producer work; inspection failure never downgrades evidence. The current producer
+has no authenticated plaintext-to-final-ciphertext inventory handoff, and a sibling
+plain image cannot establish the FDE image's contents. Pre-encryption inventory
+and decrypted FDE inspection remain unsupported. This extension changes no hosted
+privileges or guest-execution policy. External publication acceptance is recorded
+separately in reconciliation.
 
 Under the current scope, embedded-component declarations are optional: omission is not
 applicable, while any authored declaration must match its referenced upstream manifest at the pinned commit. This checks source-metadata consistency only;
@@ -265,10 +311,14 @@ Unknown modes fail closed; an omitted producer mode retains the strict contract.
 declared mode and reject invented inspection claims. Consumer acceptance is separately controlled by
 `VerificationPolicy.minimumDiskEvidence`, included in the policy digest. For `pipeline-attested`, an omitted
 value defaults to `build-provenance-v1`, admitting producer-only evidence and stricter inspected evidence;
-explicit `strict` rejects producer-only evidence. Qualified policy defaults to strict and rejects the
-producer-only minimum. Producer metadata cannot lower the consumer's selected minimum. Mode changes
-affect Environment/Plan and signed release metadata, not raw payload identity. Only the explicit native ARC
-publication route admits this mode.
+explicit `packages` accepts package-only or strict evidence and rejects producer-only
+members; `strict` accepts only reconciled evidence. A mixed Release with producer-only
+FDE members cannot satisfy the packages floor. Qualified policy defaults to strict and
+rejects weaker minima. Producer metadata cannot lower the consumer's selected minimum.
+Old readers reject the new mode rather than reinterpret it. Mode changes affect
+Environment/Plan, generated bundles, SBOM/index/attestation and enclosing signed
+publication identities; they do not change the logical producer Build or unchanged
+QCOW2/wrapper bytes. Only the explicit native ARC publication route admits these modes.
 
 The strict `disk-image` inspection route requires a full CycloneDX inventory whose subject is the
 exact delivered QCOW2 payload digest. It combines an authenticated trace of every fetched or built material with

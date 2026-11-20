@@ -1,0 +1,60 @@
+{
+  "buildDigest": "sha256:caf590fbe9bebce50c9ec79cd719d3d40a3ac98ec85a50440742e2f3fa031425",
+  "catalogDigest": "sha256:f632d51a8e58b5728e8900b24370cff90c875bac0b3d250d7cb700dc03604d87",
+  "components": [
+    "nktp-collector-image"
+  ],
+  "executionGraph": {
+    "nodes": [
+      {
+        "artifact": "otel/opentelemetry-collector-k8s:0.164.0",
+        "component": "nktp-collector-image",
+        "digest": "sha256:d02f91eae487d99cfad338ca4a7d12ac108c9dd18e8c3a80950d70dceabd87ec",
+        "id": "pull-nktp-collector-image",
+        "imageParentDigest": "sha256:8f7e5aaac0302f090164d5f9c14e4437d8037c5aaa2d025fc3ad74c1922602eb",
+        "kind": "pull",
+        "network": "default",
+        "outputType": "oci-image",
+        "platform": "linux/arm64",
+        "version": "0.1.0"
+      },
+      {
+        "id": "verify",
+        "kind": "verify",
+        "needs": [
+          "pull-nktp-collector-image"
+        ]
+      }
+    ],
+    "platform": "linux/arm64",
+    "schemaVersion": "nvkr.dev/ir/v4"
+  },
+  "name": "nktp-collector-image-arm64",
+  "platform": "linux/arm64",
+  "resolvedComponents": [
+    {
+      "Name": "nktp-collector-image",
+      "commit": "a97548c56d101b41740e8a00e273166c84b442e7",
+      "fromSource": false,
+      "outputType": "oci-image",
+      "platforms": [
+        "linux/amd64",
+        "linux/arm64"
+      ],
+      "prebuilt": {
+        "digests": {
+          "amd64": "sha256:25510edb4dff3810d3dd7542db4d396ce0d870b2f57d32c93a8dcd6dde2677b6",
+          "arm64": "sha256:d02f91eae487d99cfad338ca4a7d12ac108c9dd18e8c3a80950d70dceabd87ec"
+        },
+        "evidence": {
+          "none": true
+        },
+        "image": "otel/opentelemetry-collector-k8s:0.164.0",
+        "imageParentDigest": "sha256:8f7e5aaac0302f090164d5f9c14e4437d8037c5aaa2d025fc3ad74c1922602eb"
+      },
+      "repo": "https://github.com/dsx-ai-factory/nvke-telemetry-pipeline",
+      "sourceDateEpoch": 1793913052,
+      "tag": "nktp/v0.1.0"
+    }
+  ]
+}

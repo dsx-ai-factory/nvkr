@@ -316,7 +316,7 @@ func TestGitHubInputRestoreCommandRemainsCompactForLargeGraph(t *testing.T) {
 			artifacts, jobs := map[string]Artifact{}, map[string]string{}
 			var inputs []string
 			for i := range count {
-				id := fmt.Sprintf("result/cwe/linux/arm64/component-%03d", i)
+				id := fmt.Sprintf("result/nvke-controller/linux/arm64/component-%03d", i)
 				inputs = append(inputs, id)
 				artifact := Artifact{ID: id, Name: id, Path: ".nvkr/factory/" + id, Producer: "producer/" + id}
 				artifacts[id], jobs[artifact.Producer] = artifact, "job-"+id

@@ -23,7 +23,7 @@ import (
 
 func maintainedPlan(t *testing.T) *factory.Plan {
 	t.Helper()
-	plan, err := factory.LoadPlanContext(t.Context(), "../../../.github/nvkr-run/plan.json")
+	plan, err := factory.LoadPlanContext(t.Context(), "../../../.github/nvkr-run-nvke/plan.json")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -65,6 +65,13 @@ func TestInspectionPreservesCanonicalIdentityAndOwnsSnapshot(t *testing.T) {
 			if err != nil || !bytes.Equal(raw, again) {
 				t.Fatalf("unstable view: %v", err)
 			}
+			if test.format == "text" {
+				for _, build := range plan.Builds {
+					if build.SelectedCatalog != nil && (!bytes.Contains(raw, []byte("catalog: "+jsonDisplay(build.SelectedCatalog.Base))) || !bytes.Contains(raw, []byte("digest="+build.CatalogDigest))) {
+						t.Fatal("inspection omitted selected catalog")
+					}
+				}
+			}
 			if test.format == "json" {
 				if !test.pretty && !bytes.Equal(raw, original) {
 					t.Fatal("canonical output differs from stored bytes")
@@ -81,7 +88,7 @@ func TestInspectionPreservesCanonicalIdentityAndOwnsSnapshot(t *testing.T) {
 					t.Fatal("pretty view became an accepted canonical Plan")
 				}
 			} else {
-				for _, want := range []string{"Producer instructions", "Artifact operations", "Publication routes", "controller-chart", "cwe", "argv:", "image bindings:", "no runtime observations"} {
+				for _, want := range []string{"Producer instructions", "Artifact operations", "Publication routes", "controller-chart", "nvke-controller", "argv:", "image bindings:", "no runtime observations"} {
 					if !strings.Contains(string(raw), want) {
 						t.Fatalf("view omits %q", want)
 					}
@@ -106,7 +113,7 @@ func TestInspectionRejectsInvalidCompletePlans(t *testing.T) {
 		code   e.Code
 	}{
 		{"stale definition", func(p *factory.Plan) { p.Definition.Metadata.Description = "replaced" }, e.CodeUnverifiedRef},
-		{"dangling edge", func(p *factory.Plan) { p.Graph.Nodes[0].Inputs = []string{"absent"} }, e.CodePipelineDrift},
+		{"dangling edge", func(p *factory.Plan) { p.Graph.Nodes[0].Inputs = []string{"absent"} }, e.CodeInvalidCatalog},
 		{"producer substitution", func(p *factory.Plan) {
 			// Select a command-producing node by kind, not the first output:
 			// acquired outputs may legitimately precede source builds.
@@ -152,7 +159,7 @@ func TestLoadRejectsAlternateBytesAndUnsafeFiles(t *testing.T) {
 		raw     []byte
 		symlink bool
 	}{
-		{"pretty", pretty, false}, {"trailing newline", append(bytes.Clone(doc.raw), '\n'), false}, {"unknown version", bytes.ReplaceAll(doc.raw, []byte(factory.PlanSchemaVersion), []byte("nvkr.dev/run-plan/v99")), false},
+		{"pretty", pretty, false}, {"trailing newline", append(bytes.Clone(doc.raw), '\n'), false}, {"unknown version", bytes.ReplaceAll(doc.raw, []byte(doc.plan.SchemaVersion), []byte("nvkr.dev/run-plan/v99")), false},
 		{"unknown field", append([]byte(`{"unknown":true,`), doc.raw[1:]...), false}, {"duplicate key", append([]byte(`{"name":"duplicate",`), doc.raw[1:]...), false},
 		{"symlink", doc.raw, true}, {"oversize", bytes.Repeat([]byte(" "), int(factory.MaxPlanBytes+1)), false},
 	} {
@@ -232,4 +239,16 @@ func comparisonPlan(t *testing.T, change func(*catalog.Catalog, *definition.Defi
 		t.Fatal(err)
 	}
 	return plan
+}
+
+func TestInspectionEscapesCatalogLocator(t *testing.T) {
+	doc := inspectPlan(t, comparisonPlan(t, nil))
+	doc.plan.Builds[0].SelectedCatalog = &definition.Catalog{Base: "catalog\x1b[2J"}
+	raw, err := doc.Render(PlanOptions{Format: "text"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if bytes.Contains(raw, []byte{0x1b}) || !bytes.Contains(raw, []byte(`"catalog\u001b[2J"`)) {
+		t.Fatal("catalog locator was not escaped")
+	}
 }

@@ -81,8 +81,8 @@ func TestImagePinExactParentSurvivesTagMovement(t *testing.T) {
 
 // Opt-in external metadata read-back uses the existing anonymous HTTPS owner.
 // It never writes a lock, fetches image layers, or grants source/release approval.
-func TestMaintainedM2ImageParentReadback(t *testing.T) {
-	if os.Getenv("NVKR_TEST_M2_IMAGE_PARENT_READBACK") != "1" {
+func TestMaintainedNVKEImageParentReadback(t *testing.T) {
+	if os.Getenv("NVKR_TEST_NVKE_IMAGE_PARENT_READBACK") != "1" {
 		t.Skip("explicit external metadata read-back was not requested")
 	}
 	provider := Dir(filepath.Join("..", "..", "..", "inputs/catalogs/runtime-dependencies")).(ContextDataProvider)

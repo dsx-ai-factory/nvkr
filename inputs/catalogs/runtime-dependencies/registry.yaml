@@ -4,7 +4,7 @@
 apiVersion: nvkr.dev/catalog/v3
 kind: SourceBuildRegistry
 metadata:
-  name: nvke-m2-deployment-images
+  name: runtime-dependencies
   description: Acquired runtime images selected by pinned NVKE deployment values and exact acquired chart payloads; not chart default deployment topology.
 components:
   csi-node-driver-registrar-image:

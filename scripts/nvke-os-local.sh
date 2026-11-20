@@ -89,8 +89,8 @@ command -v jq >/dev/null 2>&1 || {
 }
 definition_source="inputs/definitions/diagnostics/os-${arch}.yaml"
 environment_source="inputs/environments/local-linux-${arch}-kvm.yaml"
-catalog_source="inputs/catalogs/node-images/diagnostic"
-definition_catalog='../../catalogs/node-images/diagnostic'
+catalog_source="inputs/catalogs/node-images"
+definition_catalog='../../catalogs/node-images'
 definition_overlays='[]'
 overlay_source=""
 ubuntu_overlay_source=""
@@ -100,10 +100,10 @@ if [[ "${arch}" == arm64 ]]; then
 fi
 if [[ "${ubuntu_version}" == 24.04 ]]; then
   definition_source="inputs/definitions/diagnostics/ubuntu24/definition-${arch}.yaml"
-  catalog_source="inputs/catalogs/node-images/release"
+  catalog_source="inputs/catalogs/node-images"
   overlay_source="inputs/catalogs/node-images/variants/native-toolchains.yaml"
   ubuntu_overlay_source="inputs/catalogs/node-images/variants/ubuntu24.json"
-  definition_catalog='../../../catalogs/node-images/release'
+  definition_catalog='../../../catalogs/node-images'
   definition_overlays='["../../../catalogs/node-images/variants/native-toolchains.yaml","../../../catalogs/node-images/variants/ubuntu24.json"]'
 fi
 required_inputs=("${definition_source}" "${environment_source}"

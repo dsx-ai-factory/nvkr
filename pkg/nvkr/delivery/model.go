@@ -15,7 +15,6 @@ import (
 
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/canonical"
 	e "github.com/dsx-ai-factory/nvkr/pkg/nvkr/errors"
-	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/sbom"
 	"github.com/google/go-containerregistry/pkg/v1/types"
 )
 
@@ -56,18 +55,27 @@ type BinaryEntry struct {
 // BinaryBundle is the canonical semantic config carried by a binary-bundle OCI
 // artifact. The tar layer must reproduce this exact ordered entry set.
 type BinaryBundle struct {
-	SchemaVersion    string        `json:"schemaVersion"`
-	OS               string        `json:"os"`
-	Arch             string        `json:"arch"`
-	Purpose          string        `json:"purpose"`
-	ReleaseSetDigest string        `json:"releaseSetDigest,omitempty"`
-	InventoryDigest  string        `json:"inventoryDigest,omitempty"`
-	Entries          []BinaryEntry `json:"entries"`
+	SchemaVersion    string             `json:"schemaVersion"`
+	OS               string             `json:"os"`
+	Arch             string             `json:"arch"`
+	Purpose          string             `json:"purpose"`
+	ReleaseSetDigest string             `json:"releaseSetDigest,omitempty"`
+	InventoryDigest  string             `json:"inventoryDigest,omitempty"`
+	Entries          []BinaryEntry      `json:"entries"`
+	Boot             *BinaryBootBinding `json:"boot,omitempty"`
 }
 
 func (bundle BinaryBundle) Validate() error {
-	if bundle.SchemaVersion != BinaryBundleSchemaVersion {
+	if bundle.SchemaVersion != BinaryBundleSchemaVersion && bundle.SchemaVersion != BinaryBootSchemaVersion {
 		return e.New(e.CodeVerifyFailed, "binary bundle schemaVersion %q is unsupported", bundle.SchemaVersion)
+	}
+	if bundle.SchemaVersion == BinaryBundleSchemaVersion && bundle.Boot != nil {
+		return e.New(e.CodeVerifyFailed, "binary bundle v1 cannot carry boot-profile claims")
+	}
+	if bundle.SchemaVersion == BinaryBootSchemaVersion {
+		if err := validateBinaryBootBinding(bundle.Boot, bundle.Purpose, bundle.OS, bundle.Arch); err != nil {
+			return err
+		}
 	}
 	if !canonicalToken(bundle.OS) || !canonicalToken(bundle.Arch) || !canonicalToken(bundle.Purpose) {
 		return e.New(e.CodeInvalidCatalog, "binary bundle os, arch, and purpose must be canonical non-empty values")
@@ -83,6 +91,7 @@ func (bundle BinaryBundle) Validate() error {
 	}
 	previous := ""
 	paths := map[string]bool{}
+	bootFound := false
 	for _, entry := range bundle.Entries {
 		if !canonicalToken(entry.Name) || strings.ContainsAny(entry.Name, "/\\") || entry.Name <= previous || !validInstallPath(entry.InstallPath) ||
 			entry.Mode == 0 || entry.Mode > 0o777 || !isDigest(entry.SHA256) || entry.Size < 0 || paths[entry.InstallPath] {
@@ -90,6 +99,12 @@ func (bundle BinaryBundle) Validate() error {
 		}
 		paths[entry.InstallPath] = true
 		previous = entry.Name
+		if bundle.Boot != nil && entry.Name == bundle.Boot.Member {
+			bootFound = entry.Size > 0
+		}
+	}
+	if bundle.Boot != nil && !bootFound {
+		return e.New(e.CodeVerifyFailed, "binary bundle boot binding requires an exact nonempty regular member")
 	}
 	return nil
 }
@@ -165,8 +180,8 @@ func (root PublicationRoot) Validate() error {
 			}
 		}
 		for _, object := range root.Objects {
-			if object.Output != nil && object.Output.Disk != nil && object.Output.Disk.EvidenceMode == sbom.DiskBuildProvenance {
-				return e.New(e.CodeGateUnmet, "qualified publication root cannot accept producer-provenance-only disk output %q", object.Name)
+			if object.Output != nil && object.Output.Disk != nil && object.Output.Disk.EvidenceMode != "" {
+				return e.New(e.CodeGateUnmet, "qualified publication root requires strict disk evidence for output %q", object.Name)
 			}
 		}
 	default:

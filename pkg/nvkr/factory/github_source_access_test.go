@@ -29,8 +29,7 @@ func TestNightlyOVNFetchIsAnonymous(t *testing.T) {
 	for _, test := range []struct {
 		profile, source string
 	}{
-		{"nvke-nightly-arm64", "https://github.com/dsx-ai-factory/ovn-kubernetes"},
-		{"nvke-nightly-upstream-ovn-arm64", "https://github.com/ovn-kubernetes/ovn-kubernetes"},
+		{"nvke-nightly", "https://github.com/dsx-ai-factory/ovn-kubernetes"},
 	} {
 		t.Run(test.profile, func(t *testing.T) {
 			root := "../../.."
@@ -250,6 +249,7 @@ func TestGitHubSourceRefusesEmptyCredential(t *testing.T) {
 
 func TestMaintainedPinSetCatalogCredentials(t *testing.T) {
 	testutil.RequireExtended(t)
+	nvkeSplitRepository(t)
 	for _, fixture := range []struct {
 		name, bundle string
 		pinSet       bool
@@ -262,11 +262,15 @@ func TestMaintainedPinSetCatalogCredentials(t *testing.T) {
 		{"disks-ubuntu24", "nvkr-run-nvke-disks-ubuntu24", false},
 	} {
 		t.Run(fixture.name, func(t *testing.T) {
-			plan, err := LoadPlanContext(t.Context(), "../../../.github/"+fixture.bundle+"/plan.json")
-			if err != nil {
-				t.Fatal(err)
+			var plan *Plan
+			if fixture.name == "combined" {
+				plan = nvkeCombinedPlan(t)
+			} else {
+				plan = nvkeFamilyPlan(t, fixture.name)
 			}
-			addTestSourceCredential(t, plan)
+			if fixture.pinSet {
+				addTestSourceCredential(t, plan)
+			}
 			wantRepositories := map[string]bool{}
 			if fixture.pinSet {
 				wantRepositories["https://github.com/dsx-ai-factory/nvke"] = true

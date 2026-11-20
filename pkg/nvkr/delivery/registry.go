@@ -8,11 +8,17 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
+	"net/url"
 	"os"
+	"path"
+	"slices"
 	"sort"
 	"strings"
+	"sync/atomic"
 	"time"
 
+	"github.com/dsx-ai-factory/nvkr/internal/httptrust"
+	"github.com/dsx-ai-factory/nvkr/internal/readbudget"
 	e "github.com/dsx-ai-factory/nvkr/pkg/nvkr/errors"
 	"github.com/google/go-containerregistry/pkg/authn"
 	"github.com/google/go-containerregistry/pkg/name"
@@ -30,6 +36,25 @@ type RegistryOptions struct {
 	Anonymous bool
 	Username  string
 	Password  string
+	// IsolatedTransport selects a fresh standard TLS transport rather than the
+	// process-mutable upstream default. It does not alter registry credentials.
+	IsolatedTransport bool
+	// CertificateAuthority optionally selects exact PEM trust for the isolated
+	// route. Default, non-isolated registry behavior is unchanged.
+	CertificateAuthority string
+	// Authority restricts authenticated traffic to the selected registry and
+	// its token endpoint. It is descriptive and grants no provider authority.
+	Authority *RegistryAuthority
+}
+
+type RegistryAuthority struct {
+	RegistryHost  string
+	TokenEndpoint string
+	Repositories  []string
+}
+
+func (authority *RegistryAuthority) enabled() bool {
+	return authority != nil
 }
 
 // Push publishes a complete verified OCI layout to a Distribution-compatible
@@ -43,7 +68,16 @@ func Push(ctx context.Context, layoutPath, reference string, options RegistryOpt
 // explicit image discovery tags. Tags do not establish signer or release authority.
 func PushWithOptions(ctx context.Context, layoutPath, reference string, request PushOptions) (published string, resultErr error) {
 	ctx, observer := observeRegistry(ctx)
-	defer func(observedCtx context.Context) { resultErr = observer.explain(observedCtx, resultErr) }(ctx)
+	publication := &registryPublicationProgress{}
+	if ctx != nil {
+		ctx = context.WithValue(ctx, registryPublicationProgressKey{}, publication)
+	}
+	defer func(observedCtx context.Context) {
+		resultErr = observer.explain(observedCtx, resultErr)
+		if publication.writeAttempted.Load() {
+			resultErr = uncertainRegistryPublication(resultErr)
+		}
+	}(ctx)
 	options := request.Registry
 	if err := deliveryContext(ctx); err != nil {
 		return "", err
@@ -54,6 +88,21 @@ func PushWithOptions(ctx context.Context, layoutPath, reference string, request 
 	// followed by tag admission, before Inspect or any registry operation.
 	if err := request.Validate(); err != nil {
 		return "", err
+	}
+	// An isolated caller must refuse an insecure endpoint before opening any
+	// publication bytes. Keep the established ordering of ordinary callers.
+	if options.IsolatedTransport {
+		repo, err := name.NewRepository(reference, name.StrictValidation)
+		if err != nil {
+			tag, tagErr := name.NewTag(reference, name.StrictValidation)
+			if tagErr != nil {
+				return "", e.New(e.CodeUsage, "isolated registry transport requires an HTTPS reference")
+			}
+			repo = tag.Context()
+		}
+		if repo.Scheme() != "https" || (options.Authority.enabled() && repo.RegistryStr() != options.Authority.RegistryHost) {
+			return "", e.New(e.CodeUsage, "isolated registry transport requires an HTTPS reference")
+		}
 	}
 	inspection, err := Inspect(ctx, layoutPath)
 	if err != nil {
@@ -80,6 +129,9 @@ func PushWithOptions(ctx context.Context, layoutPath, reference string, request 
 	}
 	if err != nil {
 		return "", e.Wrap(e.CodeUsage, err, "parsing OCI publication tag %q", reference)
+	}
+	if options.IsolatedTransport && (ref.Context().Scheme() != "https" || (options.Authority.enabled() && ref.Context().RegistryStr() != options.Authority.RegistryHost)) {
+		return "", e.New(e.CodeUsage, "isolated registry transport requires an HTTPS reference")
 	}
 	path, err := layout.FromPath(layoutPath)
 	if err != nil {
@@ -194,6 +246,9 @@ func Pull(ctx context.Context, reference, out string, options RegistryOptions) (
 	ref, err := name.NewDigest(reference, parseOptions...)
 	if err != nil {
 		return Inspection{}, e.Wrap(e.CodeUnpinnedSource, err, "parsing digest-pinned publication reference")
+	}
+	if options.IsolatedTransport && (ref.Context().Scheme() != "https" || (options.Authority.enabled() && ref.Context().RegistryStr() != options.Authority.RegistryHost)) {
+		return Inspection{}, e.New(e.CodeUsage, "isolated registry transport requires an HTTPS reference")
 	}
 	return pullWithRecovery(ctx, out, func(attemptCtx context.Context, stage string) (Inspection, error) {
 		return pullToStage(attemptCtx, ref, stage, options)
@@ -407,9 +462,12 @@ func helmTagPublishError(err error, tag name.Tag, chart string) error {
 // push, pull, and resolve paths.
 func registryOptions(ctx context.Context, options RegistryOptions) []remote.Option {
 	remoteOptions := []remote.Option{remote.WithContext(ctx), remote.WithUserAgent("nvkr/delivery")}
+	progress, _ := ctx.Value(registryPublicationProgressKey{}).(*registryPublicationProgress)
+	base := readbudget.Transport(ctx, registryTransportWithProgress(ctx, options, progress))
 	if observer, ok := ctx.Value(registryObserverKey{}).(*registryObserver); ok {
-		remoteOptions = append(remoteOptions, remote.WithTransport(observer.transport(remote.DefaultTransport)))
+		base = observer.transport(base)
 	}
+	remoteOptions = append(remoteOptions, remote.WithTransport(base))
 	switch {
 	case options.Anonymous:
 		return append(remoteOptions, remote.WithAuth(authn.Anonymous))
@@ -420,6 +478,220 @@ func registryOptions(ctx context.Context, options RegistryOptions) []remote.Opti
 	default:
 		return append(remoteOptions, remote.WithAuthFromKeychain(options.AmbientKeychain()))
 	}
+}
+
+// All remote writes in one Push share this operation-phase observation. A
+// later local integrity failure must retain uncertainty from earlier uploads.
+type registryPublicationProgressKey struct{}
+type registryPublicationProgress struct{ writeAttempted atomic.Bool }
+type registryPublicationProgressTransport struct {
+	base     http.RoundTripper
+	progress *registryPublicationProgress
+}
+
+func (tracked registryPublicationProgressTransport) RoundTrip(request *http.Request) (*http.Response, error) {
+	switch request.Method {
+	case http.MethodPost, http.MethodPatch, http.MethodPut:
+		tracked.progress.writeAttempted.Store(true)
+	}
+	return tracked.base.RoundTrip(request)
+}
+
+func registryWriteAttempted(ctx context.Context) bool {
+	progress, ok := ctx.Value(registryPublicationProgressKey{}).(*registryPublicationProgress)
+	return ok && progress.writeAttempted.Load()
+}
+
+func registryTransport(ctx context.Context, options RegistryOptions) http.RoundTripper {
+	return registryTransportWithProgress(ctx, options, nil)
+}
+
+func registryTransportWithProgress(ctx context.Context, options RegistryOptions, progress *registryPublicationProgress) http.RoundTripper {
+	base := remote.DefaultTransport
+	if options.IsolatedTransport {
+		isolated, err := httptrust.NewTransport(ctx, options.CertificateAuthority)
+		if err != nil {
+			return httpsRegistryTransport{admissionErr: err}
+		}
+		isolated.DisableKeepAlives = true
+		isolated.MaxIdleConnsPerHost = 50
+		base = isolated
+	}
+	if progress != nil {
+		// Observe only a request admitted to the network transport. Wrapping
+		// outside HTTPS admission would count a locally refused POST as a write.
+		base = registryPublicationProgressTransport{base: base, progress: progress}
+	}
+	if options.IsolatedTransport {
+		return newHTTPSRegistryTransport(base, options.Authority)
+	}
+	return base
+}
+
+// Enforce HTTPS for every request, including redirects followed by net/http.
+type httpsRegistryTransport struct {
+	base               http.RoundTripper
+	authority          *RegistryAuthority
+	tokenEndpoint      *url.URL
+	repositoryPrefixes []string
+	allowedScopes      map[string]bool
+	admissionErr       error
+}
+
+// Freeze and parse the caller's scope once. Request processing only consults
+// this immutable snapshot, including when the HTTP client follows redirects.
+func newHTTPSRegistryTransport(base http.RoundTripper, authority *RegistryAuthority) httpsRegistryTransport {
+	scoped := httpsRegistryTransport{base: base}
+	if authority == nil {
+		return scoped
+	}
+	copy := *authority
+	copy.Repositories = slices.Clone(authority.Repositories)
+	scoped.authority = &copy
+	endpoint, err := url.Parse(copy.TokenEndpoint)
+	if err != nil {
+		scoped.admissionErr = e.New(e.CodeTrustPolicyMissing, "registry token endpoint is invalid")
+		return scoped
+	}
+	scoped.tokenEndpoint = endpoint
+	scoped.allowedScopes = make(map[string]bool, 2*len(copy.Repositories))
+	for _, selected := range copy.Repositories {
+		repo, err := name.NewRepository(selected, name.StrictValidation)
+		if err != nil || repo.RegistryStr() != copy.RegistryHost {
+			scoped.admissionErr = e.New(e.CodeTrustPolicyMissing, "registry scope is invalid")
+			return scoped
+		}
+		for _, endpoint := range []string{"blobs", "manifests", "referrers", "tags"} {
+			scoped.repositoryPrefixes = append(scoped.repositoryPrefixes, "/v2/"+repo.RepositoryStr()+"/"+endpoint+"/")
+		}
+		scoped.allowedScopes[repo.Scope(transport.PullScope)] = true
+		scoped.allowedScopes[repo.Scope(transport.PushScope)] = true
+	}
+	return scoped
+}
+
+func (scoped httpsRegistryTransport) RoundTrip(request *http.Request) (*http.Response, error) {
+	// RoundTripper owns Body even when admission refuses before the base is called.
+	refuse := func(err error) (*http.Response, error) {
+		if request.Body != nil {
+			_ = request.Body.Close()
+		}
+		return nil, err
+	}
+	if request.URL == nil || request.URL.Scheme != "https" {
+		return refuse(e.New(e.CodeUsage, "isolated registry transport requires HTTPS"))
+	}
+	if scoped.admissionErr != nil {
+		return refuse(scoped.admissionErr)
+	}
+	if scoped.authority.enabled() {
+		// Check redirect history before ordinary registry admission: delegated
+		// storage cannot redirect back into the registry's credential authority.
+		if request.Response != nil && request.Response.Request != nil {
+			source := request.Response.Request.URL
+			if source == nil || source.Host != scoped.authority.RegistryHost {
+				return refuse(e.New(e.CodeTrustPolicyMissing, "registry storage delegation permits only one redirect"))
+			}
+		}
+		if scoped.blobStorageRedirect(request) {
+			// net/http can preserve sensitive headers across a redirect to the
+			// same hostname on another port. Storage receives no credentials,
+			// regardless of that upstream forwarding policy.
+			storage := request.Clone(request.Context())
+			for _, header := range []string{"Authorization", "Proxy-Authorization", "Cookie", "PRIVATE-TOKEN", "JOB-TOKEN"} {
+				storage.Header.Del(header)
+			}
+			return scoped.base.RoundTrip(storage)
+		}
+		if request.URL.User != nil || request.URL.Fragment != "" || request.URL.RawPath != "" || (request.Host != "" && request.Host != request.URL.Host) {
+			return refuse(e.New(e.CodeTrustPolicyMissing, "registry request authority is invalid"))
+		}
+		clean := path.Clean(request.URL.Path)
+		if request.URL.Path != clean && request.URL.Path != clean+"/" {
+			return refuse(e.New(e.CodeTrustPolicyMissing, "registry request path is not canonical"))
+		}
+		auth := request.Header.Get("Authorization")
+		registry := request.URL.Host == scoped.authority.RegistryHost && request.URL.Path == "/v2/"
+		for _, prefix := range scoped.repositoryPrefixes {
+			if request.URL.Host == scoped.authority.RegistryHost && registryEndpointMatches(request.URL.Path, prefix) {
+				registry = true
+			}
+		}
+		token := request.URL.Host == scoped.tokenEndpoint.Host && request.URL.Path == scoped.tokenEndpoint.Path
+		if (registry && auth != "" && !strings.HasPrefix(auth, "Bearer ")) || (token && auth != "" && !strings.HasPrefix(auth, "Basic ")) || (!registry && !token) {
+			return refuse(e.New(e.CodeTrustPolicyMissing, "registry request is outside its admitted authority"))
+		}
+		if registry && request.Method != http.MethodGet && request.Method != http.MethodHead && request.Method != http.MethodPost && request.Method != http.MethodPatch && request.Method != http.MethodPut {
+			return refuse(e.New(e.CodeTrustPolicyMissing, "registry request method is outside its admitted authority"))
+		}
+		if token {
+			query, err := url.ParseQuery(request.URL.RawQuery)
+			if err != nil || request.Method != http.MethodGet || len(query["service"]) != 1 || query.Get("service") != "container_registry" || len(query["scope"]) == 0 || len(query["scope"]) > len(scoped.allowedScopes) {
+				return refuse(e.New(e.CodeTrustPolicyMissing, "registry token request exceeds its admitted scope"))
+			}
+			for _, scope := range query["scope"] {
+				if !scoped.allowedScopes[scope] {
+					return refuse(e.New(e.CodeTrustPolicyMissing, "registry token request exceeds its admitted scope"))
+				}
+			}
+		}
+	}
+	return scoped.base.RoundTrip(request)
+}
+
+// Match the selected repository's endpoint shape, not a descendant repository
+// that happens to start with a reserved endpoint name. Upload sessions are the
+// sole two-segment suffix used by the pinned Distribution client.
+func registryEndpointMatches(requestPath, prefix string) bool {
+	suffix, ok := strings.CutPrefix(requestPath, prefix)
+	if !ok {
+		return false
+	}
+	switch {
+	case strings.HasSuffix(prefix, "/tags/"):
+		return suffix == "list"
+	case strings.HasSuffix(prefix, "/blobs/") && strings.HasPrefix(suffix, "uploads/"):
+		return !strings.Contains(strings.TrimPrefix(suffix, "uploads/"), "/")
+	default:
+		return suffix != "" && !strings.Contains(suffix, "/")
+	}
+}
+
+// blobStorageRedirect admits one HTTPS delegation from a selected registry's
+// exact digest-addressed blob GET/HEAD. net/http supplies Response only while
+// following a redirect; use its original request rather than widening registry
+// authority to arbitrary anonymous URLs. The normal readback owner still checks
+// every blob's size and digest before accepting a publication.
+func (scoped httpsRegistryTransport) blobStorageRedirect(request *http.Request) bool {
+	if request.URL.Host == scoped.authority.RegistryHost || request.URL.User != nil || request.URL.Host == "" || request.URL.Fragment != "" || (request.Host != "" && request.Host != request.URL.Host) ||
+		(request.Method != http.MethodGet && request.Method != http.MethodHead) || request.Response == nil || request.Response.Request == nil {
+		return false
+	}
+	response := request.Response
+	switch response.StatusCode {
+	case http.StatusMovedPermanently, http.StatusFound, http.StatusSeeOther, http.StatusTemporaryRedirect, http.StatusPermanentRedirect:
+	default:
+		return false
+	}
+	source := response.Request
+	if source.URL == nil || source.URL.Scheme != "https" || source.URL.Host != scoped.authority.RegistryHost || source.URL.User != nil || source.URL.RawPath != "" || source.URL.Fragment != "" ||
+		(source.Method != http.MethodGet && source.Method != http.MethodHead) || (source.Host != "" && source.Host != source.URL.Host) {
+		return false
+	}
+	location, err := response.Location()
+	if err != nil || location.String() != request.URL.String() {
+		return false
+	}
+	for _, prefix := range scoped.repositoryPrefixes {
+		if !strings.HasSuffix(prefix, "/blobs/") {
+			continue
+		}
+		if digest, ok := strings.CutPrefix(source.URL.Path, prefix); ok {
+			_, err := v1.NewHash(digest)
+			return err == nil
+		}
+	}
+	return false
 }
 
 // AmbientKeychain returns the keychain these options consult, or nil when access
@@ -434,6 +706,35 @@ func (options RegistryOptions) AmbientKeychain() authn.Keychain {
 
 // Validate admits transport credentials before filesystem or network work.
 func (options RegistryOptions) Validate() error {
+	if options.IsolatedTransport && options.PlainHTTP {
+		return e.New(e.CodeUsage, "isolated registry transport requires HTTPS")
+	}
+	if options.CertificateAuthority != "" && !options.IsolatedTransport {
+		return e.New(e.CodeUsage, "explicit registry certificate authority requires isolated transport")
+	}
+	if options.IsolatedTransport {
+		if err := httptrust.ValidateCertificateAuthority(options.CertificateAuthority); err != nil {
+			return err
+		}
+		if options.CertificateAuthority == "" && (os.Getenv("SSL_CERT_FILE") != "" || os.Getenv("SSL_CERT_DIR") != "") {
+			return e.New(e.CodeTrustPolicyMissing, "isolated registry certificate overrides require an explicit certificate authority")
+		}
+	}
+	if options.Authority.enabled() {
+		registry, registryErr := name.NewRegistry(options.Authority.RegistryHost, name.StrictValidation)
+		endpoint, endpointErr := url.Parse(options.Authority.TokenEndpoint)
+		if !options.IsolatedTransport || registryErr != nil || registry.RegistryStr() != options.Authority.RegistryHost || endpointErr != nil || endpoint.Scheme != "https" || endpoint.Host == "" || endpoint.User != nil || endpoint.RawQuery != "" || endpoint.Fragment != "" || endpoint.Path != "/jwt/auth" || endpoint.RawPath != "" || len(options.Authority.Repositories) == 0 || len(options.Authority.Repositories) > maxDeliveryObjects+1 {
+			return e.New(e.CodeUsage, "registry authority must select an isolated HTTPS registry and exact token endpoint")
+		}
+		seen := map[string]bool{}
+		for _, selected := range options.Authority.Repositories {
+			repo, err := name.NewRepository(selected, name.StrictValidation)
+			if err != nil || repo.Name() != selected || repo.RegistryStr() != registry.RegistryStr() || seen[selected] {
+				return e.New(e.CodeUsage, "registry authority contains an invalid repository")
+			}
+			seen[selected] = true
+		}
+	}
 	if options.Anonymous && (options.Username != "" || options.Password != "") {
 		return e.New(e.CodeUsage, "anonymous registry access cannot carry explicit credentials")
 	}

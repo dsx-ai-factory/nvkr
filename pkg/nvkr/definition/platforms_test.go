@@ -11,7 +11,7 @@ import (
 )
 
 func indexDefinitionFixture() Definition {
-	return Definition{APIVersion: DefinitionAPIVersion, Kind: DefinitionKind, Metadata: Metadata{Name: "fixture"}, Catalog: Catalog{Base: "catalog"}, Outputs: []DefinitionOutput{{Name: "cwe", Platforms: []string{"linux/amd64", "linux/arm64"}, Format: OutputOCI, Components: []string{"controller"}}}}
+	return Definition{APIVersion: DefinitionAPIVersion, Kind: DefinitionKind, Metadata: Metadata{Name: "fixture"}, Catalog: Catalog{Base: "catalog"}, Outputs: []DefinitionOutput{{Name: "nvke-controller", Platforms: []string{"linux/amd64", "linux/arm64"}, Format: OutputOCI, Components: []string{"controller"}}}}
 }
 
 func TestExplicitImagePlatformAdmission(t *testing.T) {
@@ -78,7 +78,7 @@ func TestHelmReferenceRequiresImagePlatformCoverage(t *testing.T) {
 	for _, platform := range []string{"linux/amd64", "linux/arm64"} {
 		t.Run(platform, func(t *testing.T) {
 			d := indexDefinitionFixture()
-			d.Outputs = append([]DefinitionOutput{{Name: "chart", Platform: platform, Format: OutputHelm, Components: []string{"chart"}, Helm: &HelmOutput{Images: map[string]string{"controller": "cwe"}}}}, d.Outputs...)
+			d.Outputs = append([]DefinitionOutput{{Name: "chart", Platform: platform, Format: OutputHelm, Components: []string{"chart"}, Helm: &HelmOutput{Images: map[string]string{"controller": "nvke-controller"}}}}, d.Outputs...)
 			if err := d.Validate(); err != nil {
 				t.Fatal(err)
 			}

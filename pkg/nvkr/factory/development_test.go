@@ -158,7 +158,7 @@ func TestDevelopmentHostedAdmissionRejectsContextBeforeEffects(t *testing.T) {
 func TestDevelopmentRejectsForeignSubjectsBeforeSigningOrRegistryReads(t *testing.T) {
 	for _, operation := range []string{NodeSign, NodeVerifyPublication} {
 		for _, repository := range []string{
-			"ghcr.io/example/nvkr/m2-candidate/releases",
+			"ghcr.io/example/nvkr/candidate/releases",
 			"ghcr.io/example/nvkr/development/runs/12345/attempts/2/releases",
 			"ghcr.io/example/nvkr/development/runs/54321/attempts/1/releases",
 			"ghcr.io/example/nvkr/development/runs/12345/attempts/1/releases-worker",

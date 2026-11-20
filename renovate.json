@@ -6,7 +6,7 @@
     ":gitSignOff"
   ],
   "enabledManagers": ["gomod", "github-actions"],
-  "includePaths": ["go.mod", "go.sum", ".github/workflows/**"],
+  "includePaths": ["go.mod", "go.sum", "demos/nvke/go.mod", "demos/nvke/go.sum", "inputs/catalogs/nvke/machineimage/go.mod", "inputs/catalogs/nvke/machineimage/go.sum", ".github/workflows/**"],
   "ignorePaths": [
     ".github/nvkr-*/**",
     ".github/workflows/nvkr-run*.yml",
@@ -14,7 +14,6 @@
     ".github/workflows/nvkr-qualify*.yml",
     ".github/workflows/nvkr-smoke*.yml",
     ".github/workflows/catalog-refresh.yaml",
-    "inputs/catalogs/**",
     "**/pins.lock.yaml",
     "toolchains/**",
     "**/testdata/**"

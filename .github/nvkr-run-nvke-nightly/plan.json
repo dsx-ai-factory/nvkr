@@ -1,0 +1,407 @@
+{
+  "actions": {
+    "file": ".github/nvkr-plan-store/plan/actions-github-nvkr-run-nvke-nightly.json"
+  },
+  "builds": [
+    {
+      "file": ".github/nvkr-plan-store/steps/nvke-release-nvkr-run-nvke-nightly/aicr-nvke-gb200-ubuntu-training-kubeflow-argocd-helm/linux-arm64.json",
+      "name": "aicr-nvke-gb200-ubuntu-training-kubeflow-argocd-helm"
+    },
+    {
+      "file": ".github/nvkr-plan-store/steps/nvke-release-nvkr-run-nvke-nightly/aicr-nvke-gb200-ubuntu-training-kubeflow-flux/linux-arm64.json",
+      "name": "aicr-nvke-gb200-ubuntu-training-kubeflow-flux"
+    },
+    {
+      "file": ".github/nvkr-plan-store/steps/nvke-release-nvkr-run-nvke-nightly/aicr-nvke-gb200-ubuntu-training-kubeflow-helm/linux-arm64.json",
+      "name": "aicr-nvke-gb200-ubuntu-training-kubeflow-helm"
+    },
+    {
+      "file": ".github/nvkr-plan-store/steps/nvke-release-nvkr-run-nvke-nightly/capi-controller-image/linux-amd64.json",
+      "name": "capi-controller-image"
+    },
+    {
+      "file": ".github/nvkr-plan-store/steps/nvke-release-nvkr-run-nvke-nightly/capi-controller-image-arm64/linux-arm64.json",
+      "name": "capi-controller-image-arm64"
+    },
+    {
+      "file": ".github/nvkr-plan-store/steps/nvke-release-nvkr-run-nvke-nightly/capi-kubeadm-bootstrap-image/linux-amd64.json",
+      "name": "capi-kubeadm-bootstrap-image"
+    },
+    {
+      "file": ".github/nvkr-plan-store/steps/nvke-release-nvkr-run-nvke-nightly/capi-kubeadm-bootstrap-image-arm64/linux-arm64.json",
+      "name": "capi-kubeadm-bootstrap-image-arm64"
+    },
+    {
+      "file": ".github/nvkr-plan-store/steps/nvke-release-nvkr-run-nvke-nightly/capi-kubeadm-control-plane-image/linux-amd64.json",
+      "name": "capi-kubeadm-control-plane-image"
+    },
+    {
+      "file": ".github/nvkr-plan-store/steps/nvke-release-nvkr-run-nvke-nightly/capi-kubeadm-control-plane-image-arm64/linux-arm64.json",
+      "name": "capi-kubeadm-control-plane-image-arm64"
+    },
+    {
+      "file": ".github/nvkr-plan-store/steps/nvke-release-nvkr-run-nvke-nightly/capnico-controller/linux-amd64.json",
+      "name": "capnico-controller/linux/amd64"
+    },
+    {
+      "file": ".github/nvkr-plan-store/steps/nvke-release-nvkr-run-nvke-nightly/capnico-controller/linux-arm64.json",
+      "name": "capnico-controller/linux/arm64"
+    },
+    {
+      "file": ".github/nvkr-plan-store/steps/nvke-release-nvkr-run-nvke-nightly/cert-manager-cainjector-image/linux-amd64.json",
+      "name": "cert-manager-cainjector-image"
+    },
+    {
+      "file": ".github/nvkr-plan-store/steps/nvke-release-nvkr-run-nvke-nightly/cert-manager-cainjector-image-arm64/linux-arm64.json",
+      "name": "cert-manager-cainjector-image-arm64"
+    },
+    {
+      "file": ".github/nvkr-plan-store/steps/nvke-release-nvkr-run-nvke-nightly/cert-manager-controller-image/linux-amd64.json",
+      "name": "cert-manager-controller-image"
+    },
+    {
+      "file": ".github/nvkr-plan-store/steps/nvke-release-nvkr-run-nvke-nightly/cert-manager-controller-image-arm64/linux-arm64.json",
+      "name": "cert-manager-controller-image-arm64"
+    },
+    {
+      "file": ".github/nvkr-plan-store/steps/nvke-release-nvkr-run-nvke-nightly/cert-manager-webhook-image/linux-amd64.json",
+      "name": "cert-manager-webhook-image"
+    },
+    {
+      "file": ".github/nvkr-plan-store/steps/nvke-release-nvkr-run-nvke-nightly/cert-manager-webhook-image-arm64/linux-arm64.json",
+      "name": "cert-manager-webhook-image-arm64"
+    },
+    {
+      "file": ".github/nvkr-plan-store/steps/nvke-release-nvkr-run-nvke-nightly/cluster-api-provider-provisioned/linux-amd64.json",
+      "name": "cluster-api-provider-provisioned/linux/amd64"
+    },
+    {
+      "file": ".github/nvkr-plan-store/steps/nvke-release-nvkr-run-nvke-nightly/cluster-api-provider-provisioned/linux-arm64.json",
+      "name": "cluster-api-provider-provisioned/linux/arm64"
+    },
+    {
+      "file": ".github/nvkr-plan-store/steps/nvke-release-nvkr-run-nvke-nightly/controller-chart/linux-amd64.json",
+      "name": "controller-chart"
+    },
+    {
+      "file": ".github/nvkr-plan-store/steps/nvke-release-nvkr-run-nvke-nightly/controller-profiles/linux-amd64.json",
+      "name": "controller-profiles/linux/amd64"
+    },
+    {
+      "file": ".github/nvkr-plan-store/steps/nvke-release-nvkr-run-nvke-nightly/controller-profiles/linux-arm64.json",
+      "name": "controller-profiles/linux/arm64"
+    },
+    {
+      "file": ".github/nvkr-plan-store/steps/nvke-release-nvkr-run-nvke-nightly/csi-node-driver-registrar-image/linux-amd64.json",
+      "name": "csi-node-driver-registrar-image"
+    },
+    {
+      "file": ".github/nvkr-plan-store/steps/nvke-release-nvkr-run-nvke-nightly/csi-node-driver-registrar-image-arm64/linux-arm64.json",
+      "name": "csi-node-driver-registrar-image-arm64"
+    },
+    {
+      "file": ".github/nvkr-plan-store/steps/nvke-release-nvkr-run-nvke-nightly/local-path-helper-image/linux-amd64.json",
+      "name": "local-path-helper-image"
+    },
+    {
+      "file": ".github/nvkr-plan-store/steps/nvke-release-nvkr-run-nvke-nightly/local-path-helper-image-arm64/linux-arm64.json",
+      "name": "local-path-helper-image-arm64"
+    },
+    {
+      "file": ".github/nvkr-plan-store/steps/nvke-release-nvkr-run-nvke-nightly/local-path-provisioner/linux-amd64.json",
+      "name": "local-path-provisioner"
+    },
+    {
+      "file": ".github/nvkr-plan-store/steps/nvke-release-nvkr-run-nvke-nightly/local-path-provisioner-arm64/linux-arm64.json",
+      "name": "local-path-provisioner-arm64"
+    },
+    {
+      "file": ".github/nvkr-plan-store/steps/nvke-release-nvkr-run-nvke-nightly/local-path-provisioner-image/linux-amd64.json",
+      "name": "local-path-provisioner-image"
+    },
+    {
+      "file": ".github/nvkr-plan-store/steps/nvke-release-nvkr-run-nvke-nightly/local-path-provisioner-image-arm64/linux-arm64.json",
+      "name": "local-path-provisioner-image-arm64"
+    },
+    {
+      "file": ".github/nvkr-plan-store/steps/nvke-release-nvkr-run-nvke-nightly/nktp/linux-amd64.json",
+      "name": "nktp"
+    },
+    {
+      "file": ".github/nvkr-plan-store/steps/nvke-release-nvkr-run-nvke-nightly/nktp-collector-image/linux-amd64.json",
+      "name": "nktp-collector-image"
+    },
+    {
+      "file": ".github/nvkr-plan-store/steps/nvke-release-nvkr-run-nvke-nightly/nktp-collector-image-arm64/linux-arm64.json",
+      "name": "nktp-collector-image-arm64"
+    },
+    {
+      "file": ".github/nvkr-plan-store/steps/nvke-release-nvkr-run-nvke-nightly/nktp-kube-state-metrics-image/linux-amd64.json",
+      "name": "nktp-kube-state-metrics-image"
+    },
+    {
+      "file": ".github/nvkr-plan-store/steps/nvke-release-nvkr-run-nvke-nightly/nktp-kube-state-metrics-image-arm64/linux-arm64.json",
+      "name": "nktp-kube-state-metrics-image-arm64"
+    },
+    {
+      "file": ".github/nvkr-plan-store/steps/nvke-release-nvkr-run-nvke-nightly/nktp-kubectl-image/linux-amd64.json",
+      "name": "nktp-kubectl-image"
+    },
+    {
+      "file": ".github/nvkr-plan-store/steps/nvke-release-nvkr-run-nvke-nightly/nktp-kubectl-image-arm64/linux-arm64.json",
+      "name": "nktp-kubectl-image-arm64"
+    },
+    {
+      "file": ".github/nvkr-plan-store/steps/nvke-release-nvkr-run-nvke-nightly/nktp-lgtm-image/linux-amd64.json",
+      "name": "nktp-lgtm-image"
+    },
+    {
+      "file": ".github/nvkr-plan-store/steps/nvke-release-nvkr-run-nvke-nightly/nktp-lgtm-image-arm64/linux-arm64.json",
+      "name": "nktp-lgtm-image-arm64"
+    },
+    {
+      "file": ".github/nvkr-plan-store/steps/nvke-release-nvkr-run-nvke-nightly/nktp-metrics-server-image/linux-amd64.json",
+      "name": "nktp-metrics-server-image"
+    },
+    {
+      "file": ".github/nvkr-plan-store/steps/nvke-release-nvkr-run-nvke-nightly/nktp-metrics-server-image-arm64/linux-arm64.json",
+      "name": "nktp-metrics-server-image-arm64"
+    },
+    {
+      "file": ".github/nvkr-plan-store/steps/nvke-release-nvkr-run-nvke-nightly/nktp-node-exporter-image/linux-amd64.json",
+      "name": "nktp-node-exporter-image"
+    },
+    {
+      "file": ".github/nvkr-plan-store/steps/nvke-release-nvkr-run-nvke-nightly/nktp-node-exporter-image-arm64/linux-arm64.json",
+      "name": "nktp-node-exporter-image-arm64"
+    },
+    {
+      "file": ".github/nvkr-plan-store/steps/nvke-release-nvkr-run-nvke-nightly/nktp-operator-image/linux-amd64.json",
+      "name": "nktp-operator-image"
+    },
+    {
+      "file": ".github/nvkr-plan-store/steps/nvke-release-nvkr-run-nvke-nightly/nktp-operator-image-arm64/linux-arm64.json",
+      "name": "nktp-operator-image-arm64"
+    },
+    {
+      "file": ".github/nvkr-plan-store/steps/nvke-release-nvkr-run-nvke-nightly/nktp-target-allocator-image/linux-amd64.json",
+      "name": "nktp-target-allocator-image"
+    },
+    {
+      "file": ".github/nvkr-plan-store/steps/nvke-release-nvkr-run-nvke-nightly/nktp-target-allocator-image-arm64/linux-arm64.json",
+      "name": "nktp-target-allocator-image-arm64"
+    },
+    {
+      "file": ".github/nvkr-plan-store/steps/nvke-release-nvkr-run-nvke-nightly/nvke-controller/linux-amd64.json",
+      "name": "nvke-controller/linux/amd64"
+    },
+    {
+      "file": ".github/nvkr-plan-store/steps/nvke-release-nvkr-run-nvke-nightly/nvke-controller/linux-arm64.json",
+      "name": "nvke-controller/linux/arm64"
+    },
+    {
+      "file": ".github/nvkr-plan-store/steps/nvke-release-nvkr-run-nvke-nightly/nvke-node-fde-amd64/linux-amd64.json",
+      "name": "nvke-node-fde-amd64"
+    },
+    {
+      "file": ".github/nvkr-plan-store/steps/nvke-release-nvkr-run-nvke-nightly/nvke-node-fde-arm64/linux-arm64.json",
+      "name": "nvke-node-fde-arm64"
+    },
+    {
+      "file": ".github/nvkr-plan-store/steps/nvke-release-nvkr-run-nvke-nightly/nvke-node-fde-ubuntu24-amd64/linux-amd64.json",
+      "name": "nvke-node-fde-ubuntu24-amd64"
+    },
+    {
+      "file": ".github/nvkr-plan-store/steps/nvke-release-nvkr-run-nvke-nightly/nvke-node-fde-ubuntu24-arm64/linux-arm64.json",
+      "name": "nvke-node-fde-ubuntu24-arm64"
+    },
+    {
+      "file": ".github/nvkr-plan-store/steps/nvke-release-nvkr-run-nvke-nightly/nvke-node-image-amd64/linux-amd64.json",
+      "name": "nvke-node-image-amd64"
+    },
+    {
+      "file": ".github/nvkr-plan-store/steps/nvke-release-nvkr-run-nvke-nightly/nvke-node-image-arm64/linux-arm64.json",
+      "name": "nvke-node-image-arm64"
+    },
+    {
+      "file": ".github/nvkr-plan-store/steps/nvke-release-nvkr-run-nvke-nightly/nvke-node-image-ubuntu24-amd64/linux-amd64.json",
+      "name": "nvke-node-image-ubuntu24-amd64"
+    },
+    {
+      "file": ".github/nvkr-plan-store/steps/nvke-release-nvkr-run-nvke-nightly/nvke-node-image-ubuntu24-arm64/linux-arm64.json",
+      "name": "nvke-node-image-ubuntu24-arm64"
+    },
+    {
+      "file": ".github/nvkr-plan-store/steps/nvke-release-nvkr-run-nvke-nightly/nvkectl/linux-amd64.json",
+      "name": "nvkectl"
+    },
+    {
+      "file": ".github/nvkr-plan-store/steps/nvke-release-nvkr-run-nvke-nightly/nvkectl-linux-arm64/linux-arm64.json",
+      "name": "nvkectl-linux-arm64"
+    },
+    {
+      "file": ".github/nvkr-plan-store/steps/nvke-release-nvkr-run-nvke-nightly/operator-tools/linux-amd64.json",
+      "name": "operator-tools"
+    },
+    {
+      "file": ".github/nvkr-plan-store/steps/nvke-release-nvkr-run-nvke-nightly/operator-tools-linux-arm64/linux-arm64.json",
+      "name": "operator-tools-linux-arm64"
+    },
+    {
+      "file": ".github/nvkr-plan-store/steps/nvke-release-nvkr-run-nvke-nightly/postgresql/linux-amd64.json",
+      "name": "postgresql"
+    },
+    {
+      "file": ".github/nvkr-plan-store/steps/nvke-release-nvkr-run-nvke-nightly/postgresql-image/linux-amd64.json",
+      "name": "postgresql-image"
+    },
+    {
+      "file": ".github/nvkr-plan-store/steps/nvke-release-nvkr-run-nvke-nightly/postgresql-image-arm64/linux-arm64.json",
+      "name": "postgresql-image-arm64"
+    },
+    {
+      "file": ".github/nvkr-plan-store/steps/nvke-release-nvkr-run-nvke-nightly/spiffe-csi-image/linux-amd64.json",
+      "name": "spiffe-csi-image"
+    },
+    {
+      "file": ".github/nvkr-plan-store/steps/nvke-release-nvkr-run-nvke-nightly/spiffe-csi-image-arm64/linux-arm64.json",
+      "name": "spiffe-csi-image-arm64"
+    },
+    {
+      "file": ".github/nvkr-plan-store/steps/nvke-release-nvkr-run-nvke-nightly/spire/linux-amd64.json",
+      "name": "spire"
+    },
+    {
+      "file": ".github/nvkr-plan-store/steps/nvke-release-nvkr-run-nvke-nightly/spire-agent-image/linux-amd64.json",
+      "name": "spire-agent-image"
+    },
+    {
+      "file": ".github/nvkr-plan-store/steps/nvke-release-nvkr-run-nvke-nightly/spire-agent-image-arm64/linux-arm64.json",
+      "name": "spire-agent-image-arm64"
+    },
+    {
+      "file": ".github/nvkr-plan-store/steps/nvke-release-nvkr-run-nvke-nightly/spire-bash-image/linux-amd64.json",
+      "name": "spire-bash-image"
+    },
+    {
+      "file": ".github/nvkr-plan-store/steps/nvke-release-nvkr-run-nvke-nightly/spire-bash-image-arm64/linux-arm64.json",
+      "name": "spire-bash-image-arm64"
+    },
+    {
+      "file": ".github/nvkr-plan-store/steps/nvke-release-nvkr-run-nvke-nightly/spire-controller-manager-image/linux-amd64.json",
+      "name": "spire-controller-manager-image"
+    },
+    {
+      "file": ".github/nvkr-plan-store/steps/nvke-release-nvkr-run-nvke-nightly/spire-controller-manager-image-arm64/linux-arm64.json",
+      "name": "spire-controller-manager-image-arm64"
+    },
+    {
+      "file": ".github/nvkr-plan-store/steps/nvke-release-nvkr-run-nvke-nightly/spire-crds/linux-amd64.json",
+      "name": "spire-crds"
+    },
+    {
+      "file": ".github/nvkr-plan-store/steps/nvke-release-nvkr-run-nvke-nightly/spire-oidc-image/linux-amd64.json",
+      "name": "spire-oidc-image"
+    },
+    {
+      "file": ".github/nvkr-plan-store/steps/nvke-release-nvkr-run-nvke-nightly/spire-oidc-image-arm64/linux-arm64.json",
+      "name": "spire-oidc-image-arm64"
+    },
+    {
+      "file": ".github/nvkr-plan-store/steps/nvke-release-nvkr-run-nvke-nightly/spire-server-image/linux-amd64.json",
+      "name": "spire-server-image"
+    },
+    {
+      "file": ".github/nvkr-plan-store/steps/nvke-release-nvkr-run-nvke-nightly/spire-server-image-arm64/linux-arm64.json",
+      "name": "spire-server-image-arm64"
+    },
+    {
+      "file": ".github/nvkr-plan-store/steps/nvke-release-nvkr-run-nvke-nightly/spire-tpm-server-image/linux-amd64.json",
+      "name": "spire-tpm-server-image"
+    },
+    {
+      "file": ".github/nvkr-plan-store/steps/nvke-release-nvkr-run-nvke-nightly/spire-tpm-server-image-arm64/linux-arm64.json",
+      "name": "spire-tpm-server-image-arm64"
+    },
+    {
+      "file": ".github/nvkr-plan-store/steps/nvke-release-nvkr-run-nvke-nightly/temporal/linux-amd64.json",
+      "name": "temporal"
+    },
+    {
+      "file": ".github/nvkr-plan-store/steps/nvke-release-nvkr-run-nvke-nightly/temporal-admin-tools-image/linux-amd64.json",
+      "name": "temporal-admin-tools-image"
+    },
+    {
+      "file": ".github/nvkr-plan-store/steps/nvke-release-nvkr-run-nvke-nightly/temporal-admin-tools-image-arm64/linux-arm64.json",
+      "name": "temporal-admin-tools-image-arm64"
+    },
+    {
+      "file": ".github/nvkr-plan-store/steps/nvke-release-nvkr-run-nvke-nightly/temporal-server-image/linux-amd64.json",
+      "name": "temporal-server-image"
+    },
+    {
+      "file": ".github/nvkr-plan-store/steps/nvke-release-nvkr-run-nvke-nightly/temporal-server-image-arm64/linux-arm64.json",
+      "name": "temporal-server-image-arm64"
+    },
+    {
+      "file": ".github/nvkr-plan-store/steps/nvke-release-nvkr-run-nvke-nightly/temporal-ui-image/linux-amd64.json",
+      "name": "temporal-ui-image"
+    },
+    {
+      "file": ".github/nvkr-plan-store/steps/nvke-release-nvkr-run-nvke-nightly/temporal-ui-image-arm64/linux-arm64.json",
+      "name": "temporal-ui-image-arm64"
+    }
+  ],
+  "catalogDigest": "sha256:f632d51a8e58b5728e8900b24370cff90c875bac0b3d250d7cb700dc03604d87",
+  "catalogSnapshots": {
+    "sha256:339b74d541845eb20dc53f2bc5b8302c79cdb5d7789d1bb2ed590855e2877872": {
+      "file": ".github/nvkr-plan-store/plan/catalog-node-images@d1f960385276.json"
+    },
+    "sha256:846dcc17957d283482e241ed117d4d61060b1a37930c85f2a799e3de717ba092": {
+      "file": ".github/nvkr-plan-store/plan/catalog-runtime-dependencies@d79f8fcceb24.json"
+    },
+    "sha256:89be7d16270fba4550ba69b239af96a04351889196f3c7508cff9dd3270b3d29": {
+      "file": ".github/nvkr-plan-store/plan/catalog-aicr@809249666f0f.json"
+    },
+    "sha256:9bc477c5d41d1a66c9cb5aca4e5e5b58d0f09a65ed0939b6a32f37ae971daa9e": {
+      "file": ".github/nvkr-plan-store/plan/catalog-local-path-provisioner@fcddb073c9a6.json"
+    },
+    "sha256:b6ecdd63bf4f35cbe2cbee75bd573e3afba798e410a7e81cb73d7b4c8a7da8fe": {
+      "file": ".github/nvkr-plan-store/plan/catalog-tools@e236018c5f62.json"
+    },
+    "sha256:db146195c3ef82e670bd5dfdacd63a91fd643e0ca79daf42b18da65e82d67261": {
+      "file": ".github/nvkr-plan-store/plan/catalog-node-images@e71c0a37ae36.json"
+    },
+    "sha256:f632d51a8e58b5728e8900b24370cff90c875bac0b3d250d7cb700dc03604d87": {
+      "file": ".github/nvkr-plan-store/plan/catalog-nvke@6fda0a197d8f.json"
+    }
+  },
+  "composition": {
+    "file": ".github/nvkr-plan-store/plan/composition-nvke-release-nvkr-run-nvke-nightly.json"
+  },
+  "definition": {
+    "file": ".github/nvkr-plan-store/plan/definition-nvke-release-nvkr-run-nvke-nightly.json"
+  },
+  "definitionDigest": "sha256:76b46c92cab7649342a122f868d66dfb5cb9aa494a87db4b61219f0a68e07760",
+  "definitionPath": "inputs/definitions/nvke/nvke-release.composite.yaml",
+  "environment": {
+    "file": ".github/nvkr-plan-store/plan/environment-nvke-nightly-github-nvkr-run-nvke-nightly.json"
+  },
+  "environmentDigest": "sha256:fc4d21222ed1bb9d603b27b46283c4d2d67a6dbf4bbd1624f784a6be94e4fc68",
+  "environmentPath": "inputs/environments/github-nvke-nightly.yaml",
+  "generatorVersion": "dev (unknown)",
+  "graphDigest": "sha256:4f9b9a41f45c76473205e41cc580e30c22ced799bb6be93d657452f2892837e5",
+  "lifecycleOutputs": {
+    "file": ".github/nvkr-plan-store/plan/outputs-nvke-release-nvkr-run-nvke-nightly.json"
+  },
+  "name": "nvke-release",
+  "qualification": "pipeline-attested",
+  "routes": {
+    "file": ".github/nvkr-plan-store/plan/routes-nvke-release-nvkr-run-nvke-nightly.json"
+  },
+  "schemaVersion": "nvkr.dev/run-plan/v6",
+  "storage": "nvkr-plan-tree-v3",
+  "targets": {
+    "file": ".github/nvkr-plan-store/plan/targets-nvke-release-nvkr-run-nvke-nightly.json"
+  }
+}

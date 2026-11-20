@@ -12,17 +12,17 @@ import (
 	e "github.com/dsx-ai-factory/nvkr/pkg/nvkr/errors"
 )
 
-// OutputAttribution names the member that declared one effective output.
+// OutputAttribution names the declaring member, or the composite when Member is empty.
 type OutputAttribution struct {
 	Output string `json:"output"`
-	Member string `json:"member"`
+	Member string `json:"member,omitempty"`
 }
 
 // Effective returns an independent copy of the derived v5 Definition. It is an
 // internal record: it has no file and is never an authored input.
 func (composition Composition) Effective() Definition { return composition.effective.Clone() }
 
-// Attribution returns every effective output's declaring member, sorted by output.
+// Attribution returns every effective output's owner, sorted by output.
 func (composition Composition) Attribution() []OutputAttribution {
 	return slices.Clone(composition.attribution)
 }
@@ -56,9 +56,21 @@ func mergeComposite(compositePath string, metadata Metadata, admitted []Admitted
 		if err != nil {
 			return Definition{}, nil, e.Wrap(e.CodeInvalidCatalog, err, "composite member %q catalog", member.Name)
 		}
+		var candidates []Catalog
+		for _, candidate := range source.Catalogs {
+			rebased, err := rebaseCatalog(member.Path, compositePath, candidate)
+			if err != nil {
+				return Definition{}, nil, e.Wrap(e.CodeInvalidCatalog, err, "composite member %q candidate catalog", member.Name)
+			}
+			candidates = append(candidates, rebased)
+		}
 		if i == 0 {
+			effective.Catalogs = candidates
 			effective.Catalog, effective.SBOMTool, effective.CosignTool = stack, source.SBOMTool, source.CosignTool
 		} else {
+			if !slices.EqualFunc(effective.Catalogs, candidates, sameCatalog) {
+				return Definition{}, nil, e.New(e.CodeInvalidCatalog, "composite member %q catalog list differs from member %q", member.Name, members[0].Name)
+			}
 			if !sameCatalog(effective.Catalog, stack) {
 				return Definition{}, nil, e.New(e.CodeInvalidCatalog, "composite member %q top-level catalog stack differs from member %q", member.Name, members[0].Name)
 			}
@@ -77,7 +89,9 @@ func mergeComposite(compositePath string, metadata Metadata, admitted []Admitted
 					return Definition{}, nil, e.Wrap(e.CodeInvalidCatalog, err, "composite member %q output %q catalog", member.Name, output.Name)
 				}
 			}
-			output.Catalog = &outputStack
+			if output.Derived == nil && (output.Catalog != nil || len(candidates) == 0) {
+				output.Catalog = &outputStack
+			}
 			effective.Outputs = append(effective.Outputs, output)
 		}
 	}

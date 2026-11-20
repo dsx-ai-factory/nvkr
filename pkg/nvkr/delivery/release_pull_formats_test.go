@@ -117,7 +117,7 @@ func TestPullOutputSelectsDiskAndExecutable(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			if result.Output.Name != test.output || result.Output.Kind != test.kind || len(result.Files) != 1 || result.Files[0].Path != test.path {
+			if result.Output.Name != test.output || result.Output.Kind != test.kind || result.Payload != PulledPayloadFiles || len(result.Files) != 1 || result.Files[0].Path != test.path {
 				t.Fatalf("wrong pull result: %+v", result)
 			}
 			raw, err := os.ReadFile(filepath.Join(out, test.path))

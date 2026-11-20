@@ -13,6 +13,10 @@ import (
 // Clone transfers ownership of every mutable authored value to its new owner.
 func (input Definition) Clone() Definition {
 	input.Catalog.Overlays = append([]string(nil), input.Catalog.Overlays...)
+	input.Catalogs = slices.Clone(input.Catalogs)
+	for i := range input.Catalogs {
+		input.Catalogs[i].Overlays = slices.Clone(input.Catalogs[i].Overlays)
+	}
 	input.InternalTools = slices.Clone(input.InternalTools)
 	for i := range input.InternalTools {
 		tool := &input.InternalTools[i]
@@ -26,6 +30,7 @@ func (input Definition) Clone() Definition {
 	input.Outputs = append([]DefinitionOutput(nil), input.Outputs...)
 	for i := range input.Outputs {
 		out := &input.Outputs[i]
+		out.Derived = out.Derived.Clone()
 		out.Components = append([]string(nil), out.Components...)
 		out.Platforms = slices.Clone(out.Platforms)
 		if out.Catalog != nil {
@@ -53,6 +58,17 @@ func (input Environment) Clone() Environment {
 		value.Smoke = value.Smoke.Clone()
 		input.Tekton = &value
 	}
+	if input.GitLab != nil {
+		value := *input.GitLab
+		value.AdditionalRefs = slices.Clone(value.AdditionalRefs)
+		value.PipelineSources = slices.Clone(value.PipelineSources)
+		value.Runners = maps.Clone(value.Runners)
+		for platform, runner := range value.Runners {
+			runner.Tags = slices.Clone(runner.Tags)
+			value.Runners[platform] = runner
+		}
+		input.GitLab = &value
+	}
 	input.GitHubRuntimeSources = slices.Clone(input.GitHubRuntimeSources)
 	if input.ToolchainAccess != nil {
 		value := *input.ToolchainAccess
@@ -73,6 +89,7 @@ func (input Environment) Clone() Environment {
 	input.GitHubDispatchBranches = append([]string(nil), input.GitHubDispatchBranches...)
 	input.ExecutionClasses = execution.CloneClasses(input.ExecutionClasses)
 	input.DiskInspectionProfiles = maps.Clone(input.DiskInspectionProfiles)
+	input.DiskEvidenceOverrides = maps.Clone(input.DiskEvidenceOverrides)
 	if input.SourceAccess != nil {
 		original := input.SourceAccess
 		input.SourceAccess = make(map[string]SourceAccess, len(original))
@@ -84,8 +101,16 @@ func (input Environment) Clone() Environment {
 		value := *input.Publication
 		value.Transports = slices.Clone(value.Transports)
 		value.ImageTags = maps.Clone(value.ImageTags)
+		if value.BootSelection != nil {
+			selection := value.BootSelection.Clone()
+			value.BootSelection = &selection
+		}
 		value.ObjectStores = slices.Clone(value.ObjectStores)
 		for index := range value.ObjectStores {
+			if value.ObjectStores[index].Serving != nil {
+				serving := *value.ObjectStores[index].Serving
+				value.ObjectStores[index].Serving = &serving
+			}
 			if value.ObjectStores[index].S3 != nil {
 				copyS3 := *value.ObjectStores[index].S3
 				value.ObjectStores[index].S3 = &copyS3

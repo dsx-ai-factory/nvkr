@@ -24,7 +24,8 @@ make ci-check      # every merge-gate check that runs locally
   **`make test-race`** adds race detection and coverage; **`make test-full`** also
   enables expensive capacity and full-product integration fixtures. Direct
   `go test ./...` uses the fast default too.
-- Local development Runs use `run local` with an explicit Definition and Environment. Container
+- Local development Runs use `run local` with an explicit Definition and either an explicit Environment
+  or the recorded built-in build-only local policy. Container
   producers need **Docker + git** and network for their fetch step; native producers have their own
   capability admission. Local execution does not establish qualified reproduction.
 - **Lint** uses `golangci-lint` (config in [`.golangci.yml`](.golangci.yml)) and warning-or-higher
@@ -34,7 +35,7 @@ make ci-check      # every merge-gate check that runs locally
 
 `make ci-check` runs every check in the merge gate (`.github/workflows/merge-gate.yaml`) that can run locally:
 the `make check` code gate (format, Definition and ledger location, license header, restated status, vet, lint,
-shellcheck, Python report-tool tests, fast tests and Go vulnerability checks), the binary build, actionlint,
+shellcheck, CI tooling tests, fast tests and Go vulnerability checks), the binary build, actionlint,
 third-party notices drift, generated-workflow drift, the Fern docs check and the hello container demo (requires running Docker). Workflow drift needs network access
 to the public NVKE source, and the docs check needs Node and the Fern CLI. CodeQL and the DCO App run only on
 GitHub. A test in `internal/cicontract` fails when the Makefile's `CI_CHECKS` list and the make targets the
@@ -91,10 +92,10 @@ Select it directly in an output with a concrete platform, with every source, too
 content identity. A qualified prebuilt entry must also declare digest-pinned typed evidence or an exact authenticated
 waiver; v1 acquisition uses the separate production-evidence contract. Run `make build` and validate the changed Definition with `bin/nvkr definition validate --definition <path>`. The source bake-off command is retired;
 release qualification also requires the authenticated producer, terminal, evidence, policy, and status chain
-described in the ADR reconciliation. Operators may ship an entirely separate catalog via `--data` (see
+described in the ADR reconciliation. Operators may ship an entirely separate catalog via `--catalog` (see
 `testdata/examples/operator-catalog/`).
 
-Catalog diagnostics require an explicit `--data` path. There is no embedded worker catalog or backward-compatibility
+Catalog diagnostics require an explicit `--catalog` path. There is no embedded worker catalog or backward-compatibility
 requirement. Worker binaries belong to the NVKE OS-image build; add product outputs through a Definition.
 
 ## Pull request process

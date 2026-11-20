@@ -15,8 +15,9 @@ import (
 	e "github.com/dsx-ai-factory/nvkr/pkg/nvkr/errors"
 )
 
-// Output-only projection of NVIDIA/aicr@dc78e354f2a55985782cfe0d9d6b8f1591e75dd5
-// pkg/artifact/{types,parse}.go. These compatibility bounds do not verify a release.
+// Output-only projection of NVIDIA/aicr v1.3.0@d3493485869ca0a3f49f1058b3985d6ed536b6b2
+// pkg/artifact/{types,parse}.go and pkg/defaults/artifacts.go.
+// These compatibility bounds do not verify a release.
 var inventoryHost = regexp.MustCompile(`^[a-z0-9](?:[a-z0-9.-]*[a-z0-9])?(?::[0-9]+)?$`)
 var inventoryRepository = regexp.MustCompile(`^[a-z0-9]+(?:(?:[._]|__|-+)[a-z0-9]+)*(?:/[a-z0-9]+(?:(?:[._]|__|-+)[a-z0-9]+)*)*$`)
 var inventoryName = regexp.MustCompile(`^[a-z0-9]([a-z0-9._-]*[a-z0-9])?$`)
@@ -37,8 +38,20 @@ type inventoryPlatform struct {
 
 // ArtifactInventory projects inspected chart/image metadata into JSON-form YAML.
 // Image versions are digest-derived labels, not claims that version tags exist.
+// Optional output names restrict the projection; repeated names are idempotent.
 // Like the input description, this grants no signature or consumer-policy trust.
-func ArtifactInventory(description Description) ([]byte, error) {
+func ArtifactInventory(description Description, outputs ...string) ([]byte, error) {
+	selected := make(map[string]bool, len(outputs))
+	for _, name := range outputs {
+		index := slices.IndexFunc(description.Outputs, func(output Output) bool { return output.Name == name })
+		if index < 0 {
+			return nil, e.New(e.CodeUsage, "unknown release output %q", name)
+		}
+		if kind := description.Outputs[index].Kind; kind != "helm-oci" && kind != "oci" {
+			return nil, e.New(e.CodeEngineCapability, "output %q is not AICR inventory compatible", name)
+		}
+		selected[name] = true
+	}
 	document := struct {
 		APIVersion string              `json:"apiVersion"`
 		Kind       string              `json:"kind"`
@@ -46,6 +59,9 @@ func ArtifactInventory(description Description) ([]byte, error) {
 	}{"aicr.run/v1beta1", "ArtifactInventory", []inventoryIdentity{}}
 	names := make(map[string]bool)
 	for _, output := range description.Outputs {
+		if len(selected) != 0 && !selected[output.Name] {
+			continue
+		}
 		if output.Kind != "helm-oci" && output.Kind != "oci" {
 			continue
 		}

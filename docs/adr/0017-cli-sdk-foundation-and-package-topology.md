@@ -58,7 +58,7 @@ supported as described below. The compiler can describe disk publication and its
 can inspect that Plan. The ordinary local scheduler rejects disk publication with `engine-capability` before
 runtime, source, subprocess or workspace work until its grouped live inspector/package executor is connected.
 ADR-18 separately admits generated native ARC jobs for unencrypted direct-Packer outputs. The recorded
-M2 candidate exercised that pipeline-attested publication route with `build-provenance-v1`, explicitly
+NVKE candidate exercised that pipeline-attested publication route with `build-provenance-v1`, explicitly
 deferring inspection, under a validation-branch exception. A separate native ARC build-only route omits
 publication and signing, retains exact raw QCOW2 bytes and producer records, and finalizes a static-unqualified
 Run. It admits ADR-10's explicitly public-bootstrap FDE producer as well as plain disks. Native ARC also admits
@@ -252,7 +252,11 @@ presentation in auto mode and conflicts with explicit terminal presentation befo
 
 Normal commands are `validate`, `definition init|validate|inspect|pin`, `run plan|graph|diff|inspect|local|generate|check-artifacts|qualify|qualify-local`,
 and `release verify|inspect|browse|diff|export|pull`. Producer operations select authored inputs with `--definition` and
-`--environment`; artifact checking and qualification use the Run/policy interfaces above. Catalog maintenance
+`--environment`; local execution alone may omit the Environment and capture the versioned build-only
+local policy. The compiler records its exact Environment bytes and digest in the Plan and captured inputs;
+the Run binds both identities. The default grants no signing, publication or VM execution capability.
+Starter authoring requires an intended destination beneath the input root, renders relative catalog references,
+and validates output packaging through the same compiler. Artifact checking and qualification use the Run/policy interfaces above. Catalog maintenance
 and exact component/platform diagnostics remain available. The SDK resolves direct selections into generated graphs and Build Digests. Backward compatibility
 is not required. Remove superseded authoring APIs and wire fixtures; retain internal mechanics only when the
 current lifecycle uses them. SDK callers obtain an opaque prepared Run and execute/generate it; decoded
@@ -358,7 +362,7 @@ implement these owned, bounded cancellation mechanics; the acceptance section be
 exhaustive zero-orphan proof for the remaining daemon/adapter matrix.
 
 Catalog I/O follows the same rule. Authority-bearing loads admit a deep context-aware provider rather than
-placing checkpoints around a legacy blocking call. The stock `--data` provider descriptor-resolves every path
+placing checkpoints around a legacy blocking call. The stock `--catalog` provider descriptor-resolves every path
 component without following symlinks, accepts regular files only, caps each file and the aggregate load, and
 bounds recursive listing count and depth. `client/v1.WithProvider` rejects a legacy provider before invoking it.
 Catalog parsing and I/O use the same context-aware loading API.

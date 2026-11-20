@@ -36,6 +36,7 @@ type InstalledDiskPackage struct {
 	Epoch        string
 	Architecture string
 	Format       string
+	Vendor       string
 }
 
 // XML decoding belongs to encoding/xml. This projection is the documented
@@ -73,6 +74,7 @@ func ParseInstalledPackagesXML(raw []byte) ([]InstalledDiskPackage, error) {
 		Systems []struct {
 			Name   []string `xml:"name"`
 			Format []string `xml:"package_format"`
+			Distro []string `xml:"distro"`
 			Apps   []struct {
 				Name    []string `xml:"name"`
 				Version []string `xml:"version"`
@@ -106,6 +108,13 @@ func ParseInstalledPackagesXML(raw []byte) ([]InstalledDiskPackage, error) {
 	if len(system.Name) != 1 || system.Name[0] != "linux" || len(system.Format) != 1 || system.Format[0] != "deb" {
 		return nil, e.New(e.CodeEngineCapability, "disk installed-package inspection supports Linux Debian-package metadata")
 	}
+	// Preserve missing distro as unknown for diagnostic callers. Package SBOM
+	// publication requires the observed vendor; it must never infer one from a
+	// package version, an output name or the build's declared distribution.
+	vendor, err := oneDiskPackageField(system.Distro, false)
+	if err != nil {
+		return nil, err
+	}
 	packages := make([]InstalledDiskPackage, 0, len(system.Apps))
 	for _, app := range system.Apps {
 		name, err := oneDiskPackageField(app.Name, true)
@@ -121,7 +130,7 @@ func ParseInstalledPackagesXML(raw []byte) ([]InstalledDiskPackage, error) {
 			fields = append(fields, value)
 		}
 		packages = append(packages, InstalledDiskPackage{Name: fields[0], Version: fields[1],
-			Release: fields[2], Epoch: fields[3], Architecture: fields[4], Format: system.Format[0]})
+			Release: fields[2], Epoch: fields[3], Architecture: fields[4], Format: system.Format[0], Vendor: vendor})
 	}
 	return CheckInstalledPackages(packages)
 }
@@ -142,7 +151,7 @@ func CheckInstalledPackages(packages []InstalledDiskPackage) ([]InstalledDiskPac
 		if _, err := oneDiskPackageField([]string{pkg.Name}, true); err != nil {
 			return nil, err
 		}
-		for _, field := range []string{pkg.Version, pkg.Release, pkg.Epoch, pkg.Architecture} {
+		for _, field := range []string{pkg.Version, pkg.Release, pkg.Epoch, pkg.Architecture, pkg.Vendor} {
 			if _, err := oneDiskPackageField([]string{field}, false); err != nil {
 				return nil, err
 			}

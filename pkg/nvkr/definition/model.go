@@ -16,6 +16,7 @@ import (
 
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/canonical"
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/containerruntime"
+	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/derivedoutput"
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/development"
 	e "github.com/dsx-ai-factory/nvkr/pkg/nvkr/errors"
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/execution"
@@ -29,6 +30,7 @@ const (
 	DefinitionKind                    = "Definition"
 	EnvironmentAPIVersion             = "nvkr.dev/environment/v1"
 	EnvironmentObjectStoresAPIVersion = "nvkr.dev/environment/v2"
+	EnvironmentBootAPIVersion         = "nvkr.dev/environment/v3"
 	EnvironmentKind                   = "Environment"
 	OutputExecutable                  = "executable"
 	OutputOCI                         = "oci"
@@ -60,6 +62,7 @@ type Definition struct {
 	Kind       string             `json:"kind"`
 	Metadata   Metadata           `json:"metadata"`
 	Catalog    Catalog            `json:"catalog"`
+	Catalogs   []Catalog          `json:"catalogs,omitempty"`
 	SBOMTool   string             `json:"sbomTool,omitempty"`
 	CosignTool string             `json:"cosignTool,omitempty"`
 	Outputs    []DefinitionOutput `json:"outputs"`
@@ -75,14 +78,15 @@ type Catalog struct {
 // DefinitionOutput is a named artifact slot frozen before a run. Components
 // selects exact outputs of one build; format selects the standard envelope.
 type DefinitionOutput struct {
-	Name       string      `json:"name"`
-	Platform   string      `json:"platform,omitempty"`
-	Platforms  []string    `json:"platforms,omitempty"`
-	Catalog    *Catalog    `json:"catalog,omitempty"`
-	Components []string    `json:"components,omitempty"`
-	Format     string      `json:"format"`
-	APT        *APTOutput  `json:"apt,omitempty"`
-	Helm       *HelmOutput `json:"helm,omitempty"`
+	Derived    *derivedoutput.Selection `json:"derived,omitempty"`
+	Name       string                   `json:"name"`
+	Platform   string                   `json:"platform,omitempty"`
+	Platforms  []string                 `json:"platforms,omitempty"`
+	Catalog    *Catalog                 `json:"catalog,omitempty"`
+	Components []string                 `json:"components,omitempty"`
+	Format     string                   `json:"format"`
+	APT        *APTOutput               `json:"apt,omitempty"`
+	Helm       *HelmOutput              `json:"helm,omitempty"`
 }
 
 // HelmOutput maps chart image slots to named OCI outputs. Repository locations
@@ -102,6 +106,9 @@ type Environment struct {
 	// Tekton selects the explicit cluster execution and signer trust contract.
 	// It contains public configuration only; credentials stay in scoped Secrets.
 	Tekton *TektonExecution `json:"tekton,omitempty"`
+	// GitLab explicitly selects native runner routes for the GitLab adapter.
+	// Runner selectors and bootstrap pins are configuration, not runtime proof.
+	GitLab *GitLab `json:"gitlab,omitempty"`
 	// GitHubBundle selects an independent generated workflow namespace; empty
 	// preserves the original generated Run paths. Paths are never authored.
 	GitHubBundle string `json:"githubBundle,omitempty"`
@@ -123,8 +130,10 @@ type Environment struct {
 	// GitHubARC explicitly selects the trusted native KVM pool policy. It is
 	// configuration, not provider isolation or runtime-capacity evidence.
 	GitHubARC string `json:"githubARC,omitempty"`
-	// DiskEvidence selects the M2 producer-evidence contract; empty requires deep inspection.
+	// DiskEvidence selects the NVKE producer-evidence contract; empty requires deep inspection.
 	DiskEvidence string `json:"diskEvidence,omitempty"`
+	// DiskEvidenceOverrides selects an explicit evidence contract for an exact disk output.
+	DiskEvidenceOverrides map[string]string `json:"diskEvidenceOverrides,omitempty"`
 	// GitHubDispatchBranches adds exact branch names to default-branch manual execution.
 	GitHubDispatchBranches []string                         `json:"githubDispatchBranches,omitempty"`
 	APIVersion             string                           `json:"apiVersion"`
@@ -162,6 +171,7 @@ type Publication struct {
 	// OCIRepresentation is an authored construction choice, never negotiated by push.
 	OCIRepresentation ociformat.Representation `json:"ociRepresentation,omitempty"`
 	ObjectStores      []ObjectStoreDestination `json:"objectStores,omitempty" yaml:"objectStores,omitempty"`
+	BootSelection     *BootSelection           `json:"bootSelection,omitempty" yaml:"bootSelection,omitempty"`
 	// Transports is a sorted, unique selection. Omission preserves the OCI route.
 	// APT is recognized but unavailable until its publication adapter is admitted.
 	Transports []string `json:"transports,omitempty"`
@@ -222,6 +232,19 @@ func (definition Definition) Validate() error {
 	if !namePattern.MatchString(definition.Metadata.Name) || definition.Catalog.Base == "" || len(definition.Outputs) == 0 {
 		return e.New(e.CodeInvalidCatalog, "definition requires a canonical name, catalog and outputs")
 	}
+	if len(definition.Catalogs) > 64 {
+		return e.New(e.CodeInvalidCatalog, "definition catalogs exceeds 64 stacks")
+	}
+	for i, candidate := range definition.Catalogs {
+		if candidate.Base == "" {
+			return e.New(e.CodeInvalidCatalog, "definition catalogs[%d] has an empty base", i)
+		}
+		for _, earlier := range definition.Catalogs[:i] {
+			if sameCatalog(candidate, earlier) {
+				return e.New(e.CodeInvalidCatalog, "definition repeats catalog stack %q", candidate.Base)
+			}
+		}
+	}
 	for _, tool := range []string{definition.SBOMTool, definition.CosignTool} {
 		if tool != "" && !namePattern.MatchString(tool) {
 			return e.New(e.CodeInvalidCatalog, "invalid catalog tool selector %q", tool)
@@ -246,7 +269,7 @@ func (definition Definition) Validate() error {
 			if len(output.Components) != 1 {
 				return e.New(e.CodeInvalidCatalog, "definition Helm output %q requires exactly one source archive or acquired chart component", output.Name)
 			}
-		} else if len(output.Components) == 0 {
+		} else if len(output.Components) == 0 && output.Derived == nil {
 			return e.New(e.CodeInvalidCatalog, "definition output %q requires components", output.Name)
 		}
 		if output.Format == OutputOCI && len(output.Components) != 1 {
@@ -290,6 +313,9 @@ func (definition Definition) Validate() error {
 		previous = output.Name
 	}
 
+	if err := definition.validateDerivedOutputs(); err != nil {
+		return err
+	}
 	return definition.validateInternalTools()
 }
 
@@ -301,7 +327,7 @@ func (definition Definition) Digest() (string, error) {
 }
 
 func (environment Environment) Validate() error {
-	if (environment.APIVersion != EnvironmentAPIVersion && environment.APIVersion != EnvironmentObjectStoresAPIVersion) || environment.Kind != EnvironmentKind || !namePattern.MatchString(environment.Metadata.Name) {
+	if (environment.APIVersion != EnvironmentAPIVersion && environment.APIVersion != EnvironmentObjectStoresAPIVersion && environment.APIVersion != EnvironmentBootAPIVersion) || environment.Kind != EnvironmentKind || !namePattern.MatchString(environment.Metadata.Name) {
 		return e.New(e.CodeInvalidCatalog, "environment has unsupported apiVersion/kind or invalid name")
 	}
 	if err := environment.validateObjectStores(); err != nil {
@@ -365,14 +391,17 @@ func (environment Environment) Validate() error {
 	if err := validateGitHubRunners(environment.GitHubRunners, environment.RunsOn); err != nil {
 		return err
 	}
+	if err := environment.validateGitLab(); err != nil {
+		return err
+	}
 	if len(environment.GitHubDispatchBranches) > 32 {
 		return e.New(e.CodeInvalidCatalog, "too many GitHub dispatch branches")
 	}
 	if environment.GitHubARC != "" && environment.GitHubARC != "native-kvm-v1" {
 		return e.New(e.CodeEngineCapability, "unsupported GitHub ARC policy %q", environment.GitHubARC)
 	}
-	if environment.DiskEvidence != "" && (environment.DiskEvidence != "build-provenance-v1" || environment.GitHubARC != "native-kvm-v1" || environment.Publication == nil) {
-		return e.New(e.CodeEngineCapability, "disk evidence mode requires the explicit native ARC publication route")
+	if err := environment.validateDiskEvidence(); err != nil {
+		return err
 	}
 	previousBranch := ""
 	for _, branch := range environment.GitHubDispatchBranches {

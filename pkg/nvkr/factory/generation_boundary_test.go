@@ -56,7 +56,7 @@ func TestRenderIsTheGenerationSeam(t *testing.T) {
 		return previous(ctx, plan, engine)
 	}
 	t.Cleanup(func() { renderSelected = previous })
-	assertFactoryErrorCode(t, func() error { _, err := Render(t.Context(), plan, EngineGitLab); return err }(), e.CodeEngineCapability)
+	assertFactoryErrorCode(t, func() error { _, err := Render(t.Context(), plan, EngineArgo); return err }(), e.CodeEngineCapability)
 	got, err := Render(t.Context(), plan, EngineGitHub)
 	if err != nil || reached != 1 || !reflect.DeepEqual(got, want) {
 		t.Fatalf("Render did not take the seam exactly once for the admitted engine: reached=%d err=%v", reached, err)
@@ -71,6 +71,55 @@ func TestRenderIsTheGenerationSeam(t *testing.T) {
 	assertFactoryErrorCode(t, err, e.CodeEngineCapability)
 	if reached != 3 {
 		t.Fatalf("Generate pilot check did not take the seam: reached=%d", reached)
+	}
+}
+
+func TestRenderGitLabTakesTheGenerationSeam(t *testing.T) {
+	_, plan := gitlabFixture(t, 1)
+	want, err := RenderGitLab(t.Context(), plan)
+	if err != nil {
+		t.Fatal(err)
+	}
+	previous, reached := renderSelected, 0
+	renderSelected = func(ctx context.Context, plan *Plan, engine string) (*GeneratedBundle, error) {
+		reached++
+		return previous(ctx, plan, engine)
+	}
+	t.Cleanup(func() { renderSelected = previous })
+	got, err := Render(t.Context(), plan, EngineGitLab)
+	if err != nil || reached != 1 || !reflect.DeepEqual(got, want) {
+		t.Fatalf("Render did not take the seam exactly once for the admitted native GitLab engine: reached=%d err=%v", reached, err)
+	}
+	// A GitLab Environment is not silently ignored by another engine.
+	_, err = Render(t.Context(), plan, EngineGitHub)
+	assertFactoryErrorCode(t, err, e.CodeEngineCapability)
+	if reached != 1 {
+		t.Fatalf("refused GitHub generation reached the seam: reached=%d", reached)
+	}
+}
+
+func TestTektonGenerationRefusesGitLabPolicyInWriteAndCheckModes(t *testing.T) {
+	plan := tektonTestPlan(t)
+	root := t.TempDir()
+	if _, err := Generate(t.Context(), plan, EngineTekton, root, false); err != nil {
+		t.Fatal(err)
+	}
+	if err := CheckGenerated(t.Context(), plan, EngineTekton, root); err != nil {
+		t.Fatalf("ordinary Tekton bundle refused: %v", err)
+	}
+	_, gitlab := gitlabFixture(t, 1)
+	plan.Environment.GitLab = gitlab.Environment.GitLab
+	forbidGenerationSeam(t)
+	for _, engine := range []string{EngineTekton, " TekTon "} {
+		t.Run(engine, func(t *testing.T) {
+			_, err := Render(t.Context(), plan, engine)
+			assertFactoryErrorCode(t, err, e.CodeEngineCapability)
+			assertFactoryErrorCode(t, CheckGenerated(t.Context(), plan, engine, root), e.CodeEngineCapability)
+			for _, check := range []bool{false, true} {
+				_, err := Generate(t.Context(), plan, engine, root, check)
+				assertFactoryErrorCode(t, err, e.CodeEngineCapability)
+			}
+		})
 	}
 }
 
@@ -106,9 +155,16 @@ func TestGeneratedStageOwnersNeverTakeTheGenerationSeam(t *testing.T) {
 		{"check-runtime-inputs", func(ctx context.Context, root string) error {
 			return CheckGitHubRuntimeInputs(ctx, plan, root)
 		}, e.CodePipelineDrift, false},
+		{"stage-runtime-inputs", func(ctx context.Context, root string) error {
+			return StageGitHubRuntimeInputs(ctx, plan, root)
+		}, e.CodePipelineDrift, false},
 		{"install-runtime-inputs", func(ctx context.Context, root string) error {
 			stageGitHubRuntimeInputs(t, root, fresh)
 			return InstallGitHubRuntimeInputs(ctx, plan, root)
+		}, e.CodePipelineDrift, false},
+		{"install-stage-runtime-inputs", func(ctx context.Context, root string) error {
+			stageGitHubRuntimeInputs(t, root, fresh)
+			return InstallGitHubStageRuntimeInputs(ctx, plan, root)
 		}, e.CodePipelineDrift, false},
 		{"describe-action", func(ctx context.Context, root string) error {
 			return WriteGitHubActionData(ctx, plan, selector, filepath.Join(root, "github-output"))
@@ -226,9 +282,10 @@ var (
 	// bytes, add it to the seam-trap table above. Remove a command here when
 	// generation stops emitting it.
 	generatedStageCommands = map[string]bool{
-		"factory github check-runtime-inputs": true, "factory github ci-download": true,
+		"factory github ci-download":       true,
 		"factory github ci-fetch-locators": true, "factory github ci-upload": true,
 		"factory github describe-action": true, "factory github install-runtime-inputs": true,
+		"factory github stage-runtime-inputs": true, "factory github install-stage-runtime-inputs": true,
 		"factory github pack-outputs": true, "factory github prepare-images": true,
 		"factory github preflight-images": true,
 		"factory github recover":          true, "factory github run-disk": true, "factory github run-node": true,

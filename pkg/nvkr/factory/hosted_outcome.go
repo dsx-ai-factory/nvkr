@@ -43,6 +43,11 @@ func validateHostedRestores(ctx context.Context, workspace string, plan *Plan) e
 	if PerOutputPublication(plan) {
 		raw, err := readSmallFactoryFile(ctx, HostedRestoreOutcomePath(workspace, "all-provider-jobs"), "provider job closure")
 		if err != nil || string(raw) != "restored:success\n" {
+			if err == nil {
+				if detail := githubProviderFailureMessage(plan, strings.TrimSuffix(string(raw), "\n")); detail != "" {
+					return classifyContext(ctx, e.New(e.CodeProvenanceMissing, "%s; complete provider job closure did not succeed", detail))
+				}
+			}
 			return classifyContext(ctx, e.New(e.CodeProvenanceMissing, "complete provider job closure did not succeed"))
 		}
 	}
@@ -343,10 +348,14 @@ func validateProductionPredicateOrigin(raw []byte, plan *Plan, signing *definiti
 	if err != nil {
 		return e.Wrap(e.CodeProvenanceMissing, err, "decoding hosted production predicate finish time")
 	}
+	materials, err := declaredDerivedDependencies(plan, predicate.BuildDefinition.ResolvedDependencies)
+	if err != nil {
+		return err
+	}
 	expected, err := productionPredicateForRun(plan, signing, hostedPredicateRun{
 		builderID: predicate.RunDetails.Builder.ID, invocationID: predicate.RunDetails.Metadata["invocationId"],
 		startedOn: startedOn, finishedOn: finishedOn,
-	})
+	}, materials...)
 	if err != nil {
 		return err
 	}

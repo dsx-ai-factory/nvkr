@@ -56,7 +56,7 @@ func TestPublicCommandPresentationCoverage(t *testing.T) {
 		}
 	}
 	visit(newApp().Commands, "")
-	if len(leaves) != 33 || canonicalDiagnostics != 4 {
+	if len(leaves) != 36 || canonicalDiagnostics != 4 {
 		t.Fatalf("public coverage changed: %d leaves, %d canonical diagnostic commands: %v", len(leaves), canonicalDiagnostics, leaves)
 	}
 }
@@ -179,6 +179,43 @@ func TestRootCommandAdmissionBeforeInputIO(t *testing.T) {
 	}
 }
 
+func TestGitLabGenerateCapabilityRefusalPresentationBeforeInputIO(t *testing.T) {
+	previous := selectProjectionPilot
+	selectProjectionPilot = func(context.Context, string, string) (context.Context, error) {
+		t.Fatal("capability refusal reached plugin selection")
+		return nil, nil
+	}
+	t.Cleanup(func() { selectProjectionPilot = previous })
+	for _, mode := range []string{"plain", "tui"} {
+		for _, option := range []string{"--runtime", "--source-commit=" + strings.Repeat("a", 40), "--projection-pilot=in-process", "--qualification-policy=missing-policy.yaml"} {
+			t.Run(mode+"/"+option, func(t *testing.T) {
+				shown := false
+				app := newApp()
+				app.Metadata = map[string]interface{}{commandPresentationServicesKey: runPresentationServices{
+					eligible: func(io.Writer) bool { return true },
+					show: func(_ context.Context, options runpresenter.Options, source runSnapshotSource, work func(context.Context) error) runpresenter.Result {
+						shown = true
+						snapshot := source.Snapshot()
+						if work != nil || options.Live || snapshot.Status != "failed" || snapshot.FailureCode != string(e.CodeEngineCapability) || snapshot.Title != "Run generation" {
+							t.Fatalf("wrong capability result: %+v", snapshot)
+						}
+						return runpresenter.Result{}
+					},
+				}}
+				root := filepath.Join(t.TempDir(), "must-not-exist")
+				out, err := runCLIWithCapturedStdout(t, app, "nvkr", "run", "generate", "--engine=gitlab", "--definition=missing-definition.yaml", "--environment=missing-environment.yaml", "--root="+root, "--ui="+mode, option)
+				assertLifecycleCommandCode(t, err, e.CodeEngineCapability)
+				if !strings.Contains(err.Error(), "GitLab generation does not support --") || shown != (mode == "tui") || len(out) != 0 {
+					t.Fatalf("capability refusal lost presentation or owner: shown=%t, output=%q, err=%v", shown, out, err)
+				}
+				if _, err := os.Stat(root); !os.IsNotExist(err) {
+					t.Fatalf("capability refusal touched output: %v", err)
+				}
+			})
+		}
+	}
+}
+
 func TestRootCommandExplicitJSONConflictsBeforeInputIO(t *testing.T) {
 	for _, args := range [][]string{
 		{"resolve", "--data", "missing", "--output", "canonical"},
@@ -215,7 +252,7 @@ func TestGraphAndComparisonProjectionExcludeTransportAndRawValues(t *testing.T) 
 
 func TestGraphDisplayShowsFocusedOutputAndItsItems(t *testing.T) {
 	lifecycleCommandRepo(t)
-	document, err := planview.Load(context.Background(), ".github/nvkr-run/plan.json")
+	document, err := planview.Load(context.Background(), ".github/nvkr-run-nvke/plan.json")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -243,8 +280,8 @@ func TestRootCommandTypedResultsAndDefaultBytes(t *testing.T) {
 	for _, args := range [][]string{
 		{"definition", "validate", "--definition", "docs/examples/nvke-module-tags/definition.yaml"},
 		{"definition", "inspect", "--definition", "docs/examples/nvke-module-tags/definition.yaml"},
-		{"run", "graph", "--plan", ".github/nvkr-run/plan.json", "--view", "producers"},
-		{"run", "diff", "--before", ".github/nvkr-run/plan.json", "--after", ".github/nvkr-run/plan.json", "--exit-code"},
+		{"run", "graph", "--plan", ".github/nvkr-run-nvke/plan.json", "--view", "producers"},
+		{"run", "diff", "--before", ".github/nvkr-run-nvke/plan.json", "--after", ".github/nvkr-run-nvke/plan.json", "--exit-code"},
 		{"resolve", "--data", "testdata/catalogs/kubernetes-layered", "--component", "kubectl", "--platform", "linux/amd64"},
 	} {
 		t.Run(strings.Join(args[:2], " "), func(t *testing.T) {
@@ -293,7 +330,7 @@ func TestReadOnlyPlanAutoSelectsEligibleTerminalWithoutLiveWork(t *testing.T) {
 		}
 		return runpresenter.Result{}
 	}}}
-	out, err := runCLIWithCapturedStdout(t, app, "nvkr", "run", "plan", "--plan", ".github/nvkr-run/plan.json", "--ui=auto")
+	out, err := runCLIWithCapturedStdout(t, app, "nvkr", "run", "plan", "--plan", ".github/nvkr-run-nvke/plan.json", "--ui=auto")
 	if err != nil || !shown || len(out) != 0 {
 		t.Fatalf("read-only auto did not open eligible viewer: %v %s", err, out)
 	}
@@ -301,7 +338,7 @@ func TestReadOnlyPlanAutoSelectsEligibleTerminalWithoutLiveWork(t *testing.T) {
 
 func TestPlanDifferenceViewerRetainsRequestedExitStatus(t *testing.T) {
 	lifecycleCommandRepo(t)
-	before := ".github/nvkr-run/plan.json"
+	before := ".github/nvkr-run-nvke/plan.json"
 	plan, err := factory.LoadPlanContext(t.Context(), before)
 	if err != nil {
 		t.Fatal(err)

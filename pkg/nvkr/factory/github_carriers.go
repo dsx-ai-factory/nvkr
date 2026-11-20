@@ -79,6 +79,18 @@ func PackGitHubOutputs(ctx context.Context, plan *Plan, nodeID string, options G
 		return e.New(e.CodeInvalidCatalog, "GitHub plan has no node %q", nodeID)
 	}
 	outputs := githubCarrierOutputs(plan, *selected, artifacts, nodeJobs)
+	ordered, _, err := githubSchedulingProjection(plan)
+	if err != nil {
+		return err
+	}
+	seeds, err := githubSourceSeeds(plan, ordered)
+	if err != nil {
+		return err
+	}
+	seedOwner := false
+	for consumer, seed := range seeds {
+		seedOwner = seedOwner || seed.ID == nodeID && nodeJobs[consumer] != nodeJobs[seed.ID]
+	}
 	details := make([]string, 0, len(outputs))
 	for _, id := range outputs {
 		details = append(details, githubArtifactDetail(plan, "Output", id))
@@ -87,7 +99,13 @@ func PackGitHubOutputs(ctx context.Context, plan *Plan, nodeID string, options G
 		for _, id := range outputs {
 			progress.phase("archive " + id)
 			progress.log("Archive: " + id)
-			if err := transportarchive.Pack(ctx, carrierPath(id), ".", []string{artifacts[id].Path}); err != nil {
+			var err error
+			if seedOwner && artifacts[id].Kind == "source-closure" {
+				err = transportarchive.PackSourceSeed(ctx, carrierPath(id), ".", artifacts[id].Path)
+			} else {
+				err = transportarchive.Pack(ctx, carrierPath(id), ".", []string{artifacts[id].Path})
+			}
+			if err != nil {
 				return err
 			}
 		}
@@ -130,23 +148,23 @@ func recoverGitHubArtifacts(ctx context.Context, plan *Plan, providerResults str
 	if err != nil {
 		return err
 	}
+	var upstreamFailure string
 	if PerOutputPublication(plan) {
-		status := "restored:success"
-		for _, job := range jobs {
-			if results[job] != "success" {
-				status = "job-failed"
-				break
-			}
-		}
+		status := githubProviderClosureStatus(jobs, results, projection.Full)
 		if err := writeGitHubRestoreOutcome(ctx, "all-provider-jobs", status); err != nil {
 			return err
 		}
+		upstreamFailure = githubProviderFailureMessage(plan, status)
 	}
 	carriers := append([]Artifact(nil), plan.Graph.Artifacts...)
 	sort.Slice(carriers, func(i, j int) bool { return carriers[i].ID < carriers[j].ID })
-	return githubProgress(ctx, options, "Recover artifacts for finalization", []string{
+	details := []string{
 		"Transport outcomes are diagnostic; the finalizer authenticates completeness.",
-	}, func(progress *githubStepProgress) error {
+	}
+	if upstreamFailure != "" {
+		details = append(details, upstreamFailure)
+	}
+	return githubProgress(ctx, options, "Recover artifacts for finalization", details, func(progress *githubStepProgress) error {
 		counts := map[string]int{}
 		visited, restoreNoSpace, outcomeWriteFailed, outcomeNoSpace := 0, 0, 0, 0
 		defer func() {

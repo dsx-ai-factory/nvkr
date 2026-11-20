@@ -34,8 +34,9 @@ policies, including artifact-only bundle archive validation. Local composite qua
 Release reuse remain deferred and fail closed; reuse follows the result-reuse decision.
 Contract coverage includes `TestQualificationAuthenticatesCompleteComposition` and
 `TestGPUCompositeQualificationPairs`; these do not establish external service or hosted acceptance.
-Retiring the combined NVKE Definition is a separate cutover gated on a hosted composite Run and consumer
-verification.
+The 2026-11-17 maintainer decision replaces the combined production path with the composite and
+retires standalone family/legacy ARM64 nightly bundles. Independent consumer verification remains
+unrecorded acceptance work; the decision explicitly supersedes that former retirement prerequisite (ADR-26 U10).
 
 [ADR-27](../0027-pinned-tool-producers.md) defines pinned-tool producers: catalog components that run one released,
 digest-pinned executable offline in a pinned container, with no shell, a fixed argument vector and typed material

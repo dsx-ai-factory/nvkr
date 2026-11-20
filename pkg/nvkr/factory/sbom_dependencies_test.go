@@ -21,7 +21,7 @@ import (
 func TestSBOMGraphRejectsUndeclaredForeignToolResult(t *testing.T) {
 	for _, requiredTool := range []bool{false, true} {
 		t.Run(fmt.Sprintf("tool_requirement=%t", requiredTool), func(t *testing.T) {
-			plan, err := LoadPlanContext(t.Context(), "../../../.github/nvkr-run/plan.json")
+			plan, err := LoadPlanContext(t.Context(), "../../../.github/nvkr-run-nvke/plan.json")
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -29,8 +29,8 @@ func TestSBOMGraphRejectsUndeclaredForeignToolResult(t *testing.T) {
 				t.Fatal(err)
 			}
 			_, artifacts := planIndex(plan)
-			subject := artifacts["result/cwe/linux/amd64/nvke-controller"]
-			foreign := artifacts["result/cwe/linux/arm64/nvke-controller"]
+			subject := artifacts["result/nvke-controller/linux/amd64/nvke-controller"]
+			foreign := artifacts["result/nvke-controller/linux/arm64/nvke-controller"]
 			if subject.ID == "" || foreign.ID == "" || subject.Component != foreign.Component || subject.BuildTarget == foreign.BuildTarget {
 				t.Fatal("fixture lacks independently evidenced same-name producer results")
 			}
@@ -70,20 +70,20 @@ func TestMaintainedSBOMGraphRequiresScannerAndPayloads(t *testing.T) {
 		}{
 			{"complete", "", ""},
 			{"missing scanner", "scanner", e.CodeEngineCapability},
-			{"missing payload", "artifact/cwe/" + platform + "/nvke-controller", e.CodeProvenanceMissing},
+			{"missing payload", "artifact/nvke-controller/" + platform + "/nvke-controller", e.CodeProvenanceMissing},
 		} {
 			t.Run(platform+"/"+tc.name, func(t *testing.T) {
-				plan, err := LoadPlanContext(t.Context(), "../../../.github/nvkr-run/plan.json")
+				plan, err := LoadPlanContext(t.Context(), "../../../.github/nvkr-run-nvke/plan.json")
 				if err != nil {
 					t.Fatal(err)
 				}
-				if plan.Definition.SBOMTool != "syft" {
+				if plan.Definition.SBOMTool != "syft-module-tags" {
 					t.Fatal("maintained workflow does not request dependency inspection")
 				}
 				found, removed := false, false
 				for i := range plan.Graph.Nodes {
 					node := &plan.Graph.Nodes[i]
-					if node.ID != "cwe/"+platform+"/sbom" {
+					if node.ID != "nvke-controller/"+platform+"/sbom" {
 						continue
 					}
 					found = true

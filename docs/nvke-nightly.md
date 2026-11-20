@@ -64,11 +64,14 @@ the existing loader and exact-source owner resolve these relative paths there.
 A fixed local attempt/output name is safe because each job gets a fresh
 workspace, runs once and publishes no build products.
 
-The explicit `small` profile selects a 7-GiB site, 3 GiB per tenant VM, four
-vCPUs per guest and 1 GiB headroom. The temporary 6-GiB bootstrap backend stops
-before tenant creation. Initial admission requires 14 GiB actually available:
+The nightly configuration selects the explicit `small` profile with a 7-GiB site,
+3 GiB per tenant VM, four vCPUs per guest and 512 MiB host/QEMU headroom.
+The temporary 6-GiB bootstrap backend stops before tenant creation.
+Initial admission requires 13,824 MiB (13.5 GiB) actually available:
 site plus the larger of bootstrap or two tenants, plus headroom. Tenant creation
-rechecks 7 GiB beside the existing site. These checks reserve no resources.
+rechecks 6,656 MiB (6.5 GiB) beside the existing site. Less memory or fewer than
+four host CPUs fails with `NVKR-E-ENGINE-CAPABILITY` before the associated work.
+These checks reserve no resources and do not guarantee freedom from later memory pressure.
 An unset profile retains the existing scheduling defaults. These allocations
 are functional-test settings, not proven hardware minima or performance qualification.
 The small profile also sets the site's system reservation and the tenant's
@@ -76,8 +79,32 @@ Reserved/SystemReserved/KubeReserved memory to 256Mi, appends the guest kubelet
 `--kube-reserved=cpu=1000m,memory=256Mi,ephemeral-storage=1Gi` override and restarts
 it, sets OVN control-plane/node-zone memory requests to 128Mi, and adds 64Mi
 memory requests to the seven site telemetry collector roles and three target
-allocators. Recorded small-profile runtime acceptance covers these settings,
-not the default reservations.
+allocators. Recorded small-profile guest-reservation evidence is scoped to the
+exact revisions in the [reconciliation record](adr/reconciliation/consumer-acceptance-scopes.md).
+
+The demo's default StorageClass has no dynamic provisioner. It supplies four
+1-GiB volumes and writable guest directories for NKTP's persistent queues, in
+addition to the PostgreSQL and SPIRE volumes. Queue data survives Pod restarts
+within the disposable site VM; deleting that VM removes the data.
+
+An optional Helm-rendering check can detect queue-storage drift before a full VM
+cycle. Use the NKTP chart selected by the exact frozen NVKE revision and that
+revision's `deploy/nico/nktp/values.yaml`; do not mix either input with a newer
+checkout. For example, NVKE `d36f0b61ad1b0369087ddb3a277eec99fe63dbdb` selects the
+NGC `nktp` chart at `0.2.0` in its
+[deployment declaration](https://github.com/dsx-ai-factory/nvke/blob/d36f0b61ad1b0369087ddb3a277eec99fe63dbdb/deploy/nico/nktp/release.yaml).
+Keep the chart archive digest (or exact chart-source commit) with the test result.
+With Helm available, replace these paths with that matching pair:
+
+```sh
+NVKR_NATIVE_PROFILE_NKTP_CHART=/path/to/selected/nktp-0.2.0.tgz \
+NVKR_NATIVE_PROFILE_NKTP_VALUES=/path/to/frozen-nvke/deploy/nico/nktp/values.yaml \
+  go -C demos/nvke test ./internal/nvkedemo -run '^TestNativeSiteStorageMatchesSourceNKTPChart$' -count=1
+```
+
+The check validates rendered queue count, size and binding constraints. It skips
+when both inputs are absent and fails when only one is supplied. It remains
+optional and does not replace the full hosted E2E or acquire inputs in default CI.
 
 The six-hour job passes its remaining deadline to Go, which preserves two hours
 for independently bounded cleanup. Setup requires a GitHub-hosted AMD64 machine,
@@ -115,24 +142,24 @@ OCI images, QCOW2 files and private diagnostics remain on the disposable runner.
 There is no public-error option. Trusted NVKE code retains sudo/Docker access on
 that runner; these unsigned diagnostics grant no release or publication authority.
 
-The ARM64 build/publish/consume nightly is retired. Generated ARM64 producer
-workflows retain their existing admission policies, but no nightly invokes them
-or the legacy published-artifact consumer.
+The ARM64 build/publish/consume nightly is retired. Its generated ARM64 producer workflows and two Definitions are removed; no nightly invokes
+the legacy published-artifact consumer. The maintained signed candidate is the composite below.
 
 ## Dispatch a complete floating GPU-site candidate
 
-The generated `nvkr-run-nvke-nightly-gpu-site.yml` producer uses the complete
-[GPU-site composite](../inputs/definitions/nvke/gpu-site.composite.yaml) with its own
-[Environment](../inputs/environments/github-nvke-nightly-gpu-site.yaml). On first dispatch
+The generated `nvkr-run-nvke-nightly.yml` producer uses the complete
+[release composite](../inputs/definitions/nvke/nvke-release.composite.yaml), including its derived inventory, with its own
+[Environment](../inputs/environments/github-nvke-nightly.yaml). On first dispatch
 it freezes main once for `dsx-ai-factory/nvke`, `dsx-ai-factory/ovn-kubernetes`,
 `dsx-ai-factory/cluster-api-provider-nico` and `NVIDIA/aicr`. Toolchains, acquired
-dependencies and the Rancher source remain pinned. The production GPU-site workflow,
-namespace and pins are separate and unchanged.
+dependencies and the Rancher source remain pinned. Production retains its separate workflow and pins;
+future production releases publish below `ghcr.io/dsx-ai-factory/nvkr/candidate/nvke`. References to any
+releases already published remain unchanged.
 
 After maintainer configuration and merge to main, dispatch the generated producer:
 
 ```sh
-gh workflow run nvkr-run-nvke-nightly-gpu-site.yml --repo dsx-ai-factory/nvkr --ref main
+gh workflow run nvkr-run-nvke-nightly.yml --repo dsx-ai-factory/nvkr --ref main
 ```
 
 The producer is manual-only. The first bootstrap uploads `nvkr-runtime-inputs`; its
@@ -142,9 +169,10 @@ A retry restores the original same-Run artifact; it fails if that artifact has e
 Use a new dispatch to select newer main commits. Workflow topology or recipe changes
 still require reviewed regeneration.
 
-Publication is confined to `ghcr.io/dsx-ai-factory/nvkr/nightly/gpu-site` and its derived
-output repositories. The independent
-[qualification policy](../inputs/policies/nvke-nightly-gpu-site-qualification.yaml)
+Publication is confined to `ghcr.io/dsx-ai-factory/nvkr/nightly/nvke` and its derived
+output repositories for future releases. Any artifacts already published under `nightly/gpu-site` remain at their original
+paths; digest-pinned consumers must retain the original reference for those releases. The independent
+[qualification policy](../inputs/policies/nvke-composite-nightly-qualification.yaml)
 generates a complete-composite qualifier and native smoke pair. Finalization and
 qualification replay the saved inputs and exact Git commits without re-resolving main.
 Artifact checks and smoke do not establish GPU-site deployment or exact-byte reproduction.

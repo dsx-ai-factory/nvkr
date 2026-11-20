@@ -70,7 +70,7 @@ func TestGraphOutputFocusKeepsUpstreamClosureOnly(t *testing.T) {
 				}
 			}
 			if view == "producers" {
-				for _, key := range []string{"producer/controller-chart/build-nvke-controller-chart", "producer/cwe/linux/amd64/build-nvke-controller", "producer/cwe/linux/arm64/build-nvke-controller"} {
+				for _, key := range []string{"producer/controller-chart/build-nvke-controller-chart", "producer/nvke-controller/linux/amd64/build-nvke-controller", "producer/nvke-controller/linux/arm64/build-nvke-controller"} {
 					if !kept[key] {
 						t.Fatalf("producers: upstream producer %s missing", key)
 					}

@@ -17,20 +17,8 @@ import (
 // Validate admits the complete Plan in dependency order. Local checks retain
 // their coded diagnostics; rederivation finally checks every executable byte.
 func (plan Plan) Validate() error {
-	if err := plan.validateFrozenSources(); err != nil {
-		return err
-	}
-	if err := plan.validateRuntimeSourceSelection(); err != nil {
-		return err
-	}
-	packages, err := plan.validatePlanInputs()
+	packages, err := plan.validateGraphInputs()
 	if err != nil {
-		return err
-	}
-	if err := plan.validatePlanBuilds(); err != nil {
-		return err
-	}
-	if err := plan.validateInternalToolPlans(); err != nil {
 		return err
 	}
 	if err := plan.validateEvidenceAttestationGraph(); err != nil {
@@ -58,7 +46,35 @@ func (plan Plan) Validate() error {
 	if err := plan.validateLifecyclePlans(); err != nil {
 		return err
 	}
+	if err := plan.validateBootPublicationPlan(); err != nil {
+		return err
+	}
 	return plan.validateCompiledGraph(packages)
+}
+
+// Admit derivation inputs before the compiler sees an untrusted graph-free tree.
+// This is also the first phase of full Plan validation; it never reads Graph.
+func (plan Plan) validateGraphInputs() ([]packageSpec, error) {
+	if err := plan.validateFrozenSources(); err != nil {
+		return nil, err
+	}
+	if err := plan.validateRuntimeSourceSelection(); err != nil {
+		return nil, err
+	}
+	packages, err := plan.validatePlanInputs()
+	if err != nil {
+		return nil, err
+	}
+	if err := plan.validateCatalogCandidates(); err != nil {
+		return nil, err
+	}
+	if err := plan.validatePlanBuilds(); err != nil {
+		return nil, err
+	}
+	if err := plan.validateInternalToolPlans(); err != nil {
+		return nil, err
+	}
+	return packages, nil
 }
 
 func (plan Plan) validatePlanInputs() ([]packageSpec, error) {
@@ -67,8 +83,9 @@ func (plan Plan) validatePlanInputs() ([]packageSpec, error) {
 			return nil, err
 		}
 	}
-	if (plan.SchemaVersion != PlanSchemaVersion && plan.SchemaVersion != CompositePlanSchemaVersion) ||
-		(plan.SchemaVersion == CompositePlanSchemaVersion) != (plan.Composition != nil) || !canonicalName.MatchString(plan.Name) {
+	if (plan.SchemaVersion != PlanSchemaVersion && plan.SchemaVersion != CompositePlanSchemaVersion && plan.SchemaVersion != BootPlanSchemaVersion) ||
+		(plan.SchemaVersion != BootPlanSchemaVersion && (plan.SchemaVersion == CompositePlanSchemaVersion) != (plan.Composition != nil)) ||
+		(plan.SchemaVersion == BootPlanSchemaVersion) != (plan.BootPublication != nil) || !canonicalName.MatchString(plan.Name) {
 		return nil, e.New(e.CodeInvalidCatalog, "run plan schema/name is invalid")
 	}
 	if strings.TrimSpace(plan.GeneratorVersion) == "" {
@@ -138,6 +155,9 @@ func (plan Plan) validatePlanInputs() ([]packageSpec, error) {
 
 	requiredBuilds := len(plan.Definition.InternalTools)
 	for _, output := range plan.Definition.Outputs {
+		if output.Derived != nil {
+			continue
+		}
 		requiredBuilds += len(nativeOutputSelections(output))
 	}
 	if len(plan.Builds) != requiredBuilds {

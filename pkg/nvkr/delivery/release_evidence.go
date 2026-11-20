@@ -28,8 +28,17 @@ func verifyReleaseEvidence(ctx context.Context, root string, publication Publica
 }
 
 // sources receives descriptions from the same exact subject documents checked
-// for release membership. Nothing escapes an inspection unless every slot passes.
+// for release membership. This full path checks every slot before returning.
 func verifyReleaseEvidenceSources(ctx context.Context, root string, publication PublicationRoot, sources map[string]PublicationSource) error {
+	return verifySelectedReleaseEvidenceSources(ctx, root, publication, sources, nil)
+}
+
+// A non-nil selection limits physical document checks, never logical membership
+// validation. Shared evidence retains every original named use; an unselected
+// payload or binary config is not required to authenticate a selected use.
+// Unselected evidence receives no source description: omission means unchecked,
+// not a verified statement that the evidence has no source-built subject.
+func verifySelectedReleaseEvidenceSources(ctx context.Context, root string, publication PublicationRoot, sources map[string]PublicationSource, selection metadataSelection) error {
 	if publication.Release == nil {
 		return nil
 	}
@@ -80,7 +89,7 @@ func verifyReleaseEvidenceSources(ctx context.Context, root string, publication 
 			diskRoots[o.Name] = output.Disk.Component
 			diskModes[o.Name] = output.Disk.EvidenceMode
 		}
-		if output.Format == "executable" {
+		if output.Format == "executable" && selection.includes(o) {
 			manifest, err := flatManifest(ctx, root, o)
 			if err != nil {
 				return err
@@ -176,6 +185,9 @@ func verifyReleaseEvidenceSources(ctx context.Context, root string, publication 
 			previousOutput = outputName
 			seen[key] = true
 		}
+		if !selection.includes(object) {
+			continue
+		}
 		manifest, err := flatManifest(ctx, root, object)
 		if err != nil {
 			return err
@@ -236,6 +248,16 @@ func verifyReleaseEvidenceSources(ctx context.Context, root string, publication 
 				}
 				continue
 			}
+			if diskModes[outputName] == sbom.DiskInstalledPackages {
+				if diskRoot == binding.Component {
+					if err := sbom.ValidateDiskInstalledPackages(&bom); err != nil {
+						return err
+					}
+				} else if err := sbom.ValidateDiskBuildProvenance(&bom); err != nil {
+					return err
+				}
+				continue
+			}
 			keys := []string{"nvkr:dependencyScannerDigest"}
 			if diskRoot == binding.Component {
 				if len(bom.Components) == 0 || props["nvkr:dependencyInspection"] != "disk-reconciled/v1" {
@@ -268,7 +290,7 @@ func verifyReleaseEvidenceSources(ctx context.Context, root string, publication 
 			} else if method == sbom.BundleFilesMethod {
 				return e.New(e.CodeVerifyFailed, "bundle file inspection is not valid for a non-bundle output")
 			}
-			if diskRoot == "" && (method == "disk-content/v1" || method == "disk-reconciled/v1") {
+			if diskRoot == "" && (method == "disk-content/v1" || method == "disk-reconciled/v1" || method == sbom.DiskInstalledPackagesMethod) {
 				return e.New(e.CodeVerifyFailed, "disk inspection method is not valid for a non-disk output")
 			}
 		}

@@ -82,7 +82,7 @@ func TestLaptopARM64DefinitionMembership(t *testing.T) {
 							}
 							continue
 						}
-						if tc.file != "inputs/definitions/diagnostics/demo-arm64/site.json" || (output.Name != "cwe" && output.Name != "controller-chart" && output.Name != "nvkectl") {
+						if tc.file != "inputs/definitions/diagnostics/demo-arm64/site.json" || (output.Name != "nvke-controller" && output.Name != "controller-chart" && output.Name != "nvkectl") {
 							t.Fatalf("unexpected duplicate split output %s", output.Name)
 						}
 						replaced[output.Name] = true
@@ -239,12 +239,15 @@ func TestLaptopARM64CatalogCompilation(t *testing.T) {
 	testutil.RequireExtended(t)
 	t.Chdir("../../..")
 	for _, tc := range []struct {
-		file    string
-		outputs int
+		file        string
+		environment string
+		outputs     int
 	}{
-		{"inputs/definitions/diagnostics/demo-arm64/providers.json", 2},
-		{"inputs/definitions/diagnostics/demo-arm64/components.json", 22},
-		{"inputs/definitions/demo/arm64-nvidia-tcg.json", 32},
+		{"inputs/definitions/diagnostics/demo-arm64/providers.json", "local-arm64-tcg.json", 2},
+		{"inputs/definitions/diagnostics/demo-arm64/components.json", "local-arm64-tcg.json", 22},
+		{"inputs/definitions/demo/arm64-nvidia-tcg.json", "local-arm64-tcg.json", 32},
+		{"inputs/definitions/demo/arm64-nvidia-local-kvm.json", "local-arm64-kvm.json", 32},
+		{"inputs/definitions/demo/arm64-upstream-local-kvm.json", "local-arm64-kvm.json", 32},
 	} {
 		t.Run(tc.file, func(t *testing.T) {
 			path := tc.file
@@ -252,7 +255,7 @@ func TestLaptopARM64CatalogCompilation(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			envPath := "inputs/environments/local-arm64-tcg.json"
+			envPath := filepath.Join("inputs/environments", tc.environment)
 			env, err := authored.LoadEnvironment(t.Context(), envPath)
 			if err != nil {
 				t.Fatal(err)
