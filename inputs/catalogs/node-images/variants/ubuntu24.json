@@ -2,7 +2,7 @@
   "apiVersion": "nvkr.dev/catalog-overlay/v3",
   "kind": "CatalogOverlay",
   "name": "nvke-os-ubuntu24",
-  "requiresCatalogDigest": "sha256:db146195c3ef82e670bd5dfdacd63a91fd643e0ca79daf42b18da65e82d67261",
+  "requiresCatalogDigest": "sha256:61089dd4c92ad88052aa12b061b87f25c0bb08ed8832e3c1b7400e3c83d77216",
   "components": {
     "nvke-agent": {
       "component": {

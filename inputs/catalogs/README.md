@@ -66,3 +66,18 @@ fresh upstream build, exact-byte reproduction of a source build, hosted executio
 The [NVKE MachineImage candidate](nvke/machineimage/README.md) is a standalone catalog script and maintained
 template checked against a CRD read from pinned NVKE source. It is not a registered producer and changes
 no maintained output selection, Plan or Build identity. Production integration remains unavailable.
+
+## Calico image acquisition
+
+Calico's source-vendoring commands select `CNI_DOCKERHUB_MIRROR=mirror.gcr.io`
+inside the vendor container. The node-image catalog imports this command from
+the shared fragment for release and diagnostic producers; the NVSentinel
+experiment declares its own copy.
+Outer job environment variables are not forwarded into that container.
+This is a best-effort mitigation for [Docker Hub rate limiting](https://github.com/dsx-ai-factory/nvkr/issues/403):
+NVKE falls back to Docker Hub when an exact digest is missing, and retries the
+canonical image set if the mirrored transfer fails. Quay references are untouched;
+locked image digests and installed names stay unchanged. The public mirror has
+[no retention guarantee](https://docs.cloud.google.com/artifact-registry/docs/pull-cached-dockerhub-images).
+[Issue 412](https://github.com/dsx-ai-factory/nvkr/issues/412)
+tracks the durable NVKR-owned authenticated acquisition and NVKE offline bundle mode.

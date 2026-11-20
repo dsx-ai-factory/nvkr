@@ -1,14 +1,14 @@
 {
   "appliedOverlays": [
     {
-      "inputCatalogDigest": "sha256:4afb4e97f617e3c348fca7b42e9f9cb5fd2d627c58bec8242cff9ea43b77c663",
+      "inputCatalogDigest": "sha256:3ad15dad0b01c77e75dc295d8f19cad4e39bcb752769d1034d59fbfc43f30e85",
       "name": "nvke-native-toolchains",
-      "outputCatalogDigest": "sha256:db146195c3ef82e670bd5dfdacd63a91fd643e0ca79daf42b18da65e82d67261",
-      "overlayDigest": "sha256:803aec253046ffb477a60aeadbf549cdf4d282b62edbbba0a2341bd55c88f384"
+      "outputCatalogDigest": "sha256:61089dd4c92ad88052aa12b061b87f25c0bb08ed8832e3c1b7400e3c83d77216",
+      "overlayDigest": "sha256:b35554553ff34ca019451770bb53baf6e95d282a1c4903b91251b6b84f94ff1b"
     }
   ],
-  "buildDigest": "sha256:d8ae881b5c827413b56d34b0370e12e9942bac923c4cdcb0bee5e0491cea7558",
-  "catalogDigest": "sha256:db146195c3ef82e670bd5dfdacd63a91fd643e0ca79daf42b18da65e82d67261",
+  "buildDigest": "sha256:1d5e70819b68468e58c1bb50c4ee87a94d4175bdb3fa90813caf3f7dcfeaa8a5",
+  "catalogDigest": "sha256:61089dd4c92ad88052aa12b061b87f25c0bb08ed8832e3c1b7400e3c83d77216",
   "components": [
     "nvke-agent",
     "nvke-cni-calico",
@@ -148,17 +148,17 @@
         "id": "build-nvke-cni-calico",
         "kind": "build",
         "needs": [
-          "fetch-source-48059193cba8be36acd98782b295989423f79781ff7ea61abcee3cad8c2e0a32"
+          "fetch-source-72d8f0209316bbf633b8220eb8cb90d3c38117879e428fc1c85c167cad29f8b1"
         ],
         "network": "none",
         "outputType": "tarball",
         "platform": "linux/amd64",
         "sourceCommit": "2cfd00081b468d85a4894ec17e9deac13c9d8169",
-        "sourceDest": "source-48059193cba8be36acd98782b295989423f79781ff7ea61abcee3cad8c2e0a32",
+        "sourceDest": "source-72d8f0209316bbf633b8220eb8cb90d3c38117879e428fc1c85c167cad29f8b1",
         "sourceReadOnly": true,
         "sourceTreeHash": "a377abf5f0d584db9c86cc9981b2fdaa8bb4ac53",
         "toolchain": "ghcr.io/dsx-ai-factory/nvkr/m2-candidate/toolchains/packer-native@sha256:915623e06b2d599ccdaee545d9e657112cd9740603a86e652077564181892f70",
-        "vendorSpecDigest": "sha256:cb528ae00504bebb9a2cd429f6dd783a9a50d6c6c9f73f8763974ef4eb6164b9",
+        "vendorSpecDigest": "sha256:4f94170fd8d007470884a31209bb167e08e40253a8d21ab10df90696739f912d",
         "version": "0.23.0",
         "workdir": "/src",
         "writeDir": "nvkr-output"
@@ -938,8 +938,8 @@
       },
       {
         "commit": "2cfd00081b468d85a4894ec17e9deac13c9d8169",
-        "dest": "source-48059193cba8be36acd98782b295989423f79781ff7ea61abcee3cad8c2e0a32",
-        "id": "fetch-source-48059193cba8be36acd98782b295989423f79781ff7ea61abcee3cad8c2e0a32",
+        "dest": "source-72d8f0209316bbf633b8220eb8cb90d3c38117879e428fc1c85c167cad29f8b1",
+        "id": "fetch-source-72d8f0209316bbf633b8220eb8cb90d3c38117879e428fc1c85c167cad29f8b1",
         "kind": "fetch",
         "network": "default",
         "repo": "https://github.com/dsx-ai-factory/nvke.git",
@@ -948,11 +948,11 @@
           "bash",
           "-ec",
           {
-            "file": ".github/nvkr-plan-store/scripts/nvke/vendor@f04574786e4a.sh"
+            "file": ".github/nvkr-plan-store/scripts/nvke/vendor@281cc8eab63c.sh"
           }
         ],
         "vendorImage": "ghcr.io/dsx-ai-factory/nvkr/m2-candidate/toolchains/packer-native@sha256:915623e06b2d599ccdaee545d9e657112cd9740603a86e652077564181892f70",
-        "vendorSpecDigest": "sha256:cb528ae00504bebb9a2cd429f6dd783a9a50d6c6c9f73f8763974ef4eb6164b9"
+        "vendorSpecDigest": "sha256:4f94170fd8d007470884a31209bb167e08e40253a8d21ab10df90696739f912d"
       },
       {
         "commit": "2cfd00081b468d85a4894ec17e9deac13c9d8169",
@@ -1118,7 +1118,7 @@
         "bash",
         "-ec",
         {
-          "file": ".github/nvkr-plan-store/scripts/nvke/vendor@57116243ba7d.sh"
+          "file": ".github/nvkr-plan-store/scripts/nvke/vendor@9142839b750a.sh"
         }
       ],
       "writeDir": "nvkr-output"
