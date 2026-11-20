@@ -254,7 +254,11 @@ func admitPlanTransport(sourceRepository string, plan *factory.Plan) error {
 // Reject authored path symlinks before resolution. Owning loaders still hold and
 // revalidate exact regular files; this is containment, not a concurrency receipt.
 func admitPath(relative string) error {
-	current := "."
+	return admitPathAtRoot(".", relative)
+}
+
+func admitPathAtRoot(root, relative string) error {
+	current := root
 	for _, part := range strings.Split(relative, "/") {
 		current = filepath.Join(current, part)
 		info, err := os.Lstat(current)

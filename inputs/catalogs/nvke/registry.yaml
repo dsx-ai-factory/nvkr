@@ -281,13 +281,6 @@ components:
       GIT_VERSION: '{{.Commit}}'
     writeDir: bin
   nvke-controller-chart:
-    artifactPath: charts/nvke-controller-0.23.0.tgz
-    buildCommand:
-    - package
-    - controller/deploy/charts/controller
-    - --version=0.23.0
-    - --app-version=v0.23.0
-    - --destination=charts/
     fromSource: true
     helm:
       chart: .
@@ -301,13 +294,8 @@ components:
     - linux/arm64
     source: nvke-helm
     writeDir: charts
+    sourceRecipe: {"artifactPath": "charts/nvke-controller-{{.ReleaseVersion}}.tgz", "buildCommand": ["package", "controller/deploy/charts/controller", "--version={{.ReleaseVersion}}", "--app-version={{.Tag}}", "--destination=charts/"], "commitVersion": "0.23.0"}
   nvke-controller-chart-local-site:
-    artifactPath: charts/nvke-controller-0.23.0.tgz
-    buildCommand:
-    - sh
-    - -euc
-    - helm package controller/deploy/charts/controller --version=0.23.0 --app-version=v0.23.0
-      --destination=charts/
     fromSource: true
     helm:
       chart: .
@@ -320,6 +308,7 @@ components:
     - linux/arm64
     source: nvke-controller-helm
     writeDir: charts
+    sourceRecipe: {"artifactPath": "charts/nvke-controller-{{.ReleaseVersion}}.tgz", "buildCommand": ["sh", "-euc", "helm package controller/deploy/charts/controller --version={{.ReleaseVersion}} --app-version={{.Tag}} --destination=charts/"], "commitVersion": "0.23.0"}
   nvke-controller-chart-native-site:
     artifactPath: charts/nvke-controller-0.0.0.tgz
     buildCommand:

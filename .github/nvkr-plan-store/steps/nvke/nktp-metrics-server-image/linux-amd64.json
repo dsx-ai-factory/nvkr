@@ -1,6 +1,6 @@
 {
   "buildDigest": "sha256:fe66770473ebbe8479594b283dddb7774668c2588e6d59e275ad25b1bd2360c1",
-  "catalogDigest": "sha256:f632d51a8e58b5728e8900b24370cff90c875bac0b3d250d7cb700dc03604d87",
+  "catalogDigest": "sha256:84b9ecc3946d2ff92d75a413f45c9fffc7fb54f198589e5da8158ec6f397bbd2",
   "components": [
     "nktp-metrics-server-image"
   ],
