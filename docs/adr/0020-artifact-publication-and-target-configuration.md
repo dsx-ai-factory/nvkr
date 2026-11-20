@@ -1,6 +1,7 @@
 # ADR-20 — Artifact publication & target-registry configuration
 
 - **Decision status:** Accepted (2026-11-14)
+- **Revised:** 2026-11-20 — destination staging by digest (Design B), with platform-token access (Design C) as the adopter default.
 - **Implementation maturity:** Tracked separately in `reconciliation/README.md`; implementation and test evidence do not
   constitute governance ratification.
 - **Acceptance-test maturity:** Tracked separately in `reconciliation/README.md`; green unit tests alone do not
@@ -13,7 +14,8 @@
   SEC-13 (registry-by-digest).
 
 - **Scope:** Sections 3–4 specify deferred qualified publication. Diagnostic transport construction is
-  implemented as stated in §4. Section 6 defines v1 publication; §7 is deferred registration.
+  implemented as stated in §4. Section 6 defines v1 publication, including the accepted stage/release split;
+  [reconciliation](reconciliation/adr-20.md) tracks its implementation boundary. Section 7 is deferred registration.
 
 ## Context
 
@@ -71,7 +73,8 @@ into the product repositories.
 Omitting publication produces a build-only Run. In the implemented schema, destinations and a separate
 output-to-destination map are not authored. The S3 extension contract below specifies the bounded exception.
 The generated internal routes still bind exact package inputs and targets.
-Each derived route owns exactly one publisher and its publication reference. When signing is configured,
+Each derived route owns one publication authority and its publication reference, split into payload staging
+and release by reference under §6. Staging alone cannot issue an accepted release. When signing is configured,
 its sign and verification operations bind that same route's package, reference and signature artifacts.
 Another publisher or signer cannot acquire route authority merely by naming an existing target.
 
@@ -81,7 +84,7 @@ Explicit low-level tagged publication remains a discovery operation; automatic v
 promotion policy are not implemented by this lifecycle configuration.
 
 A Helm chart deliverable has a bounded discovery exception: after its manifest is durably published at its digest,
-the publisher additionally advances two chart-scoped tags — the chart's own `<version>` (matching what real
+the release operation additionally advances two chart-scoped tags — the chart's own `<version>` (matching what real
 `helm push` itself would tag) and a `<version>-<digest>` tag that is a deterministic, collision-free function of
 the chart's exact published content. Both remain non-authoritative discovery hints under the same tag rule
 stated above and in §6; no consumer, evidence binding, or release acceptance path treats either tag as
@@ -134,9 +137,9 @@ An importing descriptor walk retains its verified disk owner through the same ph
 of reopening and hashing that inode again for selection. A standalone producer wrapper is selected and
 verified in one payload pass. Every copy/export still rehashes its held bytes; separate hosted publication
 and evidence boundaries authenticate their own closures and share one exact-output membership comparison.
-The evidence-attestation handoff consumes the private preparation under §6, transferring unchanged blobs
-without another payload copy. It still revalidates the complete source and final closures.
-The disk publisher adapts the held QCOW2 directly to the registry image interface, without copying its bytes
+The destination stage consumes the original held preparation; the release job receives only controls,
+evidence and immutable references under §6. Both boundaries authenticate their exact closures.
+The disk stage adapts the held QCOW2 directly to the registry image interface, without copying its bytes
 into another local OCI layout. Exact bounded manifest/config bytes remain detached from mutable paths.
 Every upload body independently reads and hashes the held inode, checks its exact size and unchanged
 metadata, and remembers local integrity failures across transport retries. After the registry write, an
@@ -579,20 +582,80 @@ one release index from named outputs; normal authors do not wire payload → roo
 ADR-31's qualification results index is not artifact publication: it writes unsigned descriptions of
 qualification attempts, never artifact bytes, to a separate object store whose target is not part of `publication`.
 
-GitHub-hosted GHCR publication admits the exact destination packages before payload upload. The target
-package and all output/evidence sibling packages must have API-confirmed private/internal visibility and
-no repository linkage, using the publication credential independently of CI carrier storage.
+#### Destination staging and release by reference
+
+Design B is the accepted pipeline-attested transport. The publisher is split into two operations:
+
+1. **Stage:** after observation and offline packaging, the producer's final fixed push step admits the
+   destination and uploads the unchanged payload closure directly to its final output repository, untagged
+   by digest. Native architecture jobs stage their own manifests; an aggregate job writes only the index
+   after authenticating its exact children and platform membership. The stage exports bounded preparation
+   controls, raw evidence documents and immutable references bound to the exact named output, Plan and
+   originating Run/attempt. No private CI payload copy is required for this output edge.
+2. **Release:** a separate job authenticates those bindings and independently reads back the complete staged
+   payload closure by digest, checking every descriptor, payload size/digest, format, platform and evidence
+   subject before accepting it. It attests the bound evidence, derives the final metadata, signs by reference
+   and publishes the release root. Signature/provenance and served evidence verification still gate completion.
+   The release job does not rebuild, repack, restore from CI storage or re-upload product payloads. Bounded
+   streaming readback replaces payload custody; it must finish and issue an owner-held, exact-subject receipt
+   before root publication. A caller-provided digest or success flag cannot substitute for that receipt.
+
+Staging grants no release authority. Consumers authenticate the signed root, exact named-output membership
+and subject-bound evidence under their own policy; unsigned staged objects and mutable tags are insufficient.
+The release job alone holds OIDC minting authority and the `nvkr-release` environment (or the distinct
+development release environment). It runs no candidate producer code. Stage and release writes are separate
+effects; interrupted runs may leave unreferenced unsigned objects. Retention must preserve objects reachable
+from retained signed roots and active attempts, not infer liveness from tags: staged and released content are
+both digest-addressed. No server-side cross-repository mount, remote rollback or garbage-collection protocol
+is assumed by this decision.
+
+#### Adopter default and independent credentials
+
+Design C is the default for new adopters: the source repository's own GHCR namespace, `GITHUB_TOKEN` with
+job-scoped `packages: write` in producer staging and release-write jobs, `packages: read` in read-only jobs,
+and OIDC signing only in release jobs. The token is supplied to the fixed registry step, never the producer
+container. Its write grant nevertheless lasts for the whole job; verification and assembly in a release-write
+job perform only reads but cannot receive a separately downscoped platform token. This requires zero
+configured registry secrets; namespace, workflow identity, issuer and deployment policy are still admitted
+explicitly. The corresponding GitLab profile uses `CI_JOB_TOKEN` for its own
+project registry and job-scoped OIDC for release signing. This is a provider contract, not admission of the
+currently unavailable GitLab adapter. Tekton continues to require its explicit cluster keys and service-account
+separation; it does not inherit GitHub tokens or keyless identity.
+
+For C, repository linkage is admitted and the unlinked-package requirement is dropped. Repository-token
+access can expose packages to forks of a public source repository; that exposure and the loss of independent
+package principals are accepted for this profile. This does not enable fork publication, PR signing or
+untrusted dispatch. Destination visibility is the staged payload's visibility; C does not promise binary
+confidentiality from repository readers or forks. Package identity, repository association, declared visibility
+and effective access must be admitted explicitly; unknown or inaccessible policy fails closed.
+
+The fixed `github:NVKR_REGISTRY_WRITE` policy is opt-in for maintained production lanes and external
+registries. Its release writer stays in `nvkr-release`; producers require a distinct stage-only writer
+available to their fixed push step, never a copy or widening of that environment secret. Independent readers
+retain read-only bindings. External-registry credentials follow the same split with explicitly admitted
+credential references. The independent stage writer is scoped to required destination repositories and has
+no OIDC or release-environment authority. The fixed stage operation performs no deletion. Registry ACLs may
+not distinguish staging from other writes in one repository: the accepted residual risk includes a
+compromised producer adding unsigned objects or moving
+non-authoritative tags. Step-scoped delivery is not a machine boundary or a promise of append-only access.
+
+GHCR package admission moves to the stage step, before the first payload upload. It admits the exact output
+repositories and profile using metadata derived without opening payload bytes, and the push must retain the
+inspected root digest. Release writes separately admit their evidence/root destinations. The independent
+GHCR credential profile retains API-confirmed private/internal visibility and no repository linkage for all
+target and output/evidence sibling packages; C uses the repository-linked policy above.
 NVKR-produced Helm manifests retain source URLs in the chart archive and Helm config, but do not
 promote them to `org.opencontainers.image.source`: GHCR can use that annotation to create repository
 linkage after admission. This deterministic packaging rule applies across execution targets; publication
 never rewrites an already identified artifact to remove the annotation.
 The source repository metadata lookup uses the job's automatic repository token, passed separately only to
-GHCR publication jobs. Package-scoped publication credentials therefore need no source-repository scope
-for this admission check. The repository token does not replace the publication credential for package
-metadata or registry operations and is not added to producer execution.
+the fixed GHCR admission steps. Independent package credentials therefore need no source-repository scope
+for this check. They are not replaced by the repository token for package metadata or registry operations;
+in C, that token is explicitly the selected package credential. Neither enters producer containers.
 Repeated metadata checks may use ADR-18's bounded operation-local authenticated ETag revalidation; no
 admission check is skipped, and errors cannot reuse an earlier successful policy response.
-Public, unknown or inaccessible policy fails closed. A missing package can receive only a metadata-only
+Unknown or inaccessible policy fails closed; public packages fail the independent GHCR profile.
+A missing package can receive only a metadata-only
 seed before admission. The existing metadata inspector derives sibling references without opening product
 payloads; the actual push must retain that inspected root digest. Hosted GHCR layouts outside this metadata
 contract are rejected rather than falling back to unchecked publication. Local and other-registry transport
@@ -605,7 +668,8 @@ standards-conformant Helm OCI chart, readable by `helm pull`/`helm show`/`oras p
 decoder — and its former nested publication root is removed. The native image is pullable from its own output repository by its manifest
 digest, without the release index. Local OCI-layout index files are handoff scaffolding, not registry wrappers.
 
-Full-layout SBOM attestation consumes one disposable private preparation into a new final layout. The caller transfers
+The retained full-layout attestation path, used until its route migrates to destination staging, consumes
+one disposable private preparation into a new final layout. The caller transfers
 exclusive ownership with no concurrent users or writers; source and destination must share a filesystem.
 Admission rejects overlapping paths, unexpected layout entries, symlinks within the source tree and
 hardlinked files before signing. The inventory has the existing bounded OCI blob count.
@@ -624,11 +688,12 @@ private staging but cannot publish a partially attested final layout. This is di
 not a durable resume protocol or authority recovered from a pathname. Callers must stop using the consumed
 preparation; the handoff does not revoke independently held writable descriptors. Every later publication
 or consumption boundary still authenticates its exact bytes. SBOM attestation and registry credentials
-remain on generic hosted runners, outside the ARC producer boundary.
+for release remain on generic hosted runners, outside the ARC producer boundary. The destination stage
+writer is the explicit producer-side exception above.
 
 The explicit GitHub-only `publication.mode: per-output-v1` uses one output-local publication route per
 required output, retaining the full compiled Plan. Each route observes its exact payload and producer records,
-attests its required SBOMs, publishes the output and evidence, then signs and verifies its own metadata root
+stages the output, reads it back independently, attests its required SBOMs, publishes the evidence, then signs and verifies its own metadata root
 at `<prefix>/releases-<output>`. These roots are internal publication handoffs, not additional product outputs.
 Their signed metadata binds the exact Plan digest and workflow invocation, including run attempt.
 Partial retries may reuse an authenticated output-local root from an earlier attempt of the same GitHub
@@ -643,27 +708,29 @@ Output-local chart reproduction transports its bound image packages and their pr
 closure. Those packages are validation dependencies; only the selected chart enters that route's
 published output membership.
 
-Per-output GitHub handoffs move only the bytes required by each role. The preparation producer retains
-complete-byte inspection and exports a bounded control/evidence layout with the same root digest. Its
-payload carrier goes directly to the publisher; the SBOM attestation operation reads only those controls
-and canonical documents, and returns only attested controls and bundles. On GitHub it is a step of the
-output's release job (ADR-18 §8) and holds no registry credential. Before any publication side
-effect, the publisher re-inspects the original complete preparation and requires the returned metadata to
-preserve every output descriptor, repository, payload digest/size, Build Subject and release identity.
-Only raw CycloneDX evidence may become a verified bundle containing the identical decoded document.
-The publisher verifies those bundles under the admitted signer policy, consumes unchanged prepared blobs
-through the exclusive rename mechanism, and inspects the complete final layout before committing it.
-The SBOM attestation neither reads nor re-uploads the payload; there is no hardlinked retained preparation
-and no caller-supplied verification flag.
+Per-output GitHub handoffs move only bounded controls, evidence and references across the producer/release
+boundary. The preparation producer retains complete-byte inspection and stages its exact payload closure.
+The release owner authenticates the served closure before consuming its references. The SBOM attestation
+operation reads only the controls and canonical documents and returns only attested controls and bundles.
+On GitHub it is a step of the output's release job (ADR-18 §8) and holds no registry credential. Returned
+metadata must preserve every output descriptor, repository, payload digest/size, Build Subject and release
+identity. Only raw CycloneDX evidence may become a verified bundle containing the identical decoded document.
+The release owner verifies those bundles under the admitted signer policy and authenticates the complete
+final control/evidence closure against the readback receipt before publishing the root. No restored producer
+path, detached description or caller-supplied verification flag grants this authority. The SBOM attestation
+neither reads nor re-uploads payloads.
 
-After the existing full-byte/privacy/push gate, the publisher exports separate bounded signing metadata
+After full staged-byte readback and evidence binding, the release owner exports separate bounded signing metadata
 whose root must equal the digest-pinned publication reference before the metadata is committed. This is a
 pre-sign description, distinct from the remote verifier's authenticated output handoff. The signer checks
 its exact route, named output, Plan, Definition, Environment and invocation bindings, re-derives all signing
-subjects, and verifies required SBOM bundles before signing. The subsequent remote verification step
-still retrieves and authenticates the complete served payload closure. Signing metadata cannot issue a
-full-payload receipt, bypass remote readback, or authorize finalization by itself. Legacy and aggregate
-routes retain their existing contracts. This reduces repeated transport within the pipeline-attested lane;
+subjects, and verifies required SBOM bundles before signing. Release verification authenticates the served
+signatures, provenance and evidence and binds the final root to the same owner-held, complete staged-byte
+readback receipt. It requires no second full-payload pass; detached signing metadata cannot issue that receipt,
+bypass readback or authorize finalization by itself. Receipt lifetime must span this release operation; it
+cannot be recovered from a persisted success flag. Independent consumers retain their own complete-byte
+verification. Legacy routes retain their existing contracts until migrated. This reduces repeated transport
+within the pipeline-attested lane;
 it does not establish qualified execution or a stronger SLSA level.
 
 Release assembly authenticates every output-local root and its exact production predicate under the configured
@@ -686,18 +753,18 @@ exact Plan/invocation-bound production predicate, output signatures/provenance a
 success records and unverified metadata cannot authorize a complete Run. This is the pipeline-attested lane:
 it trusts the admitted producing workflow's output-local byte checks, not qualified reproduction. Registry
 read access suffices for assembly and finalization. The finalizer job receives no OIDC minting or
-package-write permission; the assembly step receives only the read credential inside the aggregate route's
-release job (ADR-18 §8).
-Production GitHub per-output publication additionally admits the fixed `github:NVKR_REGISTRY_WRITE`
-policy. Publishers and signers receive that secret and its explicit account; verification, assembly and
-finalization receive `NVKR_REGISTRY_READ` and its explicit account. These jobs request no workflow-token
-package permissions. Maintained production and nightly inputs use this policy. Legacy anonymous and
-job-scoped `github:GITHUB_TOKEN` configurations remain supported but are unsuitable for private binaries
-in a future-public source repository; arbitrary static credentials remain rejected. Generated production
-qualification requires the fixed production writer policy on both the publication and every target, matching
-its emitted credentials and permissions; legacy workflow-token producer profiles cannot generate that pair.
-The explicit signed-development contract below instead requires separately scoped read/write
-credentials. Legacy publication without this mode retains its full-closure assembly/finalization path. Local
+package-write permission. Assembly performs only reads inside the aggregate route's release job (ADR-18 §8):
+the independent profile supplies a reader, while C retains that job token's write grant.
+Production GitHub per-output publication may opt into the fixed `github:NVKR_REGISTRY_WRITE`
+policy. Release publishers and signers receive that environment secret and its explicit account; verification,
+assembly and finalization receive `NVKR_REGISTRY_READ` and its explicit account. Producers receive only the
+distinct stage writer. These jobs request no workflow-token package permissions. Maintained production and
+nightly inputs retain this opt-in policy; C is the new-adopter default, with its explicit fork-exposure tradeoff.
+Arbitrary static credentials remain rejected. The retained maintained-production qualification profile
+requires the fixed production writer policy on both the publication and every target, matching its emitted
+credentials and permissions; C does not implicitly authorize that qualification pair. The signed-development
+contract below distinguishes C from its opt-in dedicated credentials. Legacy publication without this mode
+retains its full-closure assembly/finalization path. Local
 execution and dry-run signing do not admit the new mode. Interrupted production runs can leave independently
 published outputs; no production cross-run reuse, rollback, retention protocol or atomic multi-repository
 transaction is added.
@@ -934,13 +1001,19 @@ canonical non-future attempts of the same development run; ordinary production r
 Each attempt's packages remain independently discoverable for cleanup. Expired or deleted inputs require
 rebuilding the affected dependency closure; a fresh dispatch does not implicitly reuse another run.
 
-The fixed `github:NVKR_DEV_REGISTRY_WRITE` reference selects only the dedicated development publisher.
+Design C is also the adopter default for signed development in the reserved namespace. An operator may
+instead select the dedicated development credential profile. Its fixed `github:NVKR_DEV_REGISTRY_WRITE`
+reference selects only the development release publisher, with a distinct stage-only writer for producers.
 Generated publishing/signing steps use that secret and `NVKR_DEV_REGISTRY_WRITE_USER`; verification,
 assembly and finalization instead receive `NVKR_DEV_REGISTRY_READ` and `NVKR_DEV_REGISTRY_READ_USER`.
-The usernames are provider variables. No development job gets repository-token package-write permission.
-The operator must configure token scopes and package ACLs so these development principals cannot modify
-production packages. The same development account may hold separate write, read-only and cleanup tokens;
+The usernames are provider variables. This opt-in profile grants no repository-token package-write permission;
+C grants it only to jobs with a stage or release write operation.
+For the independent-credential profile, the operator must configure token scopes and package ACLs so these
+development principals cannot modify production packages. The same development account may hold separate
+write, read-only and cleanup tokens;
 token scope still differs by phase. Provider ACLs are external prerequisites, never inferred from a prefix.
+C preserves development namespaces and distinct signing identities, but does not promise independent
+package principals or credential isolation from other packages accessible to the repository token.
 Only a release job that signs or attests holds `id-token: write`. The grant is at job scope, so that job's
 publication and verification steps share it (ADR-18 §8). The distinct default-branch cleanup environment
 holds the cleanup token; branch execution receives no deletion credential.

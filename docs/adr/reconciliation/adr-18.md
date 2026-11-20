@@ -1,5 +1,21 @@
 ## Support by owner
 
+ADR-18's 2026-11-20 revision accepts destination staging by digest (Design B), with repository-local GHCR
+and platform job tokens as the new-adopter default (Design C). It is design only: the current emitter still
+transfers output payloads through private CI storage and excludes destination writers from producer jobs.
+No destination-staging contract test or hosted Run is recorded. The job-boundary evidence below covers
+the current carrier path, not the revised producer stage-writer exception. OIDC and the release environment
+remain confined to release jobs in both contracts.
+
+Migration requires separate changes: development disks first, comparing release-root bytes with the current
+path for identical prepared bytes and frozen identity inputs; all output kinds and aggregate indexes next;
+then helper/source/intermediate/diagnostic edges, followed by deletion of the CI-storage implementation and
+all `NVKR_CI_STORAGE_*` secrets/variables. Build-only residual edges need explicit transport admission before
+that deletion. No generated workflow or credential configuration changes with this decision. C accepts
+repository linkage and fork-package exposure; the opt-in independent writer needs a distinct stage-only
+credential, never the `nvkr-release` writer. The GitLab token profile remains design only because the adapter
+is unavailable; Tekton's cluster-key contract is unchanged.
+
 Container runtime selection defaults to Docker; local Runs inherit their Environment and reject conflicting executable overrides before work, including dry runs.
 
 Tekton implements ADR-18's explicit cluster trust contract. The provider authenticates

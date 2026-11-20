@@ -4,6 +4,9 @@ This ledger carries no global review date: each row is current as of the change 
 ADR-01–31 own the lane-specific engineering contracts, accepted by njhensley on 2026-11-14
 on the maintainer's own behalf. This acceptance does not resolve operational owner questions or unpause
 the S3 work (#383–#385).
+ADR-18 and ADR-20 were revised on 2026-11-20 to accept destination staging with platform tokens as the
+adopter default; their [execution](adr-18.md) and [publication](adr-20.md) rows distinguish that decision
+from the still-active CI-carrier implementation.
 This ledger owns current implementation and remaining acceptance. Code and contract tests,
 recorded external execution, and organizational approval are separate facts. Historical source and
 schema results do not transfer to a changed candidate.

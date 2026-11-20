@@ -1,5 +1,21 @@
 ## Support by owner
 
+ADR-20's 2026-11-20 revision accepts separate destination staging and release-by-reference operations,
+with repository-local GHCR/job-token access as the adopter default. Implementation still combines payload
+upload with the hosted publisher and requires unlinked private/internal GHCR packages. The stage step,
+profile-specific admission, full streaming readback receipt and release-by-reference owner are not implemented
+or externally exercised. Current tests and recorded publications below do not establish the revised path,
+zero-registry-secret adoption or release-root byte equivalence. The [ADR-18 migration gates](adr-18.md)
+separate development disks, all outputs and residual input-edge removal.
+
+The revised C profile accepts repository-linked packages and fork exposure; independent package principals
+and binary confidentiality from public-source forks are not promised. `NVKR_REGISTRY_WRITE` remains an opt-in
+maintained-production/external-registry policy, requiring a distinct producer stage writer. Existing
+production qualification and dedicated development profiles still enforce their current credential rules
+until explicitly migrated. No secrets, package grants, environments, retention policy or generated files are
+changed by this documentation revision. Cleanup of unsigned staged objects must preserve active attempts
+and retained signed release closures; the existing development cleanup evidence is not proof of that migration.
+
 The Tekton route selects the existing per-output OCI publication owner with anonymous transport and explicit
 cluster signing keys. Its complete in-cluster registry exercise remains pending; see [ADR-18](adr-18.md).
 
