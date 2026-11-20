@@ -194,42 +194,86 @@ func githubCITransferMode(plan *Plan, uses string) string {
 // the generator's exact release pin before building a private source copy.
 const githubCIPublishedSourceShell = `cd "$cache"
 download -json %[1]s > module.json
-python3 -I - %[2]s %[3]s %[4]s <<'PYTHON'
-import json, os, shutil, sys
-def unique_object(pairs):
-    result = {}
-    for key, value in pairs:
-        if key in result:
-            raise ValueError("duplicate module result field")
-        result[key] = value
-    return result
-with open("module.json") as source:
-    item = json.load(source, object_pairs_hook=unique_object)
-if not isinstance(item, dict):
-    raise ValueError("invalid published runner module")
-if (item.get("Path"), item.get("Version"), item.get("Sum")) != tuple(sys.argv[1:]):
-    raise ValueError("published runner module does not match its pin")
-directory = item.get("Dir")
-if not isinstance(directory, str) or not os.path.isabs(directory):
-    raise ValueError("invalid published runner module directory")
-print("Building NVKR transport helper from " + " ".join(sys.argv[1:]), file=sys.stderr)
-shutil.copytree(directory, "source", symlinks=True)
-PYTHON
+cat > module-pin.go <<'GO'
+` + githubCIModulePinGo + `GO
+directory=$(GOPROXY=off GOSUMDB=off go run module-pin.go %[2]s %[3]s %[4]s < module.json)
+cp -R -- "$directory" "$cache/source"
 cd "$cache/source"
+`
+
+// go list -m omits Sum outside a main module, even after download. Decode the
+// download result with the already-required Go toolchain, without dependencies.
+const githubCIModulePinGo = `package main
+
+import (
+ "bytes"
+ "encoding/json"
+ "fmt"
+ "io"
+ "os"
+ "path/filepath"
+ "strings"
+)
+
+func main() {
+ fail := func() { fmt.Fprintln(os.Stderr, "published runner module does not match its pin"); os.Exit(1) }
+ if len(os.Args) != 4 { fail() }
+ decoder := json.NewDecoder(os.Stdin)
+ token, err := decoder.Token()
+ if err != nil || token != json.Delim('{') { fail() }
+ fields := map[string]json.RawMessage{}
+ for decoder.More() {
+  token, err := decoder.Token()
+  if err != nil { fail() }
+  key, ok := token.(string)
+  if !ok { fail() }
+  if _, duplicate := fields[key]; duplicate { fail() }
+  var value json.RawMessage
+  if decoder.Decode(&value) != nil || !unique(value) { fail() }
+  fields[key] = value
+ }
+ if token, err = decoder.Token(); err != nil || token != json.Delim('}') { fail() }
+ if _, err = decoder.Token(); err != io.EOF { fail() }
+ for i, key := range []string{"Path", "Version", "Sum"} {
+  var value string
+  if json.Unmarshal(fields[key], &value) != nil || value != os.Args[i+1] { fail() }
+ }
+ var directory string
+ if json.Unmarshal(fields["Dir"], &directory) != nil || !filepath.IsAbs(directory) || strings.ContainsAny(directory, "\x00\r\n") { fail() }
+ fmt.Fprintln(os.Stderr, "Building NVKR transport helper from " + strings.Join(os.Args[1:], " "))
+ fmt.Print(directory)
+}
+
+// RawMessage is already valid JSON; also reject duplicate keys in metadata.
+func unique(raw json.RawMessage) bool {
+ decoder := json.NewDecoder(bytes.NewReader(raw))
+ token, _ := decoder.Token()
+ if token != json.Delim('{') && token != json.Delim('[') { return true }
+ keys := map[string]bool{}
+ for decoder.More() {
+  if token == json.Delim('{') {
+   key, err := decoder.Token()
+   if err != nil || keys[key.(string)] { return false }
+   keys[key.(string)] = true
+  }
+  var value json.RawMessage
+  if decoder.Decode(&value) != nil || !unique(value) { return false }
+ }
+ return true
+}
 `
 
 // One coreutils timeout bounds dependency retries and the single offline build.
 // Only the fixed allow-list reaches Go; caches belong to this invocation.
 func githubCIBootstrapBuildCommand(linker string, release githubRunnerRelease) string {
-	publishedSource, publishedCapability := "", ""
+	publishedSource := ""
 	if release.Version != "" {
 		publishedSource = fmt.Sprintf(githubCIPublishedSourceShell, shellQuote(githubRunnerModule+"@"+release.Version), shellQuote(githubRunnerModule), shellQuote(release.Version), shellQuote(release.Sum))
-		publishedCapability = " || ! command -v python3 >/dev/null 2>&1"
 	}
 	return fmt.Sprintf(`set +x +v
 set -eu
-if [[ "${RUNNER_TEMP:-}" != /* ]] || [ ! -d "$RUNNER_TEMP" ] || ! command -v go >/dev/null 2>&1 || ! command -v timeout >/dev/null 2>&1%[8]s; then
-  printf '%[1]s: private bootstrap requires a runner temporary directory and Go (plus timeout and published-module Python when needed)\n' >&2
+if [[ "${RUNNER_TEMP:-}" != /* ]] || [ ! -d "$RUNNER_TEMP" ] || ! command -v go >/dev/null 2>&1 || ! command -v timeout >/dev/null 2>&1; then
+  printf '%[1]s: private bootstrap requires a runner temporary directory, Go and timeout\n' >&2
   exit %[2]d
 fi
 cache=$(mktemp -d "$RUNNER_TEMP/nvkr-ci-bootstrap-XXXXXXXX") || {
@@ -253,7 +297,7 @@ download() {
   done
   return 1
 }
-%[9]sregular_manifest() { [ ! -L "$1" ] && [ -f "$1" ] && [ "$(wc -c < "$1")" -le 4194304 ]; }
+%[8]sregular_manifest() { [ ! -L "$1" ] && [ -f "$1" ] && [ "$(wc -c < "$1")" -le 4194304 ]; }
 mkdir "$cache/inputs" "$cache/original"
 for name in go.mod go.sum; do
   regular_manifest "$name"
@@ -292,7 +336,7 @@ case "$result" in
   *) printf '%[6]s: private bootstrap acquisition, compilation or cache cleanup failed\n' >&2; exit %[7]d ;;
 esac`, e.CodeEngineCapability, e.ExitCode(e.New(e.CodeEngineCapability, "")), shellQuote(linker),
 		e.CodeTimeout, e.ExitCode(e.New(e.CodeTimeout, "")), e.CodeBuildFailed, e.ExitCode(e.New(e.CodeBuildFailed, "")),
-		publishedCapability, publishedSource)
+		publishedSource)
 }
 
 func githubCITransferTemplates(plan *Plan, actions githubActionRefs) (map[string][]byte, error) {
