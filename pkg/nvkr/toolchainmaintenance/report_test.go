@@ -27,7 +27,7 @@ func requireReviewError(t *testing.T, err error) {
 func comparisonFixture(t *testing.T, arch string) (*factory.Plan, []Image) {
 	t.Helper()
 	digest := "sha256:" + strings.Repeat("a", 64)
-	raw := fmt.Sprintf(`{"builds":[{"platform":"linux/%s","executionGraph":{"nodes":[{"toolchain":"%s/packer-native@%s"},{}]}}],"environment":{"diskInspectionProfiles":{"linux/%s":{"image":"%s/inspector-native@%s"}}}}`, arch, Registry, digest, arch, Registry, digest)
+	raw := fmt.Sprintf(`{"schemaVersion":%q,"builds":[{"platform":"linux/%s","executionGraph":{"nodes":[{"toolchain":"%s/packer-native@%s"},{}]}}],"environment":{"diskInspectionProfiles":{"linux/%s":{"image":"%s/inspector-native@%s"}}}}`, factory.PlanSchemaVersion, arch, Registry, digest, arch, Registry, digest)
 	var plan factory.Plan
 	if err := json.Unmarshal([]byte(raw), &plan); err != nil {
 		t.Fatal(err)
@@ -97,7 +97,7 @@ func TestCompareRejectsUnadmittedPlan(t *testing.T) {
 	}
 	if _, err := Compare(t.Context(), plan, proposal, "amd64"); err != nil {
 		var coded *e.Error
-		if !errors.As(err, &coded) || coded.Code != e.CodePipelineDrift {
+		if !errors.As(err, &coded) || coded.Code != e.CodeInvalidCatalog {
 			t.Fatalf("unadmitted Plan error: %v", err)
 		}
 	} else {

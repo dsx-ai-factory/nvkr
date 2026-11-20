@@ -32,7 +32,7 @@ type group struct {
 var groups = []group{
 	{"factory", "pkg/nvkr/factory", 34},
 	{"lifecycle", "pkg/nvkr/lifecycle", 2},
-	{"qualification", "pkg/nvkr/qualification", 4},
+	{"qualification", "pkg/nvkr/qualification", 6},
 	{"cli", "cmd/nvkr", 4},
 	{"packages", "", 5},
 }

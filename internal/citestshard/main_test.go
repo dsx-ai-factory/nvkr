@@ -29,7 +29,7 @@ func TestPartition(t *testing.T) {
 	for i := 0; i < 1000; i++ {
 		names = append(names, fmt.Sprintf("TestCase%d", i))
 	}
-	for _, count := range []int{1, 2, 4, 5, 8, 15, 34} {
+	for _, count := range []int{1, 2, 4, 5, 6, 8, 15, 34} {
 		t.Run(fmt.Sprint(count), func(t *testing.T) {
 			seen := map[string]int{}
 			for index := 0; index < count; index++ {
@@ -101,8 +101,11 @@ func TestPackages(t *testing.T) {
 		if strings.HasSuffix(p, "/lifecycle") {
 			want = 2
 		}
-		if p == "m/cmd/nvkr" || p == "m/pkg/nvkr/qualification" {
+		if p == "m/cmd/nvkr" {
 			want = 4
+		}
+		if p == "m/pkg/nvkr/qualification" {
+			want = 6
 		}
 		if counts[p] != want {
 			t.Fatalf("%s count %d want %d", p, counts[p], want)
@@ -209,14 +212,14 @@ func TestMatrix(t *testing.T) {
 	if err := json.Unmarshal(out.Bytes(), &matrix); err != nil {
 		t.Fatal(err)
 	}
-	if len(matrix.Include) != 49 {
+	if len(matrix.Include) != 51 {
 		t.Fatalf("matrix %s", out.String())
 	}
 	n := 0
 	for _, g := range []struct {
 		name  string
 		count int
-	}{{"factory", 34}, {"lifecycle", 2}, {"qualification", 4}, {"cli", 4}, {"packages", 5}} {
+	}{{"factory", 34}, {"lifecycle", 2}, {"qualification", 6}, {"cli", 4}, {"packages", 5}} {
 		for i := 0; i < g.count; i++ {
 			if matrix.Include[n].Group != g.name || matrix.Include[n].Index != i {
 				t.Fatal("matrix mismatch")
@@ -224,7 +227,7 @@ func TestMatrix(t *testing.T) {
 			n++
 		}
 	}
-	for _, args := range [][]string{nil, {"--group", "factory", "--index", "-1"}, {"--group", "packages", "--index", "5"}, {"--group", "qualification", "--index", "4"}, {"--group", "cli", "--index", "4"}, {"--group", "unknown", "--index", "0"}, {"--matrix", "unexpected"}} {
+	for _, args := range [][]string{nil, {"--group", "factory", "--index", "-1"}, {"--group", "packages", "--index", "5"}, {"--group", "qualification", "--index", "6"}, {"--group", "cli", "--index", "4"}, {"--group", "unknown", "--index", "0"}, {"--matrix", "unexpected"}} {
 		if err := run(t.Context(), args, io.Discard, io.Discard); nerrors.ExitCode(err) != 2 {
 			t.Fatalf("expected coded usage error for %v, got %v", args, err)
 		}

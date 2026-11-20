@@ -79,7 +79,7 @@ func terminalTests(t *testing.T, log string) map[[3]string]int {
 	return counts
 }
 
-// All forty-nine real shards must produce exactly the same top-level results as
+// All fifty-one real shards must produce exactly the same top-level results as
 // ordinary go test, including examples, fuzz seeds, parallel tests and subtests.
 func TestRealMatrix(t *testing.T) {
 	root := t.TempDir()
@@ -102,7 +102,7 @@ func TestRealMatrix(t *testing.T) {
 		"pkg/nvkr/factory":       factoryFixture + factoryExtraFixture,
 		"pkg/nvkr/lifecycle":     lifecycleFixture,
 		"cmd/nvkr":               factoryFixture,
-		"pkg/nvkr/qualification": factoryFixture,
+		"pkg/nvkr/qualification": factoryFixture + "\nfunc TestQualificationMatrix0(t *testing.T) {}\n",
 	}
 	for _, index := range []int{0, 1, 2, 3, 23} {
 		fixtures["ordinary/package"+strconv.Itoa(index)] = "package fixture\nimport \"testing\"\nfunc TestExact(t *testing.T){}\n"
@@ -131,8 +131,8 @@ func TestRealMatrix(t *testing.T) {
 		t.Fatalf("baseline %s %v", diagnostics.String(), err)
 	}
 	expected := terminalTests(t, baseline)
-	if len(expected) != 58 {
-		t.Fatalf("expected 58 targets: %v", expected)
+	if len(expected) != 59 {
+		t.Fatalf("expected 59 targets: %v", expected)
 	}
 	for key, n := range expected {
 		if key[2] != "pass" || n != 1 {
