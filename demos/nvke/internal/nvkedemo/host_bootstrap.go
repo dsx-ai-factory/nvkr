@@ -55,10 +55,9 @@ printf '%s' {{quote (spireEnvironment .)}} > /etc/nke/spire.env
 {{end}}
 {{prepareOVN}}
 systemctl start --no-block spire-agent.service nvke-agent.service
-python3 - "$(get_tpm_pubhash)" <<'IDENTITY' > site-prepared.json
-import json,sys
-json.dump({'tpmEkThumbprint':sys.argv[1]},sys.stdout)
-IDENTITY
+thumbprint=$(get_tpm_pubhash)
+[[ "$thumbprint" =~ ^[0123456789abcdefABCDEF]{64}$ ]] || { echo 'invalid TPM EK thumbprint' >&2; exit 1; }
+printf '{"tpmEkThumbprint": "%s"}' "$thumbprint" > site-prepared.json
 curl --fail --silent --show-error --connect-timeout 10 --max-time 60 \
   --proto '=https' --cacert handoff-ca.pem --header @handoff-header \
   --header 'X-NVKE-Startup-Status: prepared' --data-binary @site-prepared.json {{quote .HandoffURL}}

@@ -393,7 +393,7 @@ GIT_CONFIG_KEY_0="url.$NVKE_DEV_CLONE.insteadOf" \
 GIT_CONFIG_VALUE_0=https://github.com/dsx-ai-factory/nvke \
   bin/nvkr catalog pin \
   --catalog inputs/catalogs/nvke \
-  --commit "$NVKE_DEV_COMMIT" nvke
+  --commit "$NVKE_DEV_COMMIT" nvke-cli
 git diff -- inputs/catalogs/nvke
 NVKE_LOCAL_CLONE="$NVKE_DEV_CLONE" \
   bash scripts/nvke-full-arm64-local.sh cli-change-01 1 components
