@@ -5,6 +5,7 @@ package toolchainmaintenance
 
 import (
 	"context"
+	"fmt"
 	"maps"
 	"os"
 	"os/exec"
@@ -14,6 +15,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/dsx-ai-factory/nvkr/internal/ownedcmd"
 	"sigs.k8s.io/yaml"
 )
 
@@ -109,7 +111,7 @@ func TestWorkflowKeepsPreparationPublicationAndReviewSeparate(t *testing.T) {
 		t.Fatal("refresh reporter lost failure scheduling, serialized main admission or minimal permissions")
 	}
 	notify := report.Steps[len(report.Steps)-1]
-	if notify.Run != "python3 scripts/report-native-toolchains.py report" || notify.Env["RESULTS"] != "${{ toJSON(needs) }}" {
+	if notify.Run != "go run ./cmd/nvkr factory toolchain-maintenance --operation report" || notify.Env["RESULTS"] != "${{ toJSON(needs) }}" {
 		t.Fatal("refresh reporter bypasses tested actionable-issue routing")
 	}
 	measure := workflow.Jobs["measure"]
@@ -121,7 +123,8 @@ func TestWorkflowKeepsPreparationPublicationAndReviewSeparate(t *testing.T) {
 	}
 	compares := false
 	for _, step := range measure.Steps {
-		if step.ID == "compare" && strings.Contains(step.Run, "report-native-toolchains.py compare") &&
+		if step.ID == "compare" && strings.Contains(step.Run, "factory toolchain-maintenance --operation compare") &&
+			strings.Contains(step.Run, `echo "changed_${NATIVE_ARCH}=$changed" >> "$GITHUB_OUTPUT"`) &&
 			step.Env["NATIVE_ARCH"] == "${{ matrix.arch }}" {
 			compares = true
 		}
@@ -189,5 +192,63 @@ func TestNativeToolchainPushPaths(t *testing.T) {
 	expected := slices.Sorted(maps.Keys(want))
 	if !slices.Equal(paths, expected) {
 		t.Fatalf("native image push paths drifted from Linux helper dependencies; update %s\ngot: %v\nwant: %v", Workflow, paths, expected)
+	}
+}
+
+func TestComparisonWorkflowOutputs(t *testing.T) {
+	raw, err := os.ReadFile("../../../" + Workflow)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var workflow struct {
+		Jobs map[string]struct{ Steps []struct{ ID, Run string } }
+	}
+	if err := yaml.Unmarshal(raw, &workflow); err != nil {
+		t.Fatal(err)
+	}
+	script := ""
+	for _, step := range workflow.Jobs["measure"].Steps {
+		if step.ID == "compare" {
+			script = step.Run
+		}
+	}
+	if script == "" {
+		t.Fatal("missing comparison step")
+	}
+	for _, arch := range []string{"amd64", "arm64"} {
+		for _, failure := range []bool{false, true} {
+			t.Run(fmt.Sprintf("%s/failure=%t", arch, failure), func(t *testing.T) {
+				root := t.TempDir()
+				helper := `#!/bin/sh
+[ "$*" = "factory toolchain-maintenance --operation compare --arch $NATIVE_ARCH --proposal .nvkr/native-toolchains/$NATIVE_ARCH/proposal.json" ] || exit 99
+[ "$FAIL_COMPARISON" = false ] || exit 23
+printf 'false\n'
+`
+				if err := os.WriteFile(filepath.Join(root, "nvkr-exec"), []byte(helper), 0o700); err != nil {
+					t.Fatal(err)
+				}
+				output := filepath.Join(root, "output")
+				cmd := exec.CommandContext(t.Context(), "bash", "-euo", "pipefail", "-c", script)
+				cmd.Dir = root
+				cmd.Env = append(os.Environ(), "NATIVE_ARCH="+arch, "GITHUB_OUTPUT="+output, fmt.Sprintf("FAIL_COMPARISON=%t", failure))
+				err := ownedcmd.Run(t.Context(), cmd)
+				if failure {
+					if err == nil {
+						t.Fatal("failed comparison accepted")
+					}
+					if _, err := os.Stat(output); !os.IsNotExist(err) {
+						t.Fatal("failed comparison wrote output")
+					}
+					return
+				}
+				if err != nil {
+					t.Fatal(err)
+				}
+				raw, err := os.ReadFile(output)
+				if err != nil || string(raw) != "changed_"+arch+"=false\n" {
+					t.Fatalf("%q %v", raw, err)
+				}
+			})
+		}
 	}
 }
