@@ -1,12 +1,10 @@
 // SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
-// Package clustercheck retains collected cluster evidence as private,
-// byte-exact diagnostic files. The lane is descriptive (ADR-29): nothing
-// written here is an authenticated receipt, a lifecycle object or a passing
-// verdict, and no manifest, report interpretation or observation structure is
-// produced.
-package clustercheck
+// Package evidencefiles persists diagnostic components supplied by the ADR-29
+// observation owner after projection and retention admission. Exclude raw
+// collector bytes, snapshots, credentials, kubeconfigs and provider logs.
+package evidencefiles
 
 import (
 	"context"
@@ -15,23 +13,22 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"syscall"
 
 	e "github.com/dsx-ai-factory/nvkr/pkg/nvkr/errors"
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/internal/safetext"
 )
 
-// incompletePrefix marks staged or unsynced components.
-const incompletePrefix = ".incomplete-"
-
 const (
+	incompletePrefix = ".incomplete-" // marks staged or unsynced components
 	// maxComponentNameBytes bounds one member name while leaving room for the
 	// reserved in-flight prefix inside the 255-byte filesystem element limit.
 	maxComponentNameBytes = 200
 	evidenceCopyChunk     = 128 << 10
 )
 
-// EvidenceFiles writes exact, bounded payloads into a new private directory.
-// The writer is not safe for concurrent use.
+// EvidenceFiles writes admitted components into a private directory. The
+// limit applies per component. Callers enforce aggregate budgets and serialize calls.
 type EvidenceFiles struct {
 	root            string
 	maxPayloadBytes int64
@@ -40,6 +37,9 @@ type EvidenceFiles struct {
 
 // OpenEvidenceFiles creates a private directory at a new, absolute root.
 // Missing parents are created with mode 0700 and retained if opening fails.
+// Creation requires a parent owned by the effective user or root with no group
+// or other write bits. Use a path where extended ACLs or filesystem policy also
+// prevent other users from writing to the parent or the new directory.
 func OpenEvidenceFiles(ctx context.Context, root string, maxPayloadBytes int64) (*EvidenceFiles, error) {
 	if ctx == nil {
 		return nil, e.New(e.CodeUsage, "opening evidence files requires a non-nil context")
@@ -48,8 +48,8 @@ func OpenEvidenceFiles(ctx context.Context, root string, maxPayloadBytes int64) 
 		return nil, e.Wrap(e.CodeTimeout, err, "opening evidence files")
 	}
 	if !safetext.Valid(root, 4096, false) || strings.TrimSpace(root) != root || filepath.Clean(root) != root ||
-		!filepath.IsAbs(root) {
-		return nil, e.New(e.CodeUsage, "evidence directory requires a bounded safe absolute path")
+		!filepath.IsAbs(root) || filepath.Dir(root) == root {
+		return nil, e.New(e.CodeUsage, "evidence output requires a canonical absolute path to a new directory")
 	}
 	if maxPayloadBytes <= 0 {
 		return nil, e.New(e.CodeUsage, "evidence payloads require a positive byte bound")
@@ -59,9 +59,16 @@ func OpenEvidenceFiles(ctx context.Context, root string, maxPayloadBytes int64) 
 		if ctxErr := ctx.Err(); ctxErr != nil {
 			return nil, e.Wrap(e.CodeTimeout, ctxErr, "opening evidence parent directory")
 		}
+		var coded *e.Error
+		if errors.As(err, &coded) {
+			return nil, err
+		}
 		return nil, e.Wrap(e.CodeImmutableViolation, err, "opening evidence parent directory")
 	}
 	defer func() { _ = parent.Close() }()
+	if err := checkEvidenceParent(parent); err != nil {
+		return nil, e.Wrap(e.CodeImmutableViolation, err, "checking evidence parent directory")
+	}
 	name := filepath.Base(root)
 	if err := parent.Mkdir(name, 0o700); err != nil {
 		if errors.Is(err, os.ErrExist) {
@@ -73,8 +80,8 @@ func OpenEvidenceFiles(ctx context.Context, root string, maxPayloadBytes int64) 
 	if err != nil {
 		return nil, e.Wrap(e.CodeImmutableViolation, err, "inspecting evidence directory")
 	}
-	if !created.IsDir() {
-		return nil, e.New(e.CodeImmutableViolation, "created evidence path is no longer a directory")
+	if !ownedEvidenceDirectory(created, false) {
+		return nil, e.New(e.CodeImmutableViolation, "created evidence directory must belong to the effective user")
 	}
 	directory, err := parent.OpenRoot(name)
 	if err != nil {
@@ -82,7 +89,7 @@ func OpenEvidenceFiles(ctx context.Context, root string, maxPayloadBytes int64) 
 			removeCreatedDirectory(parent, name, created))
 	}
 	held, err := directory.Stat(".")
-	if err != nil || !os.SameFile(created, held) || held.Mode().Perm() != 0o700 {
+	if err != nil || !os.SameFile(created, held) || !ownedEvidenceDirectory(held, false) || held.Mode().Perm() != 0o700 {
 		_ = directory.Close()
 		if err == nil {
 			err = errors.New("evidence directory must be the new private 0700 directory")
@@ -96,6 +103,22 @@ func OpenEvidenceFiles(ctx context.Context, root string, maxPayloadBytes int64) 
 			removeCreatedDirectory(parent, name, created))
 	}
 	return &EvidenceFiles{root: root, maxPayloadBytes: maxPayloadBytes, directory: directory}, nil
+}
+
+func checkEvidenceParent(parent *os.Root) error {
+	info, err := parent.Stat(".")
+	if err != nil {
+		return err
+	}
+	if !ownedEvidenceDirectory(info, true) || info.Mode().Perm()&0o022 != 0 {
+		return errors.New("evidence parent must belong to the effective user or root and forbid group and other writes")
+	}
+	return nil
+}
+
+func ownedEvidenceDirectory(info os.FileInfo, allowRoot bool) bool {
+	stat, ok := info.Sys().(*syscall.Stat_t)
+	return ok && info.IsDir() && (stat.Uid == uint32(os.Geteuid()) || (allowRoot && stat.Uid == 0))
 }
 
 // openEvidenceParent walks real directories from the filesystem root. Existing
@@ -126,6 +149,9 @@ func openEvidenceDirectory(ctx context.Context, parent *os.Root, name string) (*
 	}
 	info, err := parent.Lstat(name)
 	if errors.Is(err, os.ErrNotExist) {
+		if err := checkEvidenceParent(parent); err != nil {
+			return nil, err
+		}
 		if err := parent.Mkdir(name, 0o700); err != nil && !errors.Is(err, os.ErrExist) {
 			return nil, err
 		}
@@ -138,7 +164,7 @@ func openEvidenceDirectory(ctx context.Context, parent *os.Root, name string) (*
 		return nil, err
 	}
 	if !info.IsDir() {
-		return nil, errors.New("evidence parent is not a real directory")
+		return nil, e.New(e.CodeUsage, "evidence parent component %q must be a real directory", name)
 	}
 	child, err := parent.OpenRoot(name)
 	if err != nil {
@@ -160,7 +186,7 @@ func syncEvidenceDirectory(root *os.Root) error {
 	return errors.Join(directory.Sync(), directory.Close())
 }
 
-// Directory returns the private directory path this writer created.
+// Directory reports the requested path. Writes stay anchored if the directory moves.
 func (files *EvidenceFiles) Directory() string {
 	if files == nil {
 		return ""
@@ -168,12 +194,9 @@ func (files *EvidenceFiles) Directory() string {
 	return files.root
 }
 
-// WriteComponent stages one bounded payload under the reserved in-flight
-// prefix, then publishes it at the exact member name without replacing any
-// existing entry or symlink. The payload bytes are preserved exactly: no
-// normalization, digesting or interpretation happens here. The caller owns
-// cancellation of blocking reads. A retained incomplete marker prevents
-// retrying that component in the same directory.
+// WriteComponent stages an admitted payload before publishing its exact bytes
+// without replacing an existing entry. A failed write can leave a marker
+// beside a visible, unsynced member. The caller owns cancellation of reads.
 func (files *EvidenceFiles) WriteComponent(ctx context.Context, name string, payload io.Reader) error {
 	if ctx == nil {
 		return e.New(e.CodeUsage, "writing evidence requires a non-nil context")
@@ -201,7 +224,6 @@ func (files *EvidenceFiles) WriteComponent(ctx context.Context, name string, pay
 		}
 		return e.Wrap(e.CodeImmutableViolation, err, "staging evidence component %s", name)
 	}
-	// Publish only after checking that the staged path still names the synced bytes.
 	if err := copyEvidencePayload(ctx, file, payload, files.maxPayloadBytes); err != nil {
 		_ = file.Close()
 		return err
@@ -211,16 +233,13 @@ func (files *EvidenceFiles) WriteComponent(ctx context.Context, name string, pay
 		return e.Wrap(e.CodeImmutableViolation, err, "syncing staged evidence component %s", name)
 	}
 	staged, err := file.Stat()
-	closeErr := file.Close()
-	if err != nil || closeErr != nil || !staged.Mode().IsRegular() {
-		if err == nil {
-			err = closeErr
-		}
-		if err == nil {
-			err = errors.New("staged evidence component is not a regular file")
-		}
+	if err := errors.Join(err, file.Close()); err != nil {
 		return e.Wrap(e.CodeImmutableViolation, err, "completing staged evidence component %s", name)
 	}
+	return files.publishStagedComponent(ctx, stagedName, name, staged)
+}
+
+func (files *EvidenceFiles) publishStagedComponent(ctx context.Context, stagedName, name string, staged os.FileInfo) error {
 	pathInfo, err := files.directory.Lstat(stagedName)
 	if err != nil || !pathInfo.Mode().IsRegular() || !os.SameFile(staged, pathInfo) {
 		if err == nil {
@@ -263,6 +282,7 @@ func (files *EvidenceFiles) publishComponent(directory *os.File, stagedName, nam
 }
 
 func (files *EvidenceFiles) checkDirectory() error {
+	// Detect changes at the time of this check. The held root anchors publication.
 	held, err := files.directory.Stat(".")
 	if err != nil {
 		return e.Wrap(e.CodeImmutableViolation, err, "inspecting held evidence directory")
@@ -292,13 +312,8 @@ func (files *EvidenceFiles) Close() error {
 }
 
 func validComponentName(name string) bool {
-	if name == "" || len(name) > maxComponentNameBytes || !safetext.Valid(name, maxComponentNameBytes, false) {
-		return false
-	}
-	if name == "." || name == ".." || strings.HasPrefix(name, ".") {
-		return false
-	}
-	return !strings.ContainsAny(name, `/\`)
+	return name == strings.TrimSpace(name) && !strings.HasPrefix(name, ".") &&
+		safetext.Valid(name, maxComponentNameBytes, false) && !strings.ContainsAny(name, `/\`)
 }
 
 func copyEvidencePayload(ctx context.Context, destination io.Writer, source io.Reader, maxBytes int64) error {

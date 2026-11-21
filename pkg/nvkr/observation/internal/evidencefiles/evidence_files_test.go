@@ -1,7 +1,7 @@
 // SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
-package clustercheck
+package evidencefiles
 
 import (
 	"context"
@@ -9,20 +9,27 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"testing"
+	"testing/iotest"
 
 	e "github.com/dsx-ai-factory/nvkr/pkg/nvkr/errors"
 )
 
 func requireCoded(t *testing.T, err error, want e.Code) {
 	t.Helper()
-	if err == nil {
-		t.Fatalf("expected %s error, got nil", want)
-	}
 	var coded *e.Error
 	if !errors.As(err, &coded) || coded.Code != want {
 		t.Fatalf("expected %s error, got %v", want, err)
+	}
+}
+
+func requireEvidenceBytes(t *testing.T, path, want string) {
+	t.Helper()
+	raw, err := os.ReadFile(path)
+	if err != nil || string(raw) != want {
+		t.Fatalf("reading %s: got %q (%v), want %q", path, raw, err, want)
 	}
 }
 
@@ -58,6 +65,13 @@ func directoryEntries(t *testing.T, root string) []string {
 	return names
 }
 
+func requireEntries(t *testing.T, root string, want ...string) {
+	t.Helper()
+	if got := directoryEntries(t, root); !slices.Equal(got, want) {
+		t.Fatalf("directory %q entries: got %v, want %v", root, got, want)
+	}
+}
+
 func TestOpenEvidenceFilesRequiresNewPrivateDirectory(t *testing.T) {
 	t.Run("creates a new private directory", func(t *testing.T) {
 		root := filepath.Join(evidenceTempDir(t), "nested", "evidence")
@@ -70,29 +84,20 @@ func TestOpenEvidenceFilesRequiresNewPrivateDirectory(t *testing.T) {
 			t.Fatalf("evidence directory is not a private 0700 directory: %v %v", info, err)
 		}
 	})
-	t.Run("refuses an existing directory and leaves it intact", func(t *testing.T) {
-		root := filepath.Join(evidenceTempDir(t), "evidence")
-		if err := os.Mkdir(root, 0o700); err != nil {
-			t.Fatalf("preparing existing directory: %v", err)
+	t.Run("preserves existing destinations", func(t *testing.T) {
+		parent := evidenceTempDir(t)
+		directory, file := filepath.Join(parent, "occupied-dir"), filepath.Join(parent, "occupied-file")
+		if err := os.Mkdir(directory, 0o700); err != nil {
+			t.Fatal(err)
 		}
-		keep := filepath.Join(root, "prior")
-		if err := os.WriteFile(keep, []byte("prior evidence"), 0o600); err != nil {
-			t.Fatalf("writing prior evidence: %v", err)
+		for root, sentinel := range map[string]string{directory: filepath.Join(directory, "prior"), file: file} {
+			if err := os.WriteFile(sentinel, []byte("prior evidence"), 0o600); err != nil {
+				t.Fatal(err)
+			}
+			_, err := OpenEvidenceFiles(t.Context(), root, 1<<20)
+			requireCoded(t, err, e.CodeWriteConflict)
+			requireEvidenceBytes(t, sentinel, "prior evidence")
 		}
-		_, err := OpenEvidenceFiles(context.Background(), root, 1<<20)
-		requireCoded(t, err, e.CodeWriteConflict)
-		raw, readErr := os.ReadFile(keep)
-		if readErr != nil || string(raw) != "prior evidence" {
-			t.Fatalf("existing directory was disturbed: %q %v", raw, readErr)
-		}
-	})
-	t.Run("refuses an existing file at the destination", func(t *testing.T) {
-		root := filepath.Join(evidenceTempDir(t), "evidence")
-		if err := os.WriteFile(root, []byte("occupied"), 0o600); err != nil {
-			t.Fatalf("writing destination file: %v", err)
-		}
-		_, err := OpenEvidenceFiles(context.Background(), root, 1<<20)
-		requireCoded(t, err, e.CodeWriteConflict)
 	})
 	t.Run("refuses invalid openings", func(t *testing.T) {
 		cases := map[string]struct {
@@ -106,6 +111,7 @@ func TestOpenEvidenceFilesRequiresNewPrivateDirectory(t *testing.T) {
 			"zero byte bound":  {filepath.Join(evidenceTempDir(t), "evidence"), 0},
 			"negative bounds":  {filepath.Join(evidenceTempDir(t), "evidence"), -1},
 			"directory dot":    {".", 1 << 20},
+			"filesystem root":  {string(filepath.Separator), 1 << 20},
 			"relative root":    {"evidence", 1 << 20},
 			"nil context":      {filepath.Join(evidenceTempDir(t), "evidence"), 1 << 20},
 		}
@@ -128,44 +134,65 @@ func TestOpenEvidenceFilesRefusesLinkedParent(t *testing.T) {
 	if err := os.Symlink(outside, link); err != nil {
 		t.Fatal(err)
 	}
-	_, err := OpenEvidenceFiles(context.Background(), filepath.Join(link, "evidence"), 8)
-	requireCoded(t, err, e.CodeImmutableViolation)
-	if entries := directoryEntries(t, outside); len(entries) != 0 {
-		t.Fatalf("wrote through a linked parent: %v", entries)
+	_, err := OpenEvidenceFiles(t.Context(), filepath.Join(link, "evidence"), 8)
+	requireCoded(t, err, e.CodeUsage)
+	if !strings.Contains(err.Error(), `"linked"`) {
+		t.Fatalf("error omitted the aliased component: %v", err)
+	}
+	requireEntries(t, outside)
+}
+
+func TestOpenEvidenceFilesRefusesSharedWritableParent(t *testing.T) {
+	for _, test := range []struct {
+		name string
+		mode os.FileMode
+		path string
+	}{
+		{"group writable", 0o730, "evidence"},
+		{"world writable", 0o703, "nested/evidence"},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			parent := evidenceTempDir(t)
+			if err := os.Chmod(parent, test.mode); err != nil {
+				t.Fatal(err)
+			}
+			_, err := OpenEvidenceFiles(t.Context(), filepath.Join(parent, test.path), 8)
+			requireCoded(t, err, e.CodeImmutableViolation)
+			requireEntries(t, parent)
+		})
 	}
 }
 
 func TestWriteComponentPreservesExactBytes(t *testing.T) {
 	root := filepath.Join(evidenceTempDir(t), "evidence")
 	files := openWriter(t, root, 1<<20)
-	first := []byte{0x00, 0x01, 0xfe, 0xff, 0x0a}
-	second := []byte("report body\n")
 	for _, component := range []struct {
 		name    string
-		payload []byte
+		payload string
 	}{
-		{"inventory.json", first},
-		{"agent.log", second},
+		{"admitted-report.bin", "\x00\x01\xfe\xff\n"},
+		{"observation.json", "{\"coverage\":\"partial\"}\n"},
 	} {
-		if err := files.WriteComponent(context.Background(), component.name, strings.NewReader(string(component.payload))); err != nil {
+		if err := files.WriteComponent(t.Context(), component.name, strings.NewReader(component.payload)); err != nil {
 			t.Fatalf("writing %s: %v", component.name, err)
 		}
-		raw, err := os.ReadFile(filepath.Join(root, component.name))
-		if err != nil {
-			t.Fatalf("reading %s: %v", component.name, err)
-		}
-		if string(raw) != string(component.payload) {
-			t.Fatalf("component %s bytes changed: wrote %q read %q", component.name, component.payload, raw)
-		}
+		requireEvidenceBytes(t, filepath.Join(root, component.name), component.payload)
 	}
-	entries := directoryEntries(t, root)
-	if len(entries) != 2 || entries[0] != "agent.log" || entries[1] != "inventory.json" {
-		t.Fatalf("unexpected directory entries after success: %v", entries)
-	}
-	info, err := os.Stat(filepath.Join(root, "inventory.json"))
+	requireEntries(t, root, "admitted-report.bin", "observation.json")
+	info, err := os.Stat(filepath.Join(root, "admitted-report.bin"))
 	if err != nil || !info.Mode().IsRegular() || info.Mode().Perm() != 0o600 {
 		t.Fatalf("published component is not a private regular file: %v %v", info, err)
 	}
+	t.Run("rejects a different stage identity", func(t *testing.T) {
+		const name = "pending.json"
+		stage := incompletePrefix + name
+		if err := files.directory.WriteFile(stage, []byte("candidate"), 0o600); err != nil {
+			t.Fatal(err)
+		}
+		requireCoded(t, files.publishStagedComponent(t.Context(), stage, name, info), e.CodeImmutableViolation)
+		requireEntries(t, root, stage, "admitted-report.bin", "observation.json")
+		requireEvidenceBytes(t, filepath.Join(root, stage), "candidate")
+	})
 }
 
 func TestWriteComponentRefusesOverwrite(t *testing.T) {
@@ -175,20 +202,13 @@ func TestWriteComponentRefusesOverwrite(t *testing.T) {
 	if err := files.WriteComponent(context.Background(), "report.json", strings.NewReader(original)); err != nil {
 		t.Fatalf("initial write: %v", err)
 	}
-	err := files.WriteComponent(context.Background(), "report.json", strings.NewReader("replacement"))
-	requireCoded(t, err, e.CodeWriteConflict)
-	raw, readErr := os.ReadFile(filepath.Join(root, "report.json"))
-	if readErr != nil || string(raw) != original {
-		t.Fatalf("overwrite replaced completed component: %q %v", raw, readErr)
-	}
-	if entries := directoryEntries(t, root); len(entries) != 1 {
-		t.Fatalf("refused overwrite left entries: %v", entries)
-	}
+	requireCoded(t, files.WriteComponent(t.Context(), "report.json", strings.NewReader("replacement")), e.CodeWriteConflict)
+	requireEvidenceBytes(t, filepath.Join(root, "report.json"), original)
+	requireEntries(t, root, "report.json")
 }
 
 func TestWriteComponentRefusesUnsafeNames(t *testing.T) {
 	files := openWriter(t, filepath.Join(evidenceTempDir(t), "evidence"), 1<<20)
-	longName := strings.Repeat("a", maxComponentNameBytes+1)
 	cases := map[string]string{
 		"empty":           "",
 		"dot":             ".",
@@ -199,17 +219,16 @@ func TestWriteComponentRefusesUnsafeNames(t *testing.T) {
 		"windows escape":  `nested\report.json`,
 		"reserved prefix": incompletePrefix + "report.json",
 		"hidden name":     ".report.json",
+		"leading space":   " report.json",
+		"trailing space":  "report.json ",
 		"control rune":    "report\x01.json",
-		"overlong":        longName,
+		"overlong":        strings.Repeat("a", maxComponentNameBytes+1),
 	}
 	for name, value := range cases {
 		t.Run(name, func(t *testing.T) {
 			before := directoryEntries(t, files.Directory())
-			err := files.WriteComponent(context.Background(), value, strings.NewReader("payload"))
-			requireCoded(t, err, e.CodeUsage)
-			if after := directoryEntries(t, files.Directory()); len(after) != len(before) {
-				t.Fatalf("unsafe name %q left entries: %v", value, after)
-			}
+			requireCoded(t, files.WriteComponent(t.Context(), value, strings.NewReader("payload")), e.CodeUsage)
+			requireEntries(t, files.Directory(), before...)
 		})
 	}
 	t.Run("admits the 200-byte boundary name", func(t *testing.T) {
@@ -219,18 +238,11 @@ func TestWriteComponentRefusesUnsafeNames(t *testing.T) {
 		}
 	})
 	t.Run("refuses a closed writer", func(t *testing.T) {
-		closed, err := OpenEvidenceFiles(context.Background(), filepath.Join(evidenceTempDir(t), "closed"), 1<<20)
-		if err != nil {
-			t.Fatalf("opening closed writer: %v", err)
-		}
+		closed := openWriter(t, filepath.Join(evidenceTempDir(t), "closed"), 1<<20)
 		if err := closed.Close(); err != nil {
 			t.Fatalf("closing writer: %v", err)
 		}
-		if err := closed.WriteComponent(context.Background(), "report.json", strings.NewReader("payload")); err != nil {
-			requireCoded(t, err, e.CodeUsage)
-		} else {
-			t.Fatal("closed writer accepted a component")
-		}
+		requireCoded(t, closed.WriteComponent(t.Context(), "report.json", strings.NewReader("payload")), e.CodeUsage)
 	})
 }
 
@@ -244,12 +256,8 @@ func TestWriteComponentRefusesSymlinkDestination(t *testing.T) {
 	if err := os.Symlink(outside, filepath.Join(root, "report.json")); err != nil {
 		t.Fatalf("planting symlink: %v", err)
 	}
-	err := files.WriteComponent(context.Background(), "report.json", strings.NewReader("payload"))
-	requireCoded(t, err, e.CodeWriteConflict)
-	raw, readErr := os.ReadFile(outside)
-	if readErr != nil || string(raw) != "sentinel" {
-		t.Fatalf("symlink destination was followed: %q %v", raw, readErr)
-	}
+	requireCoded(t, files.WriteComponent(t.Context(), "report.json", strings.NewReader("payload")), e.CodeWriteConflict)
+	requireEvidenceBytes(t, outside, "sentinel")
 	info, statErr := os.Lstat(filepath.Join(root, "report.json"))
 	if statErr != nil || info.Mode()&os.ModeSymlink == 0 {
 		t.Fatalf("symlink destination was replaced: %v %v", info, statErr)
@@ -259,19 +267,12 @@ func TestWriteComponentRefusesSymlinkDestination(t *testing.T) {
 func TestWriteComponentBoundsPayloadSize(t *testing.T) {
 	root := filepath.Join(evidenceTempDir(t), "evidence")
 	files := openWriter(t, root, 16)
-	// Exactly 16 bytes: at the bound succeeds, one byte more is refused.
 	if err := files.WriteComponent(context.Background(), "kept.txt", strings.NewReader("0123456789abcdef")); err != nil {
 		t.Fatalf("boundary-size write: %v", err)
 	}
-	raw, err := os.ReadFile(filepath.Join(root, "kept.txt"))
-	if err != nil || string(raw) != "0123456789abcdef" {
-		t.Fatalf("boundary-size component bytes changed: %q %v", raw, err)
-	}
-	err = files.WriteComponent(context.Background(), "large.log", strings.NewReader("0123456789abcdefg"))
-	requireCoded(t, err, e.CodeUsage)
-	if entries := directoryEntries(t, root); len(entries) != 2 {
-		t.Fatalf("unexpected entries after oversize refusal: %v", entries)
-	}
+	requireEvidenceBytes(t, filepath.Join(root, "kept.txt"), "0123456789abcdef")
+	requireCoded(t, files.WriteComponent(t.Context(), "large.log", strings.NewReader("0123456789abcdefg")), e.CodeUsage)
+	requireEntries(t, root, incompletePrefix+"large.log", "kept.txt")
 }
 
 func TestWriteComponentLeavesPartialWritesDistinguishable(t *testing.T) {
@@ -281,46 +282,43 @@ func TestWriteComponentLeavesPartialWritesDistinguishable(t *testing.T) {
 	if err := files.WriteComponent(context.Background(), "kept.txt", strings.NewReader(kept)); err != nil {
 		t.Fatalf("writing kept component: %v", err)
 	}
-	failing := errors.New("synthetic source failure")
-	err := files.WriteComponent(context.Background(), "broken.log",
-		io.MultiReader(strings.NewReader("partial"), &failingReader{err: failing}))
-	requireCoded(t, err, e.CodeUnavailable)
-	entries := directoryEntries(t, root)
-	if len(entries) != 2 {
-		t.Fatalf("unexpected entries after partial write: %v", entries)
-	}
-	if _, statErr := os.Lstat(filepath.Join(root, "broken.log")); !errors.Is(statErr, os.ErrNotExist) {
-		t.Fatalf("failed component published a member name: %v", statErr)
-	}
-	staged, readErr := os.ReadFile(filepath.Join(root, incompletePrefix+"broken.log"))
-	if readErr != nil || string(staged) != "partial" {
-		t.Fatalf("partial write not distinguishable: %q %v", staged, readErr)
-	}
-	raw, readErr := os.ReadFile(filepath.Join(root, "kept.txt"))
-	if readErr != nil || string(raw) != kept {
-		t.Fatalf("completed component disturbed by partial write: %q %v", raw, readErr)
-	}
+	payload := io.MultiReader(strings.NewReader("partial"), iotest.ErrReader(errors.New("synthetic source failure")))
+	requireCoded(t, files.WriteComponent(t.Context(), "broken.log", payload), e.CodeUnavailable)
+	requireEntries(t, root, incompletePrefix+"broken.log", "kept.txt")
+	requireEvidenceBytes(t, filepath.Join(root, incompletePrefix+"broken.log"), "partial")
+	requireEvidenceBytes(t, filepath.Join(root, "kept.txt"), kept)
 }
 
-func TestWriteComponentRefusesMovedEvidenceDirectory(t *testing.T) {
-	parent := evidenceTempDir(t)
-	root := filepath.Join(parent, "evidence")
-	moved := filepath.Join(parent, "moved")
-	files := openWriter(t, root, 1<<20)
-	payload := readerFunc(func(buffer []byte) (int, error) {
-		if err := os.Rename(root, moved); err != nil {
-			t.Fatalf("moving evidence directory: %v", err)
-		}
-		return copy(buffer, "payload"), io.EOF
-	})
-	err := files.WriteComponent(context.Background(), "report.json", payload)
-	requireCoded(t, err, e.CodeImmutableViolation)
-	if _, err := os.Lstat(filepath.Join(moved, "report.json")); !errors.Is(err, os.ErrNotExist) {
-		t.Fatalf("published a component after its directory moved: %v", err)
-	}
-	want := incompletePrefix + "report.json"
-	if entries := directoryEntries(t, moved); len(entries) != 1 || entries[0] != want {
-		t.Fatalf("staged bytes were lost: %v", entries)
+func TestWriteComponentRefusesEvidenceDirectoryChange(t *testing.T) {
+	for _, change := range []string{"moved", "replaced", "permissions"} {
+		t.Run(change, func(t *testing.T) {
+			parent := evidenceTempDir(t)
+			root, retained := filepath.Join(parent, "evidence"), filepath.Join(parent, "moved")
+			files := openWriter(t, root, 8)
+			payload := readerFunc(func(buffer []byte) (int, error) {
+				if change == "permissions" {
+					retained = root
+					if err := os.Chmod(root, 0o750); err != nil {
+						t.Fatal(err)
+					}
+				} else {
+					if err := os.Rename(root, retained); err != nil {
+						t.Fatal(err)
+					}
+					if change == "replaced" {
+						if err := os.Mkdir(root, 0o700); err != nil {
+							t.Fatal(err)
+						}
+					}
+				}
+				return copy(buffer, "payload"), io.EOF
+			})
+			requireCoded(t, files.WriteComponent(t.Context(), "report.json", payload), e.CodeImmutableViolation)
+			requireEntries(t, retained, incompletePrefix+"report.json")
+			if change == "replaced" {
+				requireEntries(t, root)
+			}
+		})
 	}
 }
 
@@ -332,8 +330,7 @@ func TestWriteComponentObservesContext(t *testing.T) {
 	files := openWriter(t, filepath.Join(evidenceTempDir(t), "evidence"), 1<<20)
 	ctx, cancel := context.WithCancel(context.Background())
 	cancel()
-	err := files.WriteComponent(ctx, "report.json", strings.NewReader("payload"))
-	requireCoded(t, err, e.CodeTimeout)
+	requireCoded(t, files.WriteComponent(ctx, "report.json", strings.NewReader("payload")), e.CodeTimeout)
 }
 
 func TestWriteComponentStopsBeforePublishing(t *testing.T) {
@@ -357,9 +354,7 @@ func TestWriteComponentStopsBeforePublishing(t *testing.T) {
 				return 0, nil
 			})
 			requireCoded(t, files.WriteComponent(ctx, "report.json", reader), test.code)
-			if got := directoryEntries(t, files.Directory()); len(got) != 1 || got[0] != incompletePrefix+"report.json" {
-				t.Fatalf("unexpected files after interrupted write: %v", got)
-			}
+			requireEntries(t, files.Directory(), incompletePrefix+"report.json")
 		})
 	}
 }
@@ -378,15 +373,5 @@ func TestPublishComponentLeavesMarkerWhenSyncFails(t *testing.T) {
 		t.Fatal(err)
 	}
 	requireCoded(t, files.publishComponent(directory, stage, "report.json"), e.CodeImmutableViolation)
-	if got := directoryEntries(t, files.Directory()); len(got) != 2 || got[0] != stage || got[1] != "report.json" {
-		t.Fatalf("missing marker for unsynced publication: %v", got)
-	}
-}
-
-type failingReader struct {
-	err error
-}
-
-func (reader *failingReader) Read([]byte) (int, error) {
-	return 0, reader.err
+	requireEntries(t, files.Directory(), stage, "report.json")
 }
