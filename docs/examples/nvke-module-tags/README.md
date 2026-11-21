@@ -166,7 +166,10 @@ at the selected ref and does not choose a different Definition. This alternative
 the `nvkectl`, `nvke-controller` and `nvke-helm` repositories under `ghcr.io/dsx-ai-factory/nvkr` and uses the
 exact pinned cosign executable for keyless signing and provenance attestation. Configure the GitHub deployment
 environment `nvkr-release` with a deployment branch policy admitting only `main`. Registry access and NVKE source
-access must be available to the hosted runner. Real operational acceptance is recorded separately in the
+access must be available to the hosted runner. This example selects `github:GITHUB_TOKEN` for publication;
+complete the [platform-token destination setup](../../generate-pipeline.md#platform-token-destination-setup)
+before dispatch, retaining the publishing-repository connection and its **Write** Actions grant.
+Real operational acceptance is recorded separately in the
 [implementation/evidence record](../../adr/reconciliation/README.md).
 
 The GitHub Environment fetches pinned source anonymously from the public `dsx-ai-factory/nvke` repository.
