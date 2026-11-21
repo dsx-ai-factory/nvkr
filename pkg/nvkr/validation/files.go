@@ -82,7 +82,7 @@ func runSelected(ctx context.Context, source Source, checks []Check, options lif
 		output, err := run(ctx, source.Reference, source.Policy, check.Config, options)
 		if err != nil {
 			phase := PhaseFailed
-			if canceledPhase(ctx, err) {
+			if ctx.Err() != nil {
 				phase = PhaseCanceled
 			}
 			emit(ctx, check.Name, phase)

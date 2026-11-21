@@ -48,6 +48,7 @@ func TestValidateCLIAdmissionBeforeRunner(t *testing.T) {
 	}
 }
 func TestValidateCLIForwardsConfiguredSelectionAndPartialOutputs(t *testing.T) {
+	type callerKey struct{}
 	for _, selected := range []string{"", "cluster-conformance"} {
 		t.Run(selected, func(t *testing.T) {
 			t.Setenv("NVKR_GITHUB_TOKEN", "explicit-token")
@@ -64,13 +65,21 @@ func TestValidateCLIForwardsConfiguredSelectionAndPartialOutputs(t *testing.T) {
 				workspace = "private-validation"
 				args = append(args, "--workspace", workspace, selected)
 			}
-			ctx := t.Context()
+			ctx, cancel := context.WithCancel(context.WithValue(t.Context(), callerKey{}, true))
+			defer cancel()
 			calls := 0
 			var output bytes.Buffer
 			app := validationCLI(func(got context.Context, name, config string, options lifecycle.QualificationRuntimeOptions) ([]testresults.Output, error) {
 				calls++
+				if got.Value(callerKey{}) != true {
+					t.Fatal("runner context lost a caller value")
+				}
 				if got.Err() != nil || name != selected || config != "profile.json" || options.WorkspaceRoot != workspace || options.GitHubToken != "explicit-token" || options.Credential.Registry != "registry.example.test" || options.Registry.Password != "explicit-secret" || options.Registry.Anonymous {
 					t.Fatal("changed selection, context or explicit credentials")
+				}
+				cancel()
+				if !errors.Is(got.Err(), context.Canceled) {
+					t.Fatalf("runner context did not follow caller cancellation: %v", got.Err())
 				}
 				return []testresults.Output{original}, runErr
 			}, &output)
@@ -208,7 +217,7 @@ func TestValidateCLIProgressStaysOnStderrWithUnchangedJSON(t *testing.T) {
 	requireCanonicalValidationOutput(t, output.Bytes())
 }
 
-func TestValidateCLIProgressNeverMasksOwnerFailureOrCarriesDiagnostics(t *testing.T) {
+func TestValidateCLIProgressPreservesOwnerFailure(t *testing.T) {
 	var output, diagnostics bytes.Buffer
 	original := e.New(e.CodeVerifyFailed, "producer failure with private /workspace/secret detail")
 	app := validationCLI(func(ctx context.Context, _, _ string, _ lifecycle.QualificationRuntimeOptions) ([]testresults.Output, error) {
@@ -224,9 +233,6 @@ func TestValidateCLIProgressNeverMasksOwnerFailureOrCarriesDiagnostics(t *testin
 	}
 	if got, want := diagnostics.String(), "validation check cluster-conformance: running\nvalidation check cluster-conformance: failed\n"; got != want {
 		t.Fatalf("progress lines %q want %q", got, want)
-	}
-	if strings.Contains(diagnostics.String(), "private") || strings.Contains(diagnostics.String(), "/workspace/secret") {
-		t.Fatalf("raw diagnostics leaked into progress: %q", diagnostics.String())
 	}
 	requireCanonicalValidationOutput(t, output.Bytes())
 }

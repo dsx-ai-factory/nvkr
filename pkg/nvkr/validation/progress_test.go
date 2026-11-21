@@ -25,6 +25,7 @@ func progressChecks(names ...string) []Check {
 
 func TestRunSelectedReportsObservedCheckPhases(t *testing.T) {
 	source := profileFixture().Source
+	const privateFailure = "upstream check failed with private diagnostic detail"
 	for _, tc := range []struct {
 		name     string
 		checks   []Check
@@ -43,14 +44,14 @@ func TestRunSelectedReportsObservedCheckPhases(t *testing.T) {
 			want: []Progress{{Check: "cluster-conformance", Phase: PhaseRunning}, {Check: "cluster-conformance", Phase: PhaseCompleted}},
 		},
 		{
-			name:   "failed",
+			name:   "failure reports phase without private diagnostics",
 			checks: progressChecks("cluster-conformance"),
 			run: func(context.Context) (testresults.Output, error) {
-				return testresults.Output{}, e.New(e.CodeVerifyFailed, "upstream check failed")
+				return testresults.Output{}, e.New(e.CodeVerifyFailed, privateFailure)
 			},
 			want:     []Progress{{Check: "cluster-conformance", Phase: PhaseRunning}, {Check: "cluster-conformance", Phase: PhaseFailed}},
 			wantCode: e.CodeVerifyFailed,
-			wantText: "upstream check failed",
+			wantText: privateFailure,
 		},
 		{
 			name:   "canceled context dominates a returned error",
@@ -64,12 +65,12 @@ func TestRunSelectedReportsObservedCheckPhases(t *testing.T) {
 			wantText: "upstream check failed",
 		},
 		{
-			name:   "returned context cause reports canceled",
+			name:   "internal deadline reports failed with a live caller",
 			checks: progressChecks("cluster-conformance"),
 			run: func(context.Context) (testresults.Output, error) {
 				return testresults.Output{}, e.Wrap(e.CodeTimeout, context.DeadlineExceeded, "runner deadline")
 			},
-			want:     []Progress{{Check: "cluster-conformance", Phase: PhaseRunning}, {Check: "cluster-conformance", Phase: PhaseCanceled}},
+			want:     []Progress{{Check: "cluster-conformance", Phase: PhaseRunning}, {Check: "cluster-conformance", Phase: PhaseFailed}},
 			wantCode: e.CodeTimeout,
 			wantText: "runner deadline",
 		},
@@ -105,15 +106,14 @@ func TestRunSelectedReportsObservedCheckPhases(t *testing.T) {
 		},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			ctx := t.Context()
-			if tc.cancel {
-				canceled, cancel := context.WithCancel(ctx)
-				cancel()
-				ctx = canceled
-			}
+			ctx, cancel := context.WithCancel(t.Context())
+			defer cancel()
 			var observed []Progress
 			ctx = WithReporter(ctx, func(update Progress) { observed = append(observed, update) })
 			outputs, err := runSelected(ctx, source, tc.checks, lifecycle.QualificationRuntimeOptions{}, func(ctx context.Context, _, _, _ string, _ lifecycle.QualificationRuntimeOptions) (testresults.Output, error) {
+				if tc.cancel {
+					cancel()
+				}
 				return tc.run(ctx)
 			})
 			if tc.wantCode != "" {

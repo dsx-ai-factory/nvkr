@@ -3,14 +3,12 @@
 
 package validation
 
-import (
-	"context"
-	"errors"
-)
+import "context"
 
 // Observed check phases, using the existing closed operation-state vocabulary.
 // No phase establishes capture completeness, a passing verdict or qualification.
 const (
+	// PhaseRunning begins a selected check, including its configuration admission.
 	PhaseRunning   = "running"
 	PhaseCompleted = "completed"
 	PhaseFailed    = "failed"
@@ -26,8 +24,9 @@ type Progress struct {
 	Phase string
 }
 
-// Reporter receives observed check phases. It must not block or own resources;
-// the dispatch calls it synchronously and a panic in it never skips owner work.
+// Reporter receives observed check phases. One validation call invokes it
+// serially and synchronously. It must not block or own resources, and a panic
+// in it never skips owner work.
 type Reporter func(Progress)
 
 type reporterKey struct{}
@@ -60,13 +59,4 @@ func emit(ctx context.Context, check, phase string) {
 	}
 	defer func() { _ = recover() }()
 	report(Progress{Check: check, Phase: phase})
-}
-
-// canceledPhase classifies a finished check by its observed terminal condition.
-// Caller cancellation and context-deadline causes dominate a returned error.
-func canceledPhase(ctx context.Context, err error) bool {
-	if ctx.Err() != nil {
-		return true
-	}
-	return errors.Is(err, context.Canceled) || errors.Is(err, context.DeadlineExceeded)
 }
