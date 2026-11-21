@@ -254,7 +254,7 @@ func TestNVKEUbuntu24LocalDiskSelections(t *testing.T) {
 			if build.BuildDigest != nvkeUbuntu24Build(t, hosted, build.Name).BuildDigest {
 				t.Fatal("local and hosted Ubuntu 24 selections must retain identical logical Build inputs")
 			}
-			if build.Platform != "linux/"+arch || len(build.Components) != 12 {
+			if build.Platform != "linux/"+arch || len(build.Components) != 13 || !slices.Contains(build.Components, "dsx-imds-node-attestor-agent") {
 				t.Fatalf("local native closure = %s / %v", build.Platform, build.Components)
 			}
 			for _, node := range build.Graph.Nodes {
