@@ -9,6 +9,7 @@ import (
 	"encoding/hex"
 	"errors"
 	"io"
+	"net"
 	"strings"
 	"time"
 
@@ -135,6 +136,10 @@ func readStagedDisk(ctx context.Context, ref name.Digest, controls string, optio
 		readErr := errors.Join(copyErr, body.Close())
 		if err := deliveryContext(ctx); err != nil {
 			return nil, err
+		}
+		var networkError net.Error
+		if errors.Is(readErr, io.ErrUnexpectedEOF) || errors.As(readErr, &networkError) {
+			return nil, registryReadbackError(ctx, readErr, "reading staged disk payload")
 		}
 		if size != disk.Size || "sha256:"+hex.EncodeToString(hash.Sum(nil)) != disk.PayloadDigest {
 			return nil, e.Wrap(e.CodeVerifyFailed, readErr, "served staged disk differs from its exact size or digest")

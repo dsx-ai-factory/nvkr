@@ -269,8 +269,14 @@ the development publishing token does not need repository scope for that lookup.
 Development disks stage their unsigned prepared layout directly at their final destination, without a tag.
 Only the fixed push step receives the stage writer; the producer job has no OIDC or release-environment
 credential. This is a step scope, not a machine isolation boundary: candidate code runs on that ARC host.
-The stage writer must be a separate credential from the release writer, scoped to the disposable
-development packages. Verify that the release reader can read newly staged packages.
+The stage writer must be a separate token from the release writer, scoped to the disposable
+development packages. Use the same dedicated development package principal for stage, release,
+read and cleanup tokens: the stage token creates run/attempt-derived packages that cannot be
+granted to separate accounts before dispatch. The release writer needs read/write access to these
+packages, the release reader needs read access, and cleanup needs delete/admin access. Verify the
+actual token scopes and package ACLs; this shared-principal setup has not been exercised live for staging.
+A missing or under-scoped stage writer fails in the fixed push step after the disk build has completed;
+the build does not preflight these credentials.
 The staged digest and bounded controls travel through Actions metadata. The release job reads the
 complete preparation back by digest without retaining its payload. SBOM attestation uses only controls
 and no registry credential; the publisher binds its bundles to the readback before publishing evidence

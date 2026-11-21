@@ -12,6 +12,7 @@ import (
 	"net/http/httptest"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"sync/atomic"
 	"testing"
@@ -165,6 +166,10 @@ func TestCompleteStagedDiskRejectsBeforeWrites(t *testing.T) {
 			case "corrupt payload":
 				_, _ = io.WriteString(w, "corrupted bytes")
 				return
+			case "interrupted payload":
+				w.Header().Set("Content-Length", strconv.FormatInt(request.Objects[0].Output.Disk.Size, 10))
+				_, _ = io.WriteString(w, "partial")
+				return
 			}
 		}
 		if r.Method != http.MethodGet && r.Method != http.MethodHead {
@@ -179,7 +184,7 @@ func TestCompleteStagedDiskRejectsBeforeWrites(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	for _, scenario := range []string{"changed root", "missing verifier", "rejected signer", "canceled", "changed output", "missing payload", "corrupt payload"} {
+	for _, scenario := range []string{"changed root", "missing verifier", "rejected signer", "canceled", "changed output", "missing payload", "corrupt payload", "interrupted payload"} {
 		t.Run(scenario, func(t *testing.T) {
 			writes.Store(0)
 			fault.Store(scenario)
@@ -191,7 +196,7 @@ func TestCompleteStagedDiskRejectsBeforeWrites(t *testing.T) {
 			}
 			code := e.CodeVerifyFailed
 			switch scenario {
-			case "missing payload":
+			case "missing payload", "interrupted payload":
 				code = e.CodeUnavailable
 			case "changed root":
 				root = digestBytes([]byte("other"))

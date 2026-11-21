@@ -14,16 +14,18 @@ import (
 )
 
 const (
-	ProducerWorkflow      = ".github/workflows/nvkr-dev.yml"
-	QualificationWorkflow = ".github/workflows/nvkr-dev-qualify.yml"
-	SmokeWorkflow         = ".github/workflows/nvkr-dev-smoke.yml"
-	Issuer                = "https://token.actions.githubusercontent.com"
-	WriteSecret           = "NVKR_DEV_REGISTRY_WRITE"
-	ReadSecret            = "NVKR_DEV_REGISTRY_READ"
-	WriteCredentialRef    = "github:" + WriteSecret
-	ReadCredentialRef     = "github:" + ReadSecret
-	WriteUserVariable     = "NVKR_DEV_REGISTRY_WRITE_USER"
-	ReadUserVariable      = "NVKR_DEV_REGISTRY_READ_USER"
+	ProducerWorkflow       = ".github/workflows/nvkr-dev.yml"
+	QualificationWorkflow  = ".github/workflows/nvkr-dev-qualify.yml"
+	SmokeWorkflow          = ".github/workflows/nvkr-dev-smoke.yml"
+	Issuer                 = "https://token.actions.githubusercontent.com"
+	WriteSecret            = "NVKR_DEV_REGISTRY_WRITE"
+	ReadSecret             = "NVKR_DEV_REGISTRY_READ"
+	WriteCredentialRef     = "github:" + WriteSecret
+	ReadCredentialRef      = "github:" + ReadSecret
+	WriteUserVariable      = "NVKR_DEV_REGISTRY_WRITE_USER"
+	ReadUserVariable       = "NVKR_DEV_REGISTRY_READ_USER"
+	StageWriteSecret       = "NVKR_DEV_REGISTRY_STAGE_WRITE"
+	StageWriteUserVariable = "NVKR_DEV_REGISTRY_STAGE_WRITE_USER"
 )
 
 var namespacePattern = regexp.MustCompile(`^ghcr\.io/([a-z0-9](?:[a-z0-9-]*[a-z0-9])?)/([a-z0-9](?:[a-z0-9._-]*[a-z0-9])?)/development(?:-([a-z0-9](?:[a-z0-9-]{0,46}[a-z0-9])?))?$`)

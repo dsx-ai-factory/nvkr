@@ -1,6 +1,6 @@
 ## Hosted artifact transport lifetime
 
-The Design B disk migration is limited to the signed development ARC lane. Its fixed
+The destination-staging disk migration is limited to the signed development ARC lane. Its fixed
 stage-writer step uploads the unsigned preparation directly to the final digest-addressed
 destination; the output edge carries only a staged reference and bounded controls through
 Actions metadata. The release publisher streams and authenticates the complete staged closure and publishes
@@ -20,6 +20,13 @@ The generated-boundary tests check reference-only graph edges and reject stage-w
 ordering and optional-step substitutions. The maintained development profile requires its
 own stage-only credential in the ARC environment. No hosted comparison or provider mutation
 was authorized or performed; current-candidate hosted acceptance remains unverified.
+
+`TestStagedDiskPublishExecutor` exercises successful factory completion, signing-metadata/reference
+correspondence, credential and destination refusals, admission-time controls substitution, and the
+attest step's staged-root binding. It uses the real delivery operations and Distribution handler with
+synthetic package-policy and signer adapters. `TestStagedDiskStageAdmissionRejectsBeforeWork` covers
+non-development plans, unrelated authority and missing stage credentials before staging effects.
+Successful native ARC stage execution, provider ACLs and OIDC remain unexercised by these tests.
 
 The FDE build jobs in [Run 38480478189](https://github.com/dsx-ai-factory/nvkr/actions/runs/38480478189)
 succeeded, but the later hosted SBOM-attestation jobs failed restoring their prepared layouts: the

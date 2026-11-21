@@ -14,6 +14,7 @@ import (
 
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/cistore"
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/delivery"
+	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/development"
 	e "github.com/dsx-ai-factory/nvkr/pkg/nvkr/errors"
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/sign"
 )
@@ -34,8 +35,8 @@ func stagedDiskReferenceID(route string) string { return "staged/" + route }
 
 func stagedDiskEnvironment() map[string]string {
 	return map[string]string{
-		"NVKR_CREDENTIAL":        "${{ secrets.NVKR_DEV_REGISTRY_STAGE_WRITE }}",
-		"NVKR_REGISTRY_USER":     "${{ vars.NVKR_DEV_REGISTRY_STAGE_WRITE_USER }}",
+		"NVKR_CREDENTIAL":        "${{ secrets." + development.StageWriteSecret + " }}",
+		"NVKR_REGISTRY_USER":     "${{ vars." + development.StageWriteUserVariable + " }}",
 		githubRepositoryTokenEnv: "${{ github.token }}",
 	}
 }
@@ -47,8 +48,19 @@ func StageGitHubDisk(ctx context.Context, plan *Plan, output string, options Git
 		return err
 	}
 	routeName := outputPublicationRoute(output)
-	if !stagedDiskRoute(plan, routeName) || runtime.GOOS != "linux" {
+	if !stagedDiskRoute(plan, routeName) {
 		return e.New(e.CodeEngineCapability, "destination staging requires a development ARC disk")
+	}
+	for _, key := range []string{sourceTokenEnv, githubImageToken, "ACTIONS_ID_TOKEN_REQUEST_TOKEN"} {
+		if os.Getenv(key) != "" {
+			return e.New(e.CodeEngineCapability, "disk staging contains unrelated authority")
+		}
+	}
+	if os.Getenv("NVKR_CREDENTIAL") == "" || os.Getenv("NVKR_REGISTRY_USER") == "" {
+		return e.New(e.CodeTrustPolicyMissing, "disk staging requires its stage-only writer")
+	}
+	if runtime.GOOS != "linux" {
+		return e.New(e.CodeEngineCapability, "destination staging requires native Linux")
 	}
 	stages, _, err := githubStages(plan)
 	if err != nil {
@@ -63,11 +75,6 @@ func StageGitHubDisk(ctx context.Context, plan *Plan, output string, options Git
 	if !matched {
 		return e.New(e.CodeEngineCapability, "disk staging requires its native ARC platform")
 	}
-	for _, key := range []string{sourceTokenEnv, githubImageToken, "ACTIONS_ID_TOKEN_REQUEST_TOKEN"} {
-		if os.Getenv(key) != "" {
-			return e.New(e.CodeEngineCapability, "disk staging contains unrelated authority")
-		}
-	}
 	ctx, cancel := context.WithTimeout(ctx, 30*time.Minute)
 	defer cancel()
 	var route Route
@@ -79,9 +86,6 @@ func StageGitHubDisk(ctx context.Context, plan *Plan, output string, options Git
 	target, err := runtimeTarget(plan, route.Target)
 	if err != nil {
 		return err
-	}
-	if os.Getenv("NVKR_CREDENTIAL") == "" || os.Getenv("NVKR_REGISTRY_USER") == "" {
-		return e.New(e.CodeTrustPolicyMissing, "disk staging requires its stage-only writer")
 	}
 	_, artifacts := planIndex(plan)
 	source := artifacts[route.Input].Path
@@ -133,6 +137,12 @@ func stagedDiskSubject(ctx context.Context, plan *Plan, route Route, artifacts m
 }
 
 func executeStagedDiskPublish(ctx context.Context, plan *Plan, node Node, artifacts map[string]Artifact, stdout io.Writer) error {
+	return executeStagedDiskPublishWithAdmission(ctx, plan, node, artifacts, stdout, cistore.AdmitPrivatePublication, productionOCISigner)
+}
+
+func executeStagedDiskPublishWithAdmission(ctx context.Context, plan *Plan, node Node, artifacts map[string]Artifact, stdout io.Writer,
+	admit func(context.Context, string, []string, cistore.Options) error, newSigner signerFor,
+) error {
 	route, ok := preparedEvidenceRoute(plan, node)
 	if !ok || !stagedDiskRoute(plan, route.Name) {
 		return e.New(e.CodeEngineCapability, "staged publication requires its disk route")
@@ -152,14 +162,14 @@ func executeStagedDiskPublish(ctx context.Context, plan *Plan, node Node, artifa
 	if err := admitEvidenceMetadata(plan, route, inspection); err != nil {
 		return err
 	}
-	root, err := admitGitHubPublication(ctx, target, controls.Path, cistore.AdmitPrivatePublication)
+	root, err := admitGitHubPublication(ctx, target, controls.Path, admit)
 	if err != nil {
 		return err
 	}
 	if root != inspection.RootDigest {
 		return e.New(e.CodeVerifyFailed, "staged completion controls changed after destination admission")
 	}
-	signer, err := productionOCISigner(ctx, plan, node, artifacts)
+	signer, err := newSigner(ctx, plan, node, artifacts)
 	if err != nil {
 		return err
 	}
@@ -176,7 +186,7 @@ func executeStagedDiskPublish(ctx context.Context, plan *Plan, node Node, artifa
 	if err != nil {
 		return err
 	}
-	if _, err := delivery.ExportMetadataWithExpectedRoot(ctx, controls.Path, metadata.Path, root); err != nil {
+	if _, err := delivery.CopyMetadataWithExpectedRoot(ctx, controls.Path, metadata.Path, root); err != nil {
 		return err
 	}
 	output, err := signNodeOutput(node, artifacts, "published-reference")
