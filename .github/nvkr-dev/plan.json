@@ -390,7 +390,7 @@
   "environmentDigest": "sha256:6cfc17a822fe089862a222c5a5894abb9434cd5dbc253480b6c2947d46e0d3ed",
   "environmentPath": "inputs/environments/github-development.yaml",
   "generatorVersion": "dev (unknown)",
-  "graphDigest": "sha256:72fce6081c0d6b13c81c8cb181415b2deccfb7b0723b157fab9dfc1662f35149",
+  "graphDigest": "sha256:4a675b35d5285349f54250d555860b4e28c5570affae4490de5a41aa78594cd4",
   "lifecycleOutputs": {
     "file": ".github/nvkr-plan-store/plan/outputs-nvke.json"
   },

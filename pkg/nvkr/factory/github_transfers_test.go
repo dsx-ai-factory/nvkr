@@ -98,9 +98,20 @@ func TestGitHubInternalDiskWrapperHasNoArchiveOrUpload(t *testing.T) {
 				t.Fatal("internally consumed disk wrapper still has an archive or upload")
 			}
 			prepared := "package/" + outputPublicationPackage(output)
-			if !actions.stepUploads(steps, githubArtifactName(prepared), carrierPath(prepared)) ||
-				!actions.stepUploads(steps, githubArtifactName("sbom/"+output), carrierPath("sbom/"+output)) {
-				t.Fatal("external preparation or retained metadata carrier was omitted")
+			if actions.stepUploads(steps, githubArtifactName(prepared), carrierPath(prepared)) {
+				t.Fatal("staged preparation still has a payload carrier")
+			}
+			for _, id := range []string{"sbom/" + output, preparedEvidenceMetadataID(outputPublicationRoute(output)), stagedDiskReferenceID(outputPublicationRoute(output))} {
+				if !actions.stepUploads(steps, githubArtifactName(id), carrierPath(id)) {
+					t.Fatalf("retained metadata carrier %s was omitted", id)
+				}
+			}
+			staged := false
+			for _, step := range steps {
+				staged = staged || githubDiskStageCredentialStep(plan, githubStage{DiskOutput: output}, step)
+			}
+			if !staged {
+				t.Fatal("fixed destination stage push was omitted")
 			}
 			if artifacts[wrapper].Producer != wrapper || len(nodes[wrapper].Outputs) != 1 {
 				t.Fatal("carrier suppression changed the complete logical graph")

@@ -24,7 +24,7 @@ func InspectMetadata(ctx context.Context, root string) (Inspection, error) {
 	return inspectMetadata(ctx, root, false)
 }
 
-// allowPayloads is used only for browsing an existing full layout. It permits
+// allowPayloads supports bounded inspection of an existing full layout. It permits
 // declared output blobs to be present, without opening or verifying their bytes.
 func inspectMetadata(ctx context.Context, root string, allowPayloads bool) (Inspection, error) {
 	return inspectMetadataProgress(ctx, root, allowPayloads, "", nil)

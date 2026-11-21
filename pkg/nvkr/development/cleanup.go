@@ -38,10 +38,10 @@ type CleanupReport struct {
 	Deleted    []string `json:"deleted"`
 }
 
-// Cleanup expires only internal development packages owned by completed, expired
+// Cleanup expires only private/internal development packages owned by completed, expired
 // nvkr-dev.yml attempts. Credentials are explicit and never read from ambient
 // GitHub or Docker configuration. The namespace is reserved for these attempts;
-// a later attempt must publish into its own namespace, never recreate an old one.
+// a later retry may still consume or complete an earlier staged preparation.
 // Each call selects at most 25 eligible packages; later calls drain the backlog.
 // A failed call may return a report of deletions already acknowledged by GitHub.
 func Cleanup(ctx context.Context, repository, token string, apply bool) (CleanupReport, error) {
@@ -267,9 +267,10 @@ func (api *cleanupAPI) eligible(ctx context.Context, token string, repo cleanupR
 }
 
 func (api *cleanupAPI) packageOldEnough(repo cleanupRepository, candidate cleanupCandidate, pkg cleanupPackage) (bool, error) {
-	if pkg.ID != candidate.metadata.ID || pkg.Name != candidate.metadata.Name || pkg.Type != "container" || pkg.Visibility != "internal" ||
+	if pkg.ID != candidate.metadata.ID || pkg.Name != candidate.metadata.Name || pkg.Type != "container" ||
+		(pkg.Visibility != "internal" && pkg.Visibility != "private") || pkg.Visibility != candidate.metadata.Visibility ||
 		pkg.Owner.ID != repo.Owner.ID || !strings.EqualFold(pkg.Owner.Login, repo.Owner.Login) || pkg.Owner.Type != repo.Owner.Type {
-		return false, e.New(e.CodeVerifyFailed, "development package ownership, internal visibility or identity does not match its admitted namespace")
+		return false, e.New(e.CodeVerifyFailed, "development package ownership, private/internal visibility or identity changed or does not match its admitted namespace")
 	}
 	return api.oldEnough(pkg.CreatedAt, pkg.UpdatedAt)
 }

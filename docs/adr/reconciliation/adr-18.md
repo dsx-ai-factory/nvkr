@@ -1,19 +1,22 @@
 ## Support by owner
 
 ADR-18's 2026-11-20 revision accepts destination staging by digest, with repository-local GHCR
-and platform job tokens as the new-adopter default. It is design only: the current emitter still
-transfers output payloads through private CI storage and excludes destination writers from producer jobs.
-No destination-staging contract test or hosted Run is recorded. The job-boundary evidence below covers
-the current carrier path, not the revised producer stage-writer exception. OIDC and the release environment
+and platform job tokens as the new-adopter default. Development ARC disks now implement destination
+staging with the dedicated credential profile; other outputs and lanes retain private CI storage.
+The [disk transport contracts](hosted-artifact-transport-lifetime.md) cover byte equivalence and the fixed
+stage-writer boundary locally; no hosted destination-staging Run is recorded. OIDC and the release environment
 remain confined to release jobs in both contracts.
 
 Migration requires separate changes: development disks first, comparing release-root bytes with the current
 path for identical prepared bytes and frozen identity inputs; all output kinds and aggregate indexes next;
 then helper/source/intermediate/diagnostic edges, followed by deletion of the CI-storage implementation and
 all `NVKR_CI_STORAGE_*` secrets/variables. Build-only residual edges need explicit transport admission before
-that deletion. No generated workflow or credential configuration changes with this decision. The platform-token profile accepts
+that deletion. Platform-token producer staging remains deferred. The platform-token profile accepts
 repository linkage and fork-package exposure; the opt-in independent writer needs a distinct stage-only
-credential, never the `nvkr-release` writer. The signed GitLab platform-token profile remains design only; the ordinary
+credential, never the `nvkr-release` writer. The existing hosted publisher now admits the GitHub platform-token
+profile with exact repository linkage and default-private visibility under [ADR-20's implementation boundary](adr-20.md).
+Actions roles and inheritance remain operator responsibilities; this does not implement platform-token producer staging or
+switch a maintained lane. The signed GitLab platform-token profile remains design only; the ordinary
 unsigned GitLab implementation and its proposed contract below are distinct. Tekton's cluster-key contract
 is unchanged.
 
