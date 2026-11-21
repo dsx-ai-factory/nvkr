@@ -2,7 +2,7 @@
   "apiVersion": "nvkr.dev/catalog-overlay/v3",
   "kind": "CatalogOverlay",
   "name": "nvke-os-arm64-tcg-local",
-  "requiresCatalogDigest": "sha256:8e94dd84de6431583ccf9c61d9d2b3ac45b653030529c9652e94250fa700248a",
+  "requiresCatalogDigest": "sha256:dfcf866042627ebeb7461f1caf6c11d6457524a112531b3f59c1a2628bacc870",
   "components": {
     "nvke-cni-ovn": {
       "component": {

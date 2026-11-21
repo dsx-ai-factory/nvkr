@@ -96,9 +96,12 @@ packages and demo tenant select stream `2.4.0`. Packer still consumes staged
 materials; it does not fetch the fork or compile OVN. A fresh bake and tenant
 acceptance are separate gates from compiling this selection.
 
-The shared OS catalog selects NVKE `v0.23.0` for every NVKE producer, including SPIRE
-packaging revision `4`. That source-owned package excludes DSX IMDS and requires no DSX
-build credentials. The updated inputs do not establish a new runtime acceptance result.
+The shared OS catalog still pins NVKE producers to `v0.23.0`. Its SPIRE adapter now
+requests Debian revision `5` with the source-built WLI v1.15.0 IMDS agent and checks
+the packaged executable's bytes. The NVKE pin must advance to the optional-input
+implementation before the package can build; the old source fails that check.
+TPM remains the default attestor. The updated inputs do not establish a new runtime
+acceptance result.
 
 The combined selection also produces standalone OVN OCI image and image-bound
 Helm OCI outputs. They have their own build identities; do not assume their bytes

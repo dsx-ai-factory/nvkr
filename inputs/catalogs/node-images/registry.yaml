@@ -724,7 +724,7 @@ imports:
     ubuntu-installer-iso: ubuntu-installer-iso
     ubuntu-installer-iso-amd64: ubuntu-installer-iso-amd64
   path: ../shared/node-images.yaml
-  sha256: 187275081011f1997bfd2e3dde093f544749e1cb500c4c79b54a169e50f1af94
+  sha256: 6118d0ac80fd91d38c34ecded2e72773308687ea9a2246abf6928e37c56463f5
   sources:
     nvke-cni-calico-source: nvke-cni-calico-source
     nvke-doca-ovs-source: nvke-doca-ovs-source

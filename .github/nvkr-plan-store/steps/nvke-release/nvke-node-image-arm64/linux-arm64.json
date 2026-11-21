@@ -1,14 +1,14 @@
 {
   "appliedOverlays": [
     {
-      "inputCatalogDigest": "sha256:8e94dd84de6431583ccf9c61d9d2b3ac45b653030529c9652e94250fa700248a",
+      "inputCatalogDigest": "sha256:dfcf866042627ebeb7461f1caf6c11d6457524a112531b3f59c1a2628bacc870",
       "name": "nvke-native-toolchains",
-      "outputCatalogDigest": "sha256:21e8871f854b9b40656dd293af3fcbfe252f40201ff8ce89a1d7073d7a7f646c",
-      "overlayDigest": "sha256:320f5acf323de8ee9bb7dd95f9d24001985b388a1752711f781fe7f9cb2d2932"
+      "outputCatalogDigest": "sha256:f88d791f4e2e2f0710b24812882008487b72f05b1b0ccae212dfcded9b309a0c",
+      "overlayDigest": "sha256:d1663540a68ca84b447cc1559b252f9ae97405dbc7586ea4a0af3334a78333bd"
     }
   ],
-  "buildDigest": "sha256:f688beaaf04ec143ebab3f1f33e51068c8226a09c614fa7ab39b20776ff7e300",
-  "catalogDigest": "sha256:21e8871f854b9b40656dd293af3fcbfe252f40201ff8ce89a1d7073d7a7f646c",
+  "buildDigest": "sha256:d9e2749cd15cb1e2ccdbcdd580f555a7101de50cac8194ac7aa5e4af8e103f6d",
+  "catalogDigest": "sha256:f88d791f4e2e2f0710b24812882008487b72f05b1b0ccae212dfcded9b309a0c",
   "components": [
     "dsx-imds-node-attestor-agent",
     "nvke-agent",
@@ -763,7 +763,7 @@
           "bash",
           "-ec",
           {
-            "file": ".github/nvkr-plan-store/scripts/nvke-spire-agent/build@26efeec87742.sh"
+            "file": ".github/nvkr-plan-store/scripts/nvke-spire-agent/build@88bf5c0e2312.sh"
           }
         ],
         "component": "nvke-spire-agent",
@@ -1528,7 +1528,7 @@
         "bash",
         "-ec",
         {
-          "file": ".github/nvkr-plan-store/scripts/nvke-spire-agent/build@edc609679900.sh"
+          "file": ".github/nvkr-plan-store/scripts/nvke-spire-agent/build@920bcb1ced74.sh"
         }
       ],
       "builderType": "oci-hermetic",

@@ -7,7 +7,8 @@ cp -a make /src/nvkr-output/work/
 # staging it read-only and rechecks consumption after the command.
 export IMDS_AGENT_FILE=/nvkr/inputs/materials/imds-agent
 export IMDS_AGENT_ARCH=amd64
-test -f "$IMDS_AGENT_FILE" && test ! -L "$IMDS_AGENT_FILE"
+test -f "$IMDS_AGENT_FILE"
+test ! -L "$IMDS_AGENT_FILE"
 IMDS_AGENT_SHA256="$(sha256sum "$IMDS_AGENT_FILE")"
 export IMDS_AGENT_SHA256="${IMDS_AGENT_SHA256%% *}"
 # Reuse the verified vendor cache offline, staging IMDS only at build time.

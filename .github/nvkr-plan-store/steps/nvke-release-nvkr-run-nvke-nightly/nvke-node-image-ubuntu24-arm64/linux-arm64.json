@@ -1,20 +1,20 @@
 {
   "appliedOverlays": [
     {
-      "inputCatalogDigest": "sha256:8e94dd84de6431583ccf9c61d9d2b3ac45b653030529c9652e94250fa700248a",
+      "inputCatalogDigest": "sha256:dfcf866042627ebeb7461f1caf6c11d6457524a112531b3f59c1a2628bacc870",
       "name": "nvke-native-toolchains",
-      "outputCatalogDigest": "sha256:21e8871f854b9b40656dd293af3fcbfe252f40201ff8ce89a1d7073d7a7f646c",
-      "overlayDigest": "sha256:320f5acf323de8ee9bb7dd95f9d24001985b388a1752711f781fe7f9cb2d2932"
+      "outputCatalogDigest": "sha256:f88d791f4e2e2f0710b24812882008487b72f05b1b0ccae212dfcded9b309a0c",
+      "overlayDigest": "sha256:d1663540a68ca84b447cc1559b252f9ae97405dbc7586ea4a0af3334a78333bd"
     },
     {
-      "inputCatalogDigest": "sha256:21e8871f854b9b40656dd293af3fcbfe252f40201ff8ce89a1d7073d7a7f646c",
+      "inputCatalogDigest": "sha256:f88d791f4e2e2f0710b24812882008487b72f05b1b0ccae212dfcded9b309a0c",
       "name": "nvke-os-ubuntu24",
-      "outputCatalogDigest": "sha256:d72493621326225d739de27c0bf88a4aae85b100d630d785598d8c6a3ef52420",
-      "overlayDigest": "sha256:ed1a04d5755d2eeac492e6f3bb3a8f4bedf0e3ba9fce750b9eab224655619234"
+      "outputCatalogDigest": "sha256:57d04d895816cc6d6e79295defcdd3bee96ca5223ee77edaec119f3e161c994f",
+      "overlayDigest": "sha256:a9b1a22adfebd3d168f84dea8cdc64ea8f679643d86456abbe2d80b46c9ba378"
     }
   ],
-  "buildDigest": "sha256:0bcdf63fcfac4cf6a8b567a7bda678f63753cc329406b29d06ee65a83244ce4e",
-  "catalogDigest": "sha256:d72493621326225d739de27c0bf88a4aae85b100d630d785598d8c6a3ef52420",
+  "buildDigest": "sha256:93504622ca01d6df22c71a321f3bf2aaff8eb6a1559433ee6255e1bdc54122f9",
+  "catalogDigest": "sha256:57d04d895816cc6d6e79295defcdd3bee96ca5223ee77edaec119f3e161c994f",
   "components": [
     "dsx-imds-node-attestor-agent",
     "nvke-agent",
@@ -765,7 +765,7 @@
           "bash",
           "-ec",
           {
-            "file": ".github/nvkr-plan-store/scripts/nvke-spire-agent/build@26efeec87742.sh"
+            "file": ".github/nvkr-plan-store/scripts/nvke-spire-agent/build@88bf5c0e2312.sh"
           }
         ],
         "component": "nvke-spire-agent",
@@ -1552,7 +1552,7 @@
         "bash",
         "-ec",
         {
-          "file": ".github/nvkr-plan-store/scripts/nvke-spire-agent/build@edc609679900.sh"
+          "file": ".github/nvkr-plan-store/scripts/nvke-spire-agent/build@920bcb1ced74.sh"
         }
       ],
       "builderType": "oci-hermetic",

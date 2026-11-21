@@ -6,18 +6,19 @@ cp -a make /src/nvkr-output/work/
 # The runtime authenticates this exact named producer material before
 # staging it read-only and rechecks consumption after the command.
 export IMDS_AGENT_FILE=/nvkr/inputs/materials/imds-agent
-export IMDS_AGENT_ARCH={{.Arch}}
-test -f "$IMDS_AGENT_FILE" && test ! -L "$IMDS_AGENT_FILE"
+export IMDS_AGENT_ARCH=arm64
+test -f "$IMDS_AGENT_FILE"
+test ! -L "$IMDS_AGENT_FILE"
 IMDS_AGENT_SHA256="$(sha256sum "$IMDS_AGENT_FILE")"
 export IMDS_AGENT_SHA256="${IMDS_AGENT_SHA256%% *}"
 # Reuse the verified vendor cache offline, staging IMDS only at build time.
 make -C /src/nvkr-output/work/os-image/packages/spire-agent bundle \
-  ARCH={{.Arch}} SPIRE_VERSION=1.14.1 TPM_PLUGIN_VERSION=1.9.0 \
+  ARCH=arm64 SPIRE_VERSION=1.14.1 TPM_PLUGIN_VERSION=1.9.0 \
   BIN_DIR=/usr/local/bin NFPM_BIN=/usr/local/bin/nfpm
 SPIRE_VERSION=1.14.1 TPM_PLUGIN_VERSION=1.9.0 DEB_REVISION=5 \
   NFPM_BIN=/usr/local/bin/nfpm \
   /src/nvkr-output/work/os-image/packages/spire-agent/packaging/build-deb.sh \
-  {{.Arch}} /src/nvkr-output/work/os-image/packages/spire-agent/dist/1.14.1+tpm1.9.0/{{.Arch}} \
+  arm64 /src/nvkr-output/work/os-image/packages/spire-agent/dist/1.14.1+tpm1.9.0/arm64 \
   /src/nvkr-output/spire-agent
 packages=(/src/nvkr-output/spire-agent/*.deb)
 test "${#packages[@]}" -eq 1
