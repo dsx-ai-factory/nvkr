@@ -1406,8 +1406,8 @@ admission rejects development before qualification evidence collection.
 
 Development publication and signing jobs use `nvkr-dev-release`; native disk jobs use `nvkr-dev-arc`.
 They never inherit the production deployment environments. Signed development requires the dedicated
-credential profile until ADR-20's per-attempt package-creation and verifiable Actions-role prerequisites
-for platform tokens are specified and implemented; that route remains refused. The dedicated development
+credential profile until ADR-20's per-attempt package setup for platform tokens is specified and implemented;
+that route remains deferred. Actions roles and inheritance are operator responsibilities. The dedicated development
 profile keeps separate read, stage-write and release-write bindings. Only the
 fixed stage step receives the stage writer. Only a release job that signs or attests receives OIDC minting
 permission, at job scope. Read-only toolchain preparation requires the Environment-declared independent reader for its private
@@ -1545,11 +1545,11 @@ constraints above. Each release job consumes bounded controls and immutable dest
 authenticates served bytes; it does not restore and repush a payload carrier. OIDC remains job-scoped, so a
 fused producer/release job is rejected. Step-scoped credentials limit what each operation is given; they are
 not a machine boundary between operations in one job. A compromised producer may add unsigned destination
-objects or move non-authoritative tags. The platform-token profile must admit the publishing repository's
-Actions access role as Write, not Admin, on every destination package under ADR-20. Producer and
-development-branch tokens must not be able to delete or restore released versions; those actions remain
-with a human package administrator. Unknown or broader effective package roles fail admission before
-payload writes. Only the signed release root and subject-bound evidence can authorize
+objects or move non-authoritative tags. Under ADR-20, the operator must configure the publishing repository's
+Actions access role as Write, not Admin, and disable inherited access on every destination package.
+NVKR does not verify those settings or probe deletion/restoration. Admin misconfiguration is the operator's
+risk and does not refuse the platform-token profile; package identity, association and visibility are still
+authenticated before payload writes. Only the signed release root and subject-bound evidence can authorize
 consumer acceptance; stage presence and tags cannot. [Reconciliation](reconciliation/adr-18.md) owns validation status.
 
 Tekton keeps the earlier grouping. Offline terminal observation, SBOM and packaging join one Build or
