@@ -186,7 +186,19 @@ func TestCleanupAdmitsOnlyExpiredCompleteDevelopmentAttempts(t *testing.T) {
 		{"path traversal", func(f *cleanupFixture) { f.packages[0].Name = "project/development/runs/100/attempts/1/../releases" }, 0, e.CodeEngineCapability},
 		{"wrong owner", func(f *cleanupFixture) { f.packages[0].Owner.ID++ }, 0, e.CodeVerifyFailed},
 		{"wrong package type", func(f *cleanupFixture) { f.packages[0].Type = "npm" }, 0, e.CodeVerifyFailed},
-		{"private package visibility", func(f *cleanupFixture) { f.packages[0].Visibility = "private" }, 0, e.CodeVerifyFailed},
+		{"private staging package", func(f *cleanupFixture) { f.packages[0].Visibility = "private" }, 1, ""},
+		{"private package active retry", func(f *cleanupFixture) {
+			f.packages[0].Visibility = "private"
+			f.latestRun = func(r *cleanupRun) { r.Attempt = 2; r.Status = "in_progress"; r.Conclusion = "" }
+		}, 0, ""},
+		{"young private package", func(f *cleanupFixture) {
+			f.packages[0].Visibility = "private"
+			f.packages[0].UpdatedAt = f.now.Add(-time.Hour)
+		}, 0, ""},
+		{"private package wrong owner", func(f *cleanupFixture) {
+			f.packages[0].Visibility = "private"
+			f.packages[0].Owner.ID++
+		}, 0, e.CodeVerifyFailed},
 		{"missing package visibility", func(f *cleanupFixture) { f.packages[0].Visibility = "" }, 0, e.CodeVerifyFailed},
 		{"unknown package visibility", func(f *cleanupFixture) { f.packages[0].Visibility = "unknown" }, 0, e.CodeVerifyFailed},
 		{"public package", func(f *cleanupFixture) { f.packages[0].Visibility = "public" }, 0, e.CodeVerifyFailed},
@@ -229,6 +241,10 @@ func TestCleanupDryRunAndRecheck(t *testing.T) {
 		{"dry run", false, nil, ""},
 		{"missing recheck fields", true, func(f *cleanupFixture) { f.recheckJSON = json.RawMessage(`{}`) }, e.CodeVerifyFailed},
 		{"visibility changed to private", true, func(f *cleanupFixture) { f.recheckPackage = func(p *cleanupPackage) { p.Visibility = "private" } }, e.CodeVerifyFailed},
+		{"private visibility changed to internal", true, func(f *cleanupFixture) {
+			f.packages[0].Visibility = "private"
+			f.recheckPackage = func(p *cleanupPackage) { p.Visibility = "internal" }
+		}, e.CodeVerifyFailed},
 		{"visibility changed to public", true, func(f *cleanupFixture) { f.recheckPackage = func(p *cleanupPackage) { p.Visibility = "public" } }, e.CodeVerifyFailed},
 		{"visibility changed to missing", true, func(f *cleanupFixture) { f.recheckPackage = func(p *cleanupPackage) { p.Visibility = "" } }, e.CodeVerifyFailed},
 		{"visibility changed to unknown", true, func(f *cleanupFixture) { f.recheckPackage = func(p *cleanupPackage) { p.Visibility = "unknown" } }, e.CodeVerifyFailed},

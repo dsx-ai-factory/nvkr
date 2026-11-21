@@ -133,12 +133,19 @@ func readStagedDisk(ctx context.Context, ref name.Digest, controls string, optio
 		}
 		hash := sha256.New()
 		size, copyErr := io.CopyBuffer(hash, io.LimitReader(body, disk.Size+1), make([]byte, 128<<10))
-		readErr := errors.Join(copyErr, body.Close())
+		closeErr := body.Close()
+		readErr := errors.Join(copyErr, closeErr)
 		if err := deliveryContext(ctx); err != nil {
 			return nil, err
 		}
+		if isPeerProtocolReset(copyErr) {
+			if size < disk.Size && closeErr == nil {
+				return nil, e.Wrap(e.CodeUnavailable, &interruptedPullBody{}, "reading staged disk payload")
+			}
+			return nil, e.Wrap(e.CodeVerifyFailed, readErr, "staged disk reset after declared size or independent close failure")
+		}
 		var networkError net.Error
-		if errors.Is(readErr, io.ErrUnexpectedEOF) || errors.As(readErr, &networkError) {
+		if size < disk.Size && (errors.Is(readErr, io.ErrUnexpectedEOF) || errors.As(readErr, &networkError)) {
 			return nil, registryReadbackError(ctx, readErr, "reading staged disk payload")
 		}
 		if size != disk.Size || "sha256:"+hex.EncodeToString(hash.Sum(nil)) != disk.PayloadDigest {
@@ -195,7 +202,7 @@ func StagePreparedDisk(ctx context.Context, source, repository, expectedRoot str
 	if err != nil || repo.Name() != repository {
 		return "", e.New(e.CodeUsage, "disk staging requires a canonical repository")
 	}
-	inspection, err := Inspect(ctx, source)
+	inspection, err := inspectMetadata(ctx, source, true)
 	if err != nil {
 		return "", err
 	}

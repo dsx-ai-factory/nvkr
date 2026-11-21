@@ -148,9 +148,6 @@ func executeAttestEvidenceMetadata(ctx context.Context, plan *Plan, node Node, r
 	if err != nil {
 		return err
 	}
-	if err := admitEvidenceMetadata(plan, route, inspection); err != nil {
-		return err
-	}
 	if stagedDiskRoute(plan, route.Name) {
 		subject, _, err := stagedDiskSubject(ctx, plan, route, artifacts)
 		if err != nil {
@@ -159,6 +156,11 @@ func executeAttestEvidenceMetadata(ctx context.Context, plan *Plan, node Node, r
 		if subject.Digest != inspection.RootDigest {
 			return e.New(e.CodeVerifyFailed, "staged preparation differs from exact evidence controls")
 		}
+		if err := admitStagedDiskMetadata(plan, route, inspection, subject); err != nil {
+			return err
+		}
+	} else if err := admitEvidenceMetadata(plan, route, inspection); err != nil {
+		return err
 	}
 	signer, err := newSigner(ctx, plan, node, artifacts)
 	if err != nil {

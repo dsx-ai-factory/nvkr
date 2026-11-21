@@ -10,6 +10,7 @@ import (
 	"os"
 	"path/filepath"
 	"runtime"
+	"strings"
 	"time"
 
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/cistore"
@@ -44,6 +45,12 @@ func stagedDiskEnvironment() map[string]string {
 // StageGitHubDisk admits only the development ARC route and pushes its exact
 // preparation in a separate fixed credential step, after producer execution.
 func StageGitHubDisk(ctx context.Context, plan *Plan, output string, options GitHubStepOptions) error {
+	return stageGitHubDisk(ctx, plan, output, options, runtime.GOOS+"/"+runtime.GOARCH, cistore.AdmitPublication)
+}
+
+func stageGitHubDisk(ctx context.Context, plan *Plan, output string, options GitHubStepOptions, platform string,
+	admit func(context.Context, string, []string, cistore.PublicationOptions) error,
+) error {
 	if err := admitGitHubPlan(ctx, plan); err != nil {
 		return err
 	}
@@ -59,7 +66,7 @@ func StageGitHubDisk(ctx context.Context, plan *Plan, output string, options Git
 	if os.Getenv("NVKR_CREDENTIAL") == "" || os.Getenv("NVKR_REGISTRY_USER") == "" {
 		return e.New(e.CodeTrustPolicyMissing, "disk staging requires its stage-only writer")
 	}
-	if runtime.GOOS != "linux" {
+	if !strings.HasPrefix(platform, "linux/") {
 		return e.New(e.CodeEngineCapability, "destination staging requires native Linux")
 	}
 	stages, _, err := githubStages(plan)
@@ -69,7 +76,7 @@ func StageGitHubDisk(ctx context.Context, plan *Plan, output string, options Git
 	matched := false
 	for _, stage := range stages {
 		if stage.DiskOutput == output {
-			matched = stage.Nodes[0].Platform == runtime.GOOS+"/"+runtime.GOARCH
+			matched = stage.Nodes[0].Platform == platform
 		}
 	}
 	if !matched {
@@ -89,7 +96,7 @@ func StageGitHubDisk(ctx context.Context, plan *Plan, output string, options Git
 	}
 	_, artifacts := planIndex(plan)
 	source := artifacts[route.Input].Path
-	root, err := admitGitHubPublication(ctx, target, false, source, cistore.AdmitPublication)
+	root, err := admitGitHubPublication(ctx, target, false, source, admit)
 	if err != nil {
 		return err
 	}
@@ -100,7 +107,7 @@ func StageGitHubDisk(ctx context.Context, plan *Plan, output string, options Git
 	if root != inspection.RootDigest {
 		return e.New(e.CodeVerifyFailed, "staging preparation changed after destination admission")
 	}
-	if err := admitEvidenceMetadata(plan, route, inspection); err != nil {
+	if err := admitStagedDiskMetadata(plan, route, inspection, sign.Subject{Ref: target.Ref + "@" + root, Digest: root}); err != nil {
 		return err
 	}
 	ref, err := delivery.StagePreparedDisk(ctx, source, target.Ref, root, stagedRegistryOptions(target))
@@ -130,10 +137,32 @@ func stagedDiskSubject(ctx context.Context, plan *Plan, route Route, artifacts m
 	if err != nil {
 		return sign.Subject{}, Target{}, err
 	}
-	if subject.Ref != target.Ref+"@"+subject.Digest {
-		return sign.Subject{}, Target{}, e.New(e.CodeVerifyFailed, "staged disk differs from its exact destination")
+	if err := admitDevelopmentSubject(plan, route.Target, subject); err != nil {
+		return sign.Subject{}, Target{}, err
 	}
+	// A failed-job retry may retain a successful producer from an earlier
+	// attempt of this Run. Complete in that original immutable namespace.
+	target.Ref = strings.TrimSuffix(subject.Ref, "@"+subject.Digest)
 	return subject, target, nil
+}
+
+func admitStagedDiskMetadata(plan *Plan, route Route, inspection delivery.Inspection, subject sign.Subject) error {
+	if err := admitEvidenceMetadata(plan, route, inspection); err != nil {
+		return err
+	}
+	namespace, err := development.ParseNamespace(plan.Environment.Publication.RepositoryPrefix)
+	if err != nil {
+		return err
+	}
+	prepared, err := namespace.ParseReference(strings.TrimSuffix(subject.Ref, "@"+subject.Digest))
+	if err != nil {
+		return err
+	}
+	invocation := "https://github.com/" + namespace.Repository() + "/actions/runs/" + prepared.RunID() + "/attempts/" + prepared.Attempt()
+	if inspection.Root.Release.InvocationID != invocation {
+		return e.New(e.CodeVerifyFailed, "staged disk destination differs from its preparation invocation")
+	}
+	return nil
 }
 
 func executeStagedDiskPublish(ctx context.Context, plan *Plan, node Node, artifacts map[string]Artifact, stdout io.Writer) error {
@@ -159,7 +188,7 @@ func executeStagedDiskPublishWithAdmission(ctx context.Context, plan *Plan, node
 	if err != nil {
 		return err
 	}
-	if err := admitEvidenceMetadata(plan, route, inspection); err != nil {
+	if err := admitStagedDiskMetadata(plan, route, inspection, subject); err != nil {
 		return err
 	}
 	root, err := admitGitHubPublication(ctx, target, false, controls.Path, admit)

@@ -311,6 +311,24 @@ func TestRegistryReadOnlyFailureDoesNotClaimPartialUploads(t *testing.T) {
 	}
 }
 
+func TestRegistryMetadataReadAfterWriteKeepsPublicationUncertainty(t *testing.T) {
+	for _, cause := range []error{io.ErrUnexpectedEOF, context.Canceled} {
+		t.Run(cause.Error(), func(t *testing.T) {
+			progress := &registryPublicationProgress{}
+			progress.writeAttempted.Store(true)
+			ctx := context.WithValue(t.Context(), registryPublicationProgressKey{}, progress)
+			ctx, observer := observeRegistry(ctx)
+			observer.readOnly = true // A nested metadata member read follows evidence writes.
+			observer.report.LastOperation = "manifest-readback"
+			err := uncertainRegistryPublication(observer.explain(ctx, registryReadbackError(ctx, cause, "reading metadata member")))
+			var uncertain registryPublicationUncertain
+			if strings.Contains(err.Error(), "no upload was attempted") || !errors.As(err, &uncertain) || !strings.Contains(SafeRegistryPublishError(ctx, err).Error(), "partial uploads") {
+				t.Fatalf("post-write metadata failure lost publication uncertainty: %v", err)
+			}
+		})
+	}
+}
+
 func TestRegistryHTMLBaseKeepsExplicitResponseClassification(t *testing.T) {
 	for _, status := range []int{http.StatusUnauthorized, http.StatusServiceUnavailable, http.StatusRequestTimeout, http.StatusTooManyRequests, http.StatusNotFound} {
 		t.Run(http.StatusText(status), func(t *testing.T) {

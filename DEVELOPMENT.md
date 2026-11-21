@@ -326,8 +326,9 @@ Different branches and attempts cannot advance one another's Helm aliases or sha
 The Plan records the namespace policy; the execution owner binds actual destinations to the current
 repository, workflow, run and attempt without changing logical Build identity or rewriting the committed Plan.
 
-Signed development Runs are non-canceling. To retry, dispatch a complete new Run (or rerun **all** jobs).
-Failed-job-only reruns cannot reuse publications from an earlier attempt's disposable namespace. A cancelled
+Signed development Runs are non-canceling. A complete new Run (or rerun of **all** jobs) rebuilds every output.
+A failed release job may reuse a staged disk from an earlier attempt of the same Run; its destination and
+controls must retain that preparation's exact attempt. Foreign-run and future-attempt references are refused. A cancelled
 Run can leave partial publications and may have no final record; cleanup discovers packages independently
 of successful finalization. Actions locators for CI helpers/carriers and final Run records retain seven
 days; disk diagnostic locators retain one day. GHCR carrier blobs require separate retention management.
@@ -335,10 +336,12 @@ After locator transfers expire, start a complete new Run.
 
 ### Qualify an existing development Run
 
-Development qualification is unavailable. The development bundle now belongs to the GPU site composite, and
-qualification rejects a composite Run until composite qualification has a supported owner (ADR-26 U8).
-`make pipeline-dev-generate` therefore generates no development qualifier or native smoke worker, and their
-committed pair is retired.
+The maintained GPU-site development qualifier and native smoke worker are
+`.github/workflows/nvkr-dev-qualify.yml` and `.github/workflows/nvkr-dev-smoke.yml`.
+`make pipeline-dev-generate` regenerates these with the other maintained owners.
+Use the separate development qualification policy for a development Run; see
+[ADR-26 reconciliation](docs/adr/reconciliation/adr-26.md#support-by-owner) for hosted acceptance and the
+separate local composite rehearsal boundary. Generating workflows does not establish hosted qualification.
 
 ### Disposable registry cleanup
 
@@ -351,9 +354,9 @@ the rest. Preview from the default branch before enabling deletion:
 gh workflow run nvkr-dev-cleanup.yml --repo dsx-ai-factory/nvkr --ref main -f apply=false
 ```
 
-Cleanup requires internal packages in the exact reserved namespace, matching GitHub account and workflow attempt, a completed
+Cleanup requires private or internal packages in the exact reserved namespace, matching GitHub account and workflow attempt, a completed
 attempt at least 24 hours old, and package/version timestamps at least 24 hours old. It rechecks candidates
-before deletion. Active, young or ambiguous state is retained; API/admission failures fail the job rather
+before deletion, including unchanged visibility. Active, young or ambiguous state is retained; API/admission failures fail the job rather
 than claim cleanup succeeded. Whole-package deletion includes that package's versions, signatures and
 referrers, avoiding guesses based on tags. The next hourly sweep removes eligible packages; this is not an
 exact 24-hour expiry or proof of physical storage reclamation. Existing production and older unscoped

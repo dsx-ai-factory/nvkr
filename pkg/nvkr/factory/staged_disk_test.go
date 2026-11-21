@@ -103,7 +103,7 @@ func TestStagedDiskDevelopmentGraph(t *testing.T) {
 }
 
 func TestStagedDiskRejectsWorkflowTampering(t *testing.T) {
-	for _, scenario := range []string{"missing", "writer", "OIDC", "early", "producer credential", "optional"} {
+	for _, scenario := range []string{"missing", "writer", "OIDC", "early", "producer credential", "optional", "wrong ID", "wrong command"} {
 		t.Run(scenario, func(t *testing.T) {
 			plan := developmentPublicationPlan(t, arcTestPlan(t, "linux/amd64"), "ghcr.io/example/nvkr/development")
 			bundle, err := RenderGitHub(t.Context(), plan)
@@ -142,11 +142,17 @@ func TestStagedDiskRejectsWorkflowTampering(t *testing.T) {
 			case "OIDC":
 				job.Permissions = map[string]string{"id-token": "write"}
 			case "early":
-				job.Steps[push], job.Steps[run] = job.Steps[run], job.Steps[push]
+				pushStep := job.Steps[push]
+				copy(job.Steps[run+1:push+1], job.Steps[run:push])
+				job.Steps[run] = pushStep
 			case "producer credential":
 				job.Steps[run].Env = stagedDiskEnvironment()
 			case "optional":
 				job.Steps[push].ContinueOnError = true
+			case "wrong ID":
+				job.Steps[push].ID = "other-stage"
+			case "wrong command":
+				job.Steps[push].Run = "true"
 			}
 			document.Jobs[stage.ID] = job
 			raw, err := yaml.Marshal(document)
@@ -154,7 +160,11 @@ func TestStagedDiskRejectsWorkflowTampering(t *testing.T) {
 				t.Fatal(err)
 			}
 			changed := unsharedGitHubTestBundle(t, plan, bundle, raw)
-			assertFactoryErrorCode(t, ValidateGitHubBundle(t.Context(), plan, changed), e.CodeEngineCapability)
+			err = ValidateGitHubBundle(t.Context(), plan, changed)
+			assertFactoryErrorCode(t, err, e.CodeEngineCapability)
+			if scenario == "early" && !strings.Contains(err.Error(), "disk stage push precedes producer completion") {
+				t.Fatalf("ordering mutation failed an unrelated gate: %v", err)
+			}
 		})
 	}
 }

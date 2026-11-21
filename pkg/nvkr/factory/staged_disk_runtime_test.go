@@ -59,6 +59,9 @@ func TestStagedDiskStageAdmissionRejectsBeforeWork(t *testing.T) {
 			route := outputPublicationRoute(plan.LifecycleOutputs[0].Name)
 			err := StageGitHubDisk(t.Context(), plan, plan.LifecycleOutputs[0].Name, GitHubStepOptions{Stdout: io.Discard})
 			assertFactoryErrorCode(t, err, code)
+			if (scenario == "source token" || scenario == "image token" || scenario == "OIDC") && !strings.Contains(err.Error(), "disk staging contains unrelated authority") {
+				t.Fatalf("unrelated authority reached a later capability gate: %v", err)
+			}
 			if staged := artifacts[stagedDiskReferenceID(route)]; staged.Path != "" {
 				if _, err := os.Stat(staged.Path); !os.IsNotExist(err) {
 					t.Fatalf("refusal wrote staged reference: %v", err)
@@ -71,9 +74,13 @@ func TestStagedDiskStageAdmissionRejectsBeforeWork(t *testing.T) {
 // Synthetic observations exercise the factory/delivery handoff, not ARC execution,
 // provider ACLs, cosign or OIDC. Registry requests use the real Distribution handler.
 func TestStagedDiskPublishExecutor(t *testing.T) {
-	for _, scenario := range []string{"success", "missing writer", "private admission denied", "wrong staged destination", "changed admitted root"} {
+	for _, scenario := range []string{"success", "retained attempt", "missing writer", "private admission denied", "wrong staged destination", "foreign run", "reference attempt differs", "changed admitted root"} {
 		t.Run(scenario, func(t *testing.T) {
-			plan, artifacts, ref, signer := stagedDiskRuntimeFixture(t)
+			attempt := "1"
+			if scenario == "retained attempt" || scenario == "reference attempt differs" {
+				attempt = "2"
+			}
+			plan, artifacts, ref, signer := stagedDiskRuntimeFixture(t, attempt)
 			route := outputPublicationRoute(plan.LifecycleOutputs[0].Name)
 			node := planNode(plan, NodePublish+"/"+route)
 			t.Setenv("NVKR_CREDENTIAL", "synthetic-release-token")
@@ -112,8 +119,10 @@ func TestStagedDiskPublishExecutor(t *testing.T) {
 				code = e.CodeTrustPolicyMissing
 			case "private admission denied":
 				code = e.CodeTrustPolicyMissing
-			case "wrong staged destination":
+			case "wrong staged destination", "reference attempt differs":
 				writeReferenceFile(t, artifacts[stagedDiskReferenceID(route)].Path, strings.Replace(ref, "/attempts/1/", "/attempts/2/", 1))
+			case "foreign run":
+				writeReferenceFile(t, artifacts[stagedDiskReferenceID(route)].Path, strings.Replace(ref, "/runs/12345/", "/runs/12346/", 1))
 			}
 			var err error
 			if scenario == "missing writer" {
@@ -122,14 +131,14 @@ func TestStagedDiskPublishExecutor(t *testing.T) {
 			} else {
 				err = executeStagedDiskPublishWithAdmission(t.Context(), plan, node, artifacts, io.Discard, admit, referenceSignerFactory(signer))
 			}
-			if scenario != "success" {
+			if scenario != "success" && scenario != "retained attempt" {
 				assertFactoryErrorCode(t, err, code)
 				for _, id := range node.Outputs {
 					if _, err := os.Stat(artifacts[id].Path); !os.IsNotExist(err) {
 						t.Fatalf("refusal wrote output %s: %v", id, err)
 					}
 				}
-				if (scenario == "missing writer" || scenario == "wrong staged destination") && calls != 0 {
+				if (scenario == "missing writer" || scenario == "wrong staged destination" || scenario == "foreign run" || scenario == "reference attempt differs") && calls != 0 {
 					t.Fatal("refusal reached registry policy")
 				}
 				return
@@ -155,12 +164,16 @@ func TestStagedDiskPublishExecutor(t *testing.T) {
 	}
 }
 
-func stagedDiskRuntimeFixture(t *testing.T) (*Plan, map[string]Artifact, string, *referenceSigner) {
+func stagedDiskRuntimeFixture(t *testing.T, completionAttempt string) (*Plan, map[string]Artifact, string, *referenceSigner) {
 	t.Helper()
 	plan := developmentPublicationPlan(t, arcTestPlan(t, "linux/amd64"), "ghcr.io/example/nvkr/development")
 	setDevelopmentRun(t)
+	for _, key := range []string{sourceTokenEnv, githubImageToken, "ACTIONS_ID_TOKEN_REQUEST_TOKEN"} {
+		t.Setenv(key, "")
+	}
 	t.Setenv("NVKR_CREDENTIAL", "synthetic-stage-token")
 	t.Setenv("NVKR_REGISTRY_USER", "synthetic-stage-user")
+	t.Setenv(githubRepositoryTokenEnv, "synthetic-repository-token")
 	backend := registry.New(registry.Logger(log.New(io.Discard, "", 0)))
 	original := remote.DefaultTransport
 	remote.DefaultTransport = developmentRegistryTransport(func(request *http.Request) (*http.Response, error) {
@@ -272,11 +285,29 @@ func stagedDiskRuntimeFixture(t *testing.T) (*Plan, map[string]Artifact, string,
 	if err != nil {
 		t.Fatal(err)
 	}
-	ref, err := delivery.StagePreparedDisk(t.Context(), artifacts[route.Input].Path, target.Ref, result.RootDigest, stagedRegistryOptions(target))
-	if err != nil {
+	admissions := 0
+	admit := func(_ context.Context, repository string, destinations []string, options cistore.PublicationOptions) error {
+		admissions++
+		if repository != "example/nvkr" || options.PlatformToken || options.AllowPublicPackages || options.Token != "synthetic-stage-token" || options.Username != "synthetic-stage-user" || options.RepositoryToken != "synthetic-repository-token" {
+			t.Fatal("stage admission lost credential or source binding")
+		}
+		for _, destination := range destinations {
+			if !strings.HasPrefix(destination, "ghcr.io/example/nvkr/development/runs/12345/attempts/1/") {
+				t.Fatalf("foreign stage admission destination %s", destination)
+			}
+		}
+		return nil
+	}
+	if err := stageGitHubDisk(t.Context(), plan, expected.Name, GitHubStepOptions{Stdout: io.Discard}, "linux/amd64", admit); err != nil {
 		t.Fatal(err)
 	}
 	staged := artifacts[stagedDiskReferenceID(routeName)].Path
+	stagedSubject, err := readPublicationSubject(t.Context(), staged)
+	if err != nil || stagedSubject.Ref != target.Ref+"@"+result.RootDigest || admissions != 2 {
+		t.Fatalf("stage handoff differs: subject=%+v admissions=%d err=%v", stagedSubject, admissions, err)
+	}
+	ref := stagedSubject.Ref
+	t.Setenv("GITHUB_RUN_ATTEMPT", completionAttempt)
 	writeReferenceFile(t, staged, strings.Split(ref, "@")[0]+"@sha256:"+strings.Repeat("f", 64))
 	signer := &referenceSigner{}
 	attest := planNode(plan, NodeAttestEvidence+"/"+routeName)

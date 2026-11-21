@@ -23,10 +23,20 @@ was authorized or performed; current-candidate hosted acceptance remains unverif
 
 `TestStagedDiskPublishExecutor` exercises successful factory completion, signing-metadata/reference
 correspondence, credential and destination refusals, admission-time controls substitution, and the
-attest step's staged-root binding. It uses the real delivery operations and Distribution handler with
+attest step's staged-root binding. It also exercises the successful stage adapter handoff and completion
+from a retained attempt of the same Run; the reference and controls must bind that exact preparation attempt.
+Foreign-run, future-attempt and mismatched control/reference attempts remain refused.
+It uses the real delivery operations and Distribution handler with an injected platform and
 synthetic package-policy and signer adapters. `TestStagedDiskStageAdmissionRejectsBeforeWork` covers
 non-development plans, unrelated authority and missing stage credentials before staging effects.
 Successful native ARC stage execution, provider ACLs and OIDC remain unexercised by these tests.
+
+`TestCompleteStagedDiskRejectsBeforeWrites` injects persistent typed peer resets, including a reset
+delivered with the final declared payload bytes, and an independent close failure. It asserts the coded
+refusal and zero destination writes; rejection of the second attestation bundle also precedes every write.
+`TestCompleteStagedDiskMetadataFailureKeepsUncertainty` uses the local registry fixture to truncate a
+metadata read after evidence uploads and checks that the returned error retains publication uncertainty.
+These tests cover local failure classification, not provider retry or durability behavior.
 
 The FDE build jobs in [Run 38480478189](https://github.com/dsx-ai-factory/nvkr/actions/runs/38480478189)
 succeeded, but the later hosted SBOM-attestation jobs failed restoring their prepared layouts: the

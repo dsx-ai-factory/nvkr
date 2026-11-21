@@ -6,6 +6,7 @@ package delivery
 import (
 	"bytes"
 	"context"
+	"errors"
 	"io"
 	"log"
 	"net/http"
@@ -20,7 +21,20 @@ import (
 	e "github.com/dsx-ai-factory/nvkr/pkg/nvkr/errors"
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/sbom"
 	"github.com/google/go-containerregistry/pkg/registry"
+	"github.com/google/go-containerregistry/pkg/v1/remote"
 )
+
+type stagedResetBody struct{ *releasePullResetBody }
+
+func (body stagedResetBody) Read(buffer []byte) (int, error) {
+	n, err := body.releasePullResetBody.Read(buffer)
+	// Deliver a persistent reset with the final prefix bytes, before the
+	// Content-Length-limited registry reader can synthesize EOF itself.
+	if n > 0 && body.remaining == 0 {
+		_, err = body.releasePullResetBody.Read(nil)
+	}
+	return n, err
+}
 
 func TestStagedDiskMatchesCurrentReleaseRoot(t *testing.T) {
 	for _, arch := range []string{"amd64", "arm64"} {
@@ -184,25 +198,32 @@ func TestCompleteStagedDiskRejectsBeforeWrites(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	for _, scenario := range []string{"changed root", "missing verifier", "rejected signer", "canceled", "changed output", "missing payload", "corrupt payload", "interrupted payload"} {
+	for _, scenario := range []string{"changed root", "missing verifier", "rejected signer", "rejected second bundle", "canceled", "changed output", "missing payload", "corrupt payload", "interrupted payload", "peer reset", "peer reset after size", "peer reset and close failure"} {
 		t.Run(scenario, func(t *testing.T) {
 			writes.Store(0)
 			fault.Store(scenario)
 			ctx, cancel := context.WithCancel(t.Context())
 			defer cancel()
 			root, input := signed.RootDigest, attested
+			verifications := 0
+			var resets atomic.Int32
+			var resetTransport *releasePullBlobTransport
 			verify := func(context.Context, string, []byte) error {
+				verifications++
+				if scenario == "rejected second bundle" && verifications == 1 {
+					return nil
+				}
 				return e.New(e.CodeSignatureInvalid, "synthetic signer rejection")
 			}
 			code := e.CodeVerifyFailed
 			switch scenario {
-			case "missing payload", "interrupted payload":
+			case "missing payload", "interrupted payload", "peer reset":
 				code = e.CodeUnavailable
 			case "changed root":
 				root = digestBytes([]byte("other"))
 			case "missing verifier":
 				verify, code = nil, e.CodeEngineCapability
-			case "rejected signer":
+			case "rejected signer", "rejected second bundle":
 				code = e.CodeSignatureInvalid
 			case "canceled":
 				cancel()
@@ -224,11 +245,87 @@ func TestCompleteStagedDiskRejectsBeforeWrites(t *testing.T) {
 				}
 				root = changed.RootDigest
 			}
+			if strings.HasPrefix(scenario, "peer reset") {
+				original := remote.DefaultTransport
+				resetTransport = &releasePullBlobTransport{RoundTripper: original, digest: payload, body: func(_ int, body io.ReadCloser) io.ReadCloser {
+					remaining := int(request.Objects[0].Output.Disk.Size) / 2
+					if scenario == "peer reset after size" {
+						remaining = int(request.Objects[0].Output.Disk.Size)
+					}
+					reset := &releasePullResetBody{ReadCloser: body, remaining: remaining, onReset: func() { resets.Add(1) }}
+					if scenario == "peer reset and close failure" {
+						return releasePullCloseFailureBody{reset}
+					}
+					return stagedResetBody{reset}
+				}}
+				remote.DefaultTransport = resetTransport
+				t.Cleanup(func() { remote.DefaultTransport = original })
+			}
 			_, err := CompleteStagedDisk(ctx, ref, filepath.Join(t.TempDir(), "readback"), input, root, options, verify)
 			assertRegistryCode(t, err, code)
+			if resetTransport != nil && (resets.Load() == 0 || resetTransport.reads.Load() != 1 || verifications != 0) {
+				t.Fatalf("reset was not observed before attestation: resets=%d reads=%d verifications=%d", resets.Load(), resetTransport.reads.Load(), verifications)
+			}
+			if scenario == "rejected second bundle" && verifications != 2 {
+				t.Fatalf("second-bundle refusal verified %d bundles", verifications)
+			}
 			if writes.Load() != 0 {
 				t.Fatalf("rejected completion wrote %d requests", writes.Load())
 			}
 		})
+	}
+}
+
+func TestCompleteStagedDiskMetadataFailureKeepsUncertainty(t *testing.T) {
+	request, manifest := diskPublicationRequest(t, "amd64")
+	parent := t.TempDir()
+	source, controls, attested := filepath.Join(parent, "prepared"), filepath.Join(parent, "controls"), filepath.Join(parent, "attested")
+	prepared, err := BuildPublicationRoot(t.Context(), source, request)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := ExportMetadataWithExpectedRoot(t.Context(), source, controls, prepared.RootDigest); err != nil {
+		t.Fatal(err)
+	}
+	signed, err := AttestPreparedMetadata(t.Context(), controls, attested, prepared.RootDigest, fixtureMetadataAttester)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var completing atomic.Bool
+	var writes, failures atomic.Int32
+	backend := registry.New(registry.Logger(log.New(io.Discard, "", 0)))
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if completing.Load() {
+			if r.Method != http.MethodGet && r.Method != http.MethodHead {
+				writes.Add(1)
+			}
+			if writes.Load() > 0 && r.Method == http.MethodGet && strings.HasSuffix(r.URL.Path, "/manifests/"+manifest) {
+				failures.Add(1)
+				// Persistently truncate metadata readback after evidence uploads.
+				w.Header().Set("Content-Length", "1024")
+				_, _ = io.WriteString(w, "{}")
+				return
+			}
+		}
+		backend.ServeHTTP(w, r)
+	}))
+	defer server.Close()
+	options := RegistryOptions{PlainHTTP: true, Anonymous: true}
+	repository := strings.TrimPrefix(server.URL, "http://") + "/fixture/releases"
+	ref, err := StagePreparedDisk(t.Context(), source, repository, prepared.RootDigest, options)
+	if err != nil {
+		t.Fatal(err)
+	}
+	completing.Store(true)
+	published, err := CompleteStagedDisk(t.Context(), ref, filepath.Join(parent, "readback"), attested, signed.RootDigest, options,
+		func(_ context.Context, subject string, bundle []byte) error {
+			_, err := sbom.AttestedDocument(bundle, subject)
+			return err
+		})
+	assertRegistryCode(t, err, e.CodeUnavailable)
+	var uncertain registryPublicationUncertain
+	if published != "" || writes.Load() == 0 || failures.Load() == 0 || !errors.As(err, &uncertain) ||
+		strings.Contains(err.Error(), "no upload was attempted") || !strings.Contains(SafeRegistryPublishError(t.Context(), err).Error(), "partial uploads") {
+		t.Fatalf("post-write failure lost uncertainty: ref=%q writes=%d failed reads=%d err=%v", published, writes.Load(), failures.Load(), err)
 	}
 }

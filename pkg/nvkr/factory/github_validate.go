@@ -309,8 +309,7 @@ func validateGitHubBundleFlat(ctx context.Context, plan *Plan, bundle *Generated
 				continue
 			}
 			sourceStage, sourceJob := byNodeForJob(stages, jobID)
-			if sourceJob && sourceStage.DiskOutput != "" && stagedDiskRoute(plan, outputPublicationRoute(sourceStage.DiskOutput)) &&
-				step.ID == "stage-disk" && step.Run == githubRunnerCommand(plan, "stage-disk", "output", sourceStage.DiskOutput) && maps.Equal(step.Env, stagedDiskEnvironment()) {
+			if sourceJob && githubDiskStageCredentialStep(plan, sourceStage, step) {
 				continue // The fixed step's complete shape and ordering are checked below.
 			}
 			// A release operation's registry credential is admitted only on its
@@ -815,15 +814,14 @@ func validateGitHubStageExecution(plan *Plan, stage githubStage, steps []githubS
 		}
 		stagePushes := 0
 		for i, step := range steps {
-			if step.ID != "stage-disk" && step.Run != githubRunnerCommand(plan, "stage-disk", "output", stage.DiskOutput) {
+			if !githubDiskStageCandidate(plan, stage, step) {
 				if step.Env["NVKR_CREDENTIAL"] != "" || step.Env["NVKR_REGISTRY_USER"] != "" {
 					return e.New(e.CodeEngineCapability, "disk writer credential escaped its fixed push step")
 				}
 				continue
 			}
-			if !stagedDiskRoute(plan, outputPublicationRoute(stage.DiskOutput)) || stagePushes != 0 || i == 0 ||
-				step.ID != "stage-disk" || step.Name != "Stage disk at destination by digest" || step.If != "" || step.Uses != "" || step.ContinueOnError || step.TimeoutMinutes != 35 ||
-				step.Run != githubRunnerCommand(plan, "stage-disk", "output", stage.DiskOutput) || !maps.Equal(step.Env, stagedDiskEnvironment()) {
+			if !githubDiskStageCredentialStep(plan, stage, step) || stagePushes != 0 || i == 0 ||
+				step.Name != "Stage disk at destination by digest" || step.If != "" || step.Uses != "" || step.ContinueOnError || step.TimeoutMinutes != 35 {
 				return e.New(e.CodeEngineCapability, "disk stage writer differs from its fixed operation")
 			}
 			foundExecutor := false
@@ -910,6 +908,17 @@ func byNodeForJob(stages []githubStage, id string) (githubStage, bool) {
 		}
 	}
 	return githubStage{}, false
+}
+
+// Partial matches are candidates so malformed ID/command pairs still reach
+// the complete shape check instead of escaping validation.
+func githubDiskStageCandidate(plan *Plan, stage githubStage, step githubStep) bool {
+	return step.ID == "stage-disk" || step.Run == githubRunnerCommand(plan, "stage-disk", "output", stage.DiskOutput)
+}
+
+func githubDiskStageCredentialStep(plan *Plan, stage githubStage, step githubStep) bool {
+	return stage.DiskOutput != "" && stagedDiskRoute(plan, outputPublicationRoute(stage.DiskOutput)) &&
+		step.ID == "stage-disk" && step.Run == githubRunnerCommand(plan, "stage-disk", "output", stage.DiskOutput) && maps.Equal(step.Env, stagedDiskEnvironment())
 }
 
 func hasExactGitHubRun(steps []githubStep, command string) bool {
