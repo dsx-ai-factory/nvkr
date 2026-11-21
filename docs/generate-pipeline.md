@@ -7,6 +7,9 @@ The walkthrough uses GitHub Actions. [Native GitLab execution](#native-gitlab-ex
 unsigned profile; [Tekton cluster execution](#tekton-cluster-execution) uses explicit cluster trust.
 Both retain the same Plan and shared execution owners.
 
+This walkthrough's GitHub Environment selects `github:GITHUB_TOKEN` for publication. Before dispatch,
+complete the [platform-token destination setup](#platform-token-destination-setup) for its release packages.
+
 Start at the repository root with `bin/nvkr` built as described in the [quickstart](quickstart.md#build-only-the-cli).
 Run these commands in the same terminal. They write to a temporary directory, leaving the repository's
 generated pipeline untouched.
@@ -148,7 +151,7 @@ Invalid bytes, unsafe archive entries, filesystem or cleanup failures stop immed
 destination replacement are outside the retry boundary. Error reports include only a fixed category,
 chunk number and byte counts, keeping provider URLs and response bodies out of logs.
 
-Production registry access uses separate credentials from CI storage. Configure repository secret
+The maintained independent-credential publication profile uses registry credentials separate from CI storage. Configure repository secret
 `NVKR_REGISTRY_READ` and variable `NVKR_REGISTRY_READ_USER` for a package reader covering release,
 toolchain and smoke-image packages. Configure secret `NVKR_REGISTRY_WRITE` and variable
 `NVKR_REGISTRY_WRITE_USER` in the protected `nvkr-release` environment for publication, signing and
@@ -166,7 +169,13 @@ configs on each selected runner placement before producers can start. These poin
 download no layers and do not replace per-job pulls or runtime byte/platform checks. A failed reader
 check stops producer fan-out; source and publication credentials are never fallback readers.
 
-For each existing storage, release, toolchain and smoke-image package, an administrator must:
+The following checklist applies to private CI-storage, toolchain and smoke-image packages, and to release
+destinations using the independent-credential publication profile. For `github:GITHUB_TOKEN` release
+destinations, follow [platform-token destination setup](#platform-token-destination-setup) instead:
+that profile requires the publishing-repository connection and a **Write** Actions grant.
+
+For each package covered by this checklist, an administrator must:
+
 1. Keep visibility private (or internal only when enterprise-wide access is intended).
 2. Disable repository permission inheritance and remove the source-repository connection.
 3. Remove the source repository under **Manage Actions access**, including explicit grants.
@@ -178,7 +187,7 @@ before changing repository visibility. Replacing a token does not revoke existin
 Do not revoke grants needed by an active old workflow: migrate credentials, merge and validate the new
 workflow, then retire the old access. Existing dispatched runs retain their original workflow code.
 
-To enter credentials securely from a local terminal (the commands prompt without printing the secret):
+To enter independent-profile credentials securely from a local terminal (the commands prompt without printing the secret):
 
 ```sh
 gh secret set NVKR_REGISTRY_READ --repo dsx-ai-factory/nvkr
@@ -188,7 +197,7 @@ gh variable set NVKR_REGISTRY_WRITE_USER --repo dsx-ai-factory/nvkr --env nvkr-r
 ```
 
 Before making the source public, verify hidden package grants and anonymous, unrelated-user and fork access
-for storage, toolchain and release packages. Previously retained Actions artifacts, caches, active runs and
+for packages covered by the independent-credential checklist above. Previously retained Actions artifacts, caches, active runs and
 old workflow refs also require separate handling; this change does not migrate or delete historical payloads.
 Compiled-output caches and CodeQL database uploads are disabled. Candidate OS builds retain private files
 only for the exact trusted workflow commit, so arbitrary candidate code cannot access a later storage writer.
