@@ -65,11 +65,21 @@ func TestPublicationVisibilityOptInRequiresPlatformTokenGHCR(t *testing.T) {
 		{"other registry", func(env *Environment) { env.Publication.RepositoryPrefix = "registry.example/source" }},
 		{"plain HTTP", func(env *Environment) { env.Publication.PlainHTTP = true }},
 		{"anonymous", func(env *Environment) { env.Publication.CredentialRef, env.Publication.Anonymous = "", true }},
+		{"GitLab", func(env *Environment) { env.GitLab = gitlabTestEnvironment().GitLab }},
+		{"Tekton", func(env *Environment) {
+			*env = tektonEnvironmentFixture(t)
+			env.Publication.AllowPublicPackages = true
+		}},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			env := publicationTestEnvironment()
 			env.Publication = &Publication{RepositoryPrefix: "ghcr.io/example/source", CredentialRef: "github:GITHUB_TOKEN", AllowPublicPackages: true}
 			tc.edit(&env)
+			withoutOptIn := env.Clone()
+			withoutOptIn.Publication.AllowPublicPackages = false
+			if err := withoutOptIn.Validate(); err != nil {
+				t.Fatalf("fixture fails admission before the visibility opt-in: %v", err)
+			}
 			var coded *e.Error
 			if err := env.Validate(); !errors.As(err, &coded) || coded.Code != e.CodeEngineCapability {
 				t.Fatalf("unsupported opt-in accepted: %v", err)

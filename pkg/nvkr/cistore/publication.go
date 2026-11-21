@@ -31,16 +31,6 @@ func AdmitPublication(ctx context.Context, sourceRepository string, repositories
 	return newBackend().admitPublication(ctx, sourceRepository, repositories, opts)
 }
 
-// AdmitPrivatePublication checks the current access policy of every exact GHCR
-// package before the caller writes payloads. Credentials are explicit publisher
-// credentials, independent of CI transport credentials. Missing packages may be
-// seeded with metadata only and must then pass the same API checks. The operation
-// issues no build/release authority and cannot lock future external visibility or
-// prove independent package grants. Call it at the owning publication boundary.
-func AdmitPrivatePublication(ctx context.Context, sourceRepository string, repositories []string, opts Options) error {
-	return newBackend().admitPrivatePublication(ctx, sourceRepository, repositories, opts)
-}
-
 func (b *backend) admitPrivatePublication(ctx context.Context, sourceRepository string, repositories []string, opts Options) error {
 	return b.admitPublication(ctx, sourceRepository, repositories, PublicationOptions{Options: opts})
 }

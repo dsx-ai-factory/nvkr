@@ -157,7 +157,7 @@ write-capable PAT into the reader secret does not narrow its authority. The exis
 remain unchanged. Native image access scopes its reader to manifest preflight and per-job preparation.
 
 The repository-level `NVKR_REGISTRY_READ` secret and `NVKR_REGISTRY_READ_USER` variable are also
-required for private native toolchain and smoke-image pulls in development and legacy
+required for private native toolchain and smoke-image pulls in development and
 `github:GITHUB_TOKEN` output-publication profiles. Development output credentials do not replace this
 shared image reader. A missing reader refuses the pull; there is no workflow-token fallback.
 The entry workflow passes both reader values explicitly into composite actions, scoped to preflight
@@ -338,9 +338,11 @@ worker and selected-platform matrix (ADR-21).
 ## Platform-token destination setup
 
 The accepted [destination-staging decision](https://github.com/dsx-ai-factory/nvkr/blob/main/docs/adr/0020-artifact-publication-and-target-configuration.md#destination-staging-and-release-by-reference)
-defines the adopter default using the publishing repository's GHCR namespace and job tokens, with no configured registry
-secrets. Select `publication.credentialRef: github:GITHUB_TOKEN` and a `publication.repositoryPrefix` beneath
-`ghcr.io/<owner>/<publishing-repository>/`. This profile is admitted for the existing hosted publisher;
+defines the adopter default using the publishing repository's GHCR namespace and job tokens, with no configured
+publication secrets. Private native toolchain and smoke-image pulls still require the independent image reader
+described above. Select `publication.credentialRef: github:GITHUB_TOKEN` and a `publication.repositoryPrefix`
+at or beneath `ghcr.io/<owner>/<publishing-repository>`. Packages are published beneath that prefix.
+This profile is admitted for the existing hosted publisher;
 producer destination staging remains a separate migration. The instructions above describe the maintained private-carrier and independent-credential setup;
 the [publication implementation boundary](https://github.com/dsx-ai-factory/nvkr/blob/main/docs/adr/reconciliation/adr-20.md)
 tracks the migration. Maintained lanes retain their explicit independent credentials.
@@ -375,8 +377,8 @@ the job token to delete or restore released versions; that misconfiguration is t
 NVKR does not verify these settings, request an operator attestation, or create canary packages to probe
 permissions. It admits the profile without a role check. Its provider-authenticated package identity,
 publishing-repository association and visibility checks still fail closed. Missing packages fail without
-seeding; initialize and configure each fixed package before dispatch. Zero registry secrets still requires
-this package setup; these instructions change no live setting.
+seeding; initialize and configure each fixed package before dispatch. Avoiding configured publication secrets
+still requires this package setup and does not replace private-image reader credentials; these instructions change no live setting.
 
 GitHub's [package REST schema](https://docs.github.com/en/rest/packages/packages#get-a-package-for-an-organization)
 does not expose Actions roles or inheritance. Its [Packages GraphQL API](https://docs.github.com/en/packages/learn-github-packages/deleting-and-restoring-a-package#packages-api-support)
