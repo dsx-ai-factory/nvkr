@@ -157,7 +157,7 @@ write-capable PAT into the reader secret does not narrow its authority. The exis
 remain unchanged. Native image access scopes its reader to manifest preflight and per-job preparation.
 
 The repository-level `NVKR_REGISTRY_READ` secret and `NVKR_REGISTRY_READ_USER` variable are also
-required for private native toolchain and smoke-image pulls in development and legacy
+required for private native toolchain and smoke-image pulls in development and
 `github:GITHUB_TOKEN` output-publication profiles. Development output credentials do not replace this
 shared image reader. A missing reader refuses the pull; there is no workflow-token fallback.
 The entry workflow passes both reader values explicitly into composite actions, scoped to preflight
@@ -335,17 +335,23 @@ workflow. Producer jobs retain explicit dependencies and separate results; produ
 callable workflows remain deferred. The optional qualification bundle has its own fixed reusable native
 worker and selected-platform matrix (ADR-21).
 
-## Planned platform-token destination setup
+## Platform-token destination setup
 
 The accepted [destination-staging decision](https://github.com/dsx-ai-factory/nvkr/blob/main/docs/adr/0020-artifact-publication-and-target-configuration.md#destination-staging-and-release-by-reference)
-defines a future default using this repository's GHCR namespace and job tokens, with no configured registry
-secrets. The instructions above describe the current private-carrier and independent-credential setup;
+defines the adopter default using the publishing repository's GHCR namespace and job tokens, with no configured
+publication secrets. Private native toolchain and smoke-image pulls still require the independent image reader
+described above. Select `publication.credentialRef: github:GITHUB_TOKEN` and a `publication.repositoryPrefix`
+at or beneath `ghcr.io/<owner>/<publishing-repository>`. Packages are published beneath that prefix.
+This profile is admitted for the existing hosted publisher;
+producer destination staging remains a separate migration. The instructions above describe the maintained private-carrier and independent-credential setup;
 the [publication implementation boundary](https://github.com/dsx-ai-factory/nvkr/blob/main/docs/adr/reconciliation/adr-20.md)
-tracks the migration. Do not replace current credentials or package grants based on this planned profile.
+tracks the migration. Maintained lanes retain their explicit independent credentials.
 Destinations default to internal/private visibility; an unexpected public package must stop publication.
-The planned Environment field `publication.allowPublicPackages: true` is the explicit public-visibility
-opt-in, and must be implemented and enforced before public platform-token publication is admitted. It does
-not change package visibility or relax the Actions role requirement below.
+The Environment field `publication.allowPublicPackages: true` is the explicit public-visibility opt-in;
+omission or `false` admits only internal/private packages. The field is bound to Environment and Plan identity
+and checked for every output, evidence and release destination before payload writes. It does not change
+package visibility. This opt-in is supported only for the GitHub platform-token GHCR profile;
+independent credentials continue to require private/internal packages.
 
 Before using the platform-token profile, a human package administrator must perform this one-time setup
 for each fixed destination package, including output, evidence and release packages:
@@ -365,18 +371,20 @@ Granting a public publishing repository access to a private package can expose t
 the repository. The platform-token profile accepts this exposure; see
 [ADR-20's adopter-default policy](https://github.com/dsx-ai-factory/nvkr/blob/main/docs/adr/0020-artifact-publication-and-target-configuration.md#adopter-default-and-independent-credentials).
 
-The effective Write-only role is required so producer and development-branch job tokens cannot delete or
-restore released versions. The workflow's `packages: write` permission is not a substitute for this package
-setting. Unknown or broader roles must stop publication. Package creation or a metadata-only seed must not
-bypass the role check; repeat the setup for each new fixed package or changed grant before dispatch.
-Deletion and restoration remain human-admin operations for this profile. Zero registry secrets still
-requires this package setup; this documentation changes no live setting.
+Write-only Actions access and disabled inheritance are the operator's responsibility. The workflow's
+`packages: write` permission does not prove them. Granting Admin or leaving inheritance enabled may allow
+the job token to delete or restore released versions; that misconfiguration is the operator's risk.
+NVKR does not verify these settings, request an operator attestation, or create canary packages to probe
+permissions. It admits the profile without a role check. Its provider-authenticated package identity,
+publishing-repository association and visibility checks still fail closed. Missing packages fail without
+seeding; initialize and configure each fixed package before dispatch. Avoiding configured publication secrets
+still requires this package setup and does not replace private-image reader credentials; these instructions change no live setting.
 
-The platform-token profile remains refused until a verifiable provider-authenticated Actions-role check
-exists. An operator statement that these steps were completed cannot replace that check. Signed development
+GitHub's [package REST schema](https://docs.github.com/en/rest/packages/packages#get-a-package-for-an-organization)
+does not expose Actions roles or inheritance. Its [Packages GraphQL API](https://docs.github.com/en/packages/learn-github-packages/deleting-and-restoring-a-package#packages-api-support)
+does not support registries with granular permissions such as GHCR. Signed development
 uses the dedicated credential profile: its run/attempt-derived package names cannot be prepared before
-dispatch. Platform-token development remains refused until a per-attempt creation and Write-role admission
-mechanism is specified and implemented, preserving human-admin deletion and restoration.
+dispatch. Platform-token development remains deferred until per-attempt package setup is specified and implemented.
 
 ## Tekton cluster execution
 

@@ -11,9 +11,12 @@ Migration requires separate changes: development disks first, comparing release-
 path for identical prepared bytes and frozen identity inputs; all output kinds and aggregate indexes next;
 then helper/source/intermediate/diagnostic edges, followed by deletion of the CI-storage implementation and
 all `NVKR_CI_STORAGE_*` secrets/variables. Build-only residual edges need explicit transport admission before
-that deletion. Platform-token admission remains deferred. The platform-token profile accepts
+that deletion. Platform-token producer staging remains deferred. The platform-token profile accepts
 repository linkage and fork-package exposure; the opt-in independent writer needs a distinct stage-only
-credential, never the `nvkr-release` writer. The signed GitLab platform-token profile remains design only; the ordinary
+credential, never the `nvkr-release` writer. The existing hosted publisher now admits the GitHub platform-token
+profile with exact repository linkage and default-private visibility under [ADR-20's implementation boundary](adr-20.md).
+Actions roles and inheritance remain operator responsibilities; this does not implement platform-token producer staging or
+switch a maintained lane. The signed GitLab platform-token profile remains design only; the ordinary
 unsigned GitLab implementation and its proposed contract below are distinct. Tekton's cluster-key contract
 is unchanged.
 

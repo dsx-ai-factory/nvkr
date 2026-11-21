@@ -80,9 +80,9 @@ func TestStagedDiskPublishExecutor(t *testing.T) {
 			t.Setenv("NVKR_REGISTRY_USER", "synthetic-release-user")
 			t.Setenv(githubRepositoryTokenEnv, "synthetic-repository-token")
 			calls := 0
-			admit := func(_ context.Context, repository string, destinations []string, options cistore.Options) error {
+			admit := func(_ context.Context, repository string, destinations []string, options cistore.PublicationOptions) error {
 				calls++
-				if repository != "example/nvkr" || options.Token != "synthetic-release-token" || options.Username != "synthetic-release-user" || options.RepositoryToken != "synthetic-repository-token" {
+				if options.PlatformToken || options.AllowPublicPackages || repository != "example/nvkr" || options.Token != "synthetic-release-token" || options.Username != "synthetic-release-user" || options.RepositoryToken != "synthetic-repository-token" {
 					t.Fatal("release admission lost credential or source binding")
 				}
 				for _, destination := range destinations {

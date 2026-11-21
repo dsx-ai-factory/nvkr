@@ -89,7 +89,7 @@ func StageGitHubDisk(ctx context.Context, plan *Plan, output string, options Git
 	}
 	_, artifacts := planIndex(plan)
 	source := artifacts[route.Input].Path
-	root, err := admitGitHubPublication(ctx, target, source, cistore.AdmitPrivatePublication)
+	root, err := admitGitHubPublication(ctx, target, false, source, cistore.AdmitPublication)
 	if err != nil {
 		return err
 	}
@@ -137,11 +137,11 @@ func stagedDiskSubject(ctx context.Context, plan *Plan, route Route, artifacts m
 }
 
 func executeStagedDiskPublish(ctx context.Context, plan *Plan, node Node, artifacts map[string]Artifact, stdout io.Writer) error {
-	return executeStagedDiskPublishWithAdmission(ctx, plan, node, artifacts, stdout, cistore.AdmitPrivatePublication, productionOCISigner)
+	return executeStagedDiskPublishWithAdmission(ctx, plan, node, artifacts, stdout, cistore.AdmitPublication, productionOCISigner)
 }
 
 func executeStagedDiskPublishWithAdmission(ctx context.Context, plan *Plan, node Node, artifacts map[string]Artifact, stdout io.Writer,
-	admit func(context.Context, string, []string, cistore.Options) error, newSigner signerFor,
+	admit func(context.Context, string, []string, cistore.PublicationOptions) error, newSigner signerFor,
 ) error {
 	route, ok := preparedEvidenceRoute(plan, node)
 	if !ok || !stagedDiskRoute(plan, route.Name) {
@@ -162,7 +162,7 @@ func executeStagedDiskPublishWithAdmission(ctx context.Context, plan *Plan, node
 	if err := admitEvidenceMetadata(plan, route, inspection); err != nil {
 		return err
 	}
-	root, err := admitGitHubPublication(ctx, target, controls.Path, admit)
+	root, err := admitGitHubPublication(ctx, target, false, controls.Path, admit)
 	if err != nil {
 		return err
 	}

@@ -24,6 +24,9 @@ policy bytes and digest are frozen with the Plan and Run. This grants no signing
 Selecting an unavailable transport fails before work; a supported sibling cannot
 substitute for it. An explicit OCI representation selects construction before packaging and signing;
 it changes Environment and Plan identity, not logical Build identity or existing publication bytes.
+The GitHub platform-token publication profile admits private/internal packages by default; an explicit
+public-visibility opt-in changes Environment and Plan identity. Package Actions roles and inheritance
+remain operator responsibilities, separate from authenticated package identity, linkage and visibility.
 Image access separately declares private and anonymous image roots and
 an independent reader; publication namespaces grant no pull access. Unclassified GitHub execution images
 fail admission. Exact source/location bindings preserve logical Build identity; measured local images and
