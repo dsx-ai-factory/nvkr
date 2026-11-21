@@ -6,8 +6,6 @@ package cistore
 import (
 	"context"
 	"encoding/json"
-	"net/http"
-	"net/url"
 	"slices"
 	"strings"
 
@@ -98,23 +96,12 @@ func (b *backend) checkPublicationPackage(ctx context.Context, packageName strin
 		// The public opt-in never relaxes an independent credential's policy.
 		return b.checkPackagePrivacy(ctx, packageName, source, opts.Options, true)
 	}
-	kind := "users"
-	if source.Owner.Type == "Organization" {
-		kind = "orgs"
-	}
-	var record packageRecord
-	status, err := b.get(ctx, "/"+kind+"/"+url.PathEscape(source.Owner.Login)+"/packages/container/"+url.PathEscape(packageName), opts.Token, &record)
+	record, exists, err := b.lookupPackage(ctx, packageName, source, opts.Options)
 	if err != nil {
 		return false, err
 	}
-	if status == http.StatusNotFound {
+	if !exists {
 		return false, e.New(e.CodeTrustPolicyMissing, "platform-token destination package %q must be initialized and linked by its operator before publication", packageName)
-	}
-	if status != http.StatusOK {
-		return false, e.New(e.CodeFetchFailed, "publication package request returned HTTP %d", status)
-	}
-	if record.Name != packageName || record.PackageType != "container" || !strings.EqualFold(record.Owner.Login, source.Owner.Login) {
-		return false, e.New(e.CodeTrustPolicyMissing, "platform-token destination package identity was not authenticated by GitHub")
 	}
 	if !privateVisibility(record.Visibility) && !(opts.AllowPublicPackages && record.Visibility == "public") {
 		return false, e.New(e.CodeTrustPolicyMissing, "destination package %q requires private/internal visibility or publication.allowPublicPackages for public visibility", packageName)
