@@ -274,7 +274,7 @@ development packages. Use the same dedicated development package principal for s
 read and cleanup tokens: the stage token creates run/attempt-derived packages that cannot be
 granted to separate accounts before dispatch. The release writer needs read/write access to these
 packages, the release reader needs read access, and cleanup needs delete/admin access. Verify the
-actual token scopes and package ACLs; this shared-principal setup has not been exercised live for staging.
+actual token scopes and package ACLs; see [staging acceptance](docs/adr/reconciliation/adr-20.md#support-by-owner).
 A missing or under-scoped stage writer fails in the fixed push step after the disk build has completed;
 the build does not preflight these credentials.
 The staged digest and bounded controls travel through Actions metadata. The release job reads the
@@ -283,7 +283,7 @@ and no registry credential; the publisher binds its bundles to the readback befo
 and root metadata. Signing and independent full-payload verification follow. Other outputs and production lanes retain private CI
 payload transport, and all `NVKR_CI_STORAGE_*` settings remain required for those and shared inputs.
 This maintained lane retains its explicit scoped accounts; the adopter platform-token default is a
-separate migration step. No hosted validation of the staged-disk path has been recorded.
+separate migration step.
 
 Configure repository secret `NVKR_REGISTRY_READ` and variable `NVKR_REGISTRY_READ_USER` for the
 shared private toolchain and smoke images as well. These are additional prerequisites to the development

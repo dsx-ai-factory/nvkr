@@ -5,6 +5,8 @@ with repository-local GHCR/job-token access as the adopter default. Development 
 directly with a dedicated writer and use a process-local complete streaming readback receipt before
 publishing attested controls. Their [local transport contracts](hosted-artifact-transport-lifetime.md)
 compare exact release-root bytes with the legacy path; hosted acceptance remains unverified.
+The shared development package principal and separate stage/release/read/cleanup token grants have
+not been exercised live for staging.
 Other outputs retain hosted payload upload. Development disks retain the dedicated credential profile's
 unlinked private/internal GHCR package policy. The [ADR-18 migration gates](adr-18.md)
 separate development disks, all outputs and residual input-edge removal.
