@@ -34,6 +34,12 @@ func validationProgressReporter(c *cli.Context) validation.Reporter {
 		writer = os.Stderr
 	}
 	return func(update validation.Progress) {
+		if _, file := writer.(*os.File); file {
+			// Go may raise SIGPIPE for a broken standard descriptor. Scope
+			// handling to this progress write so producer and stdout behavior
+			// retain their existing dispositions.
+			defer checkedOutputSignals()()
+		}
 		_, _ = fmt.Fprintf(writer, "validation check %s: %s\n", update.Check, update.Phase)
 	}
 }

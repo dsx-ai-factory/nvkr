@@ -9,8 +9,11 @@ import (
 	"encoding/json"
 	"errors"
 	"io"
+	"os"
+	"os/exec"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/canonical"
 	e "github.com/dsx-ai-factory/nvkr/pkg/nvkr/errors"
@@ -233,6 +236,66 @@ func TestValidateCLIProgressPreservesOwnerFailure(t *testing.T) {
 	}
 	if got, want := diagnostics.String(), "validation check cluster-conformance: running\nvalidation check cluster-conformance: failed\n"; got != want {
 		t.Fatalf("progress lines %q want %q", got, want)
+	}
+	requireCanonicalValidationOutput(t, output.Bytes())
+}
+
+func TestValidateCLIProgressPreservesResultsWithClosedStderr(t *testing.T) {
+	const fixture = "NVKR_TEST_VALIDATE_CLOSED_STDERR"
+	if scenario := os.Getenv(fixture); scenario != "" {
+		var owner error
+		if scenario == "failure" {
+			owner = e.New(e.CodeVerifyFailed, "fixture owner error")
+		}
+		assertValidationProgressRetainsResult(t, os.Stderr, owner)
+		return
+	}
+	for _, scenario := range []string{"success", "failure"} {
+		t.Run(scenario, func(t *testing.T) {
+			reader, writer, err := os.Pipe()
+			if err != nil {
+				t.Fatal(err)
+			}
+			defer writer.Close()
+			if err := reader.Close(); err != nil {
+				t.Fatal(err)
+			}
+			ctx, cancel := context.WithTimeout(t.Context(), 10*time.Second)
+			defer cancel()
+			cmd := exec.CommandContext(ctx, os.Args[0], "-test.run=^TestValidateCLIProgressPreservesResultsWithClosedStderr$")
+			cmd.Env = append(os.Environ(), fixture+"="+scenario)
+			cmd.Stderr = writer
+			if diagnostics, err := cmd.Output(); err != nil {
+				t.Fatalf("validation did not survive the closed stderr reader: %v\n%s", err, diagnostics)
+			}
+		})
+	}
+}
+
+func TestValidateCLIProgressPreservesResultsWithWriterError(t *testing.T) {
+	assertValidationProgressRetainsResult(t, failingWriter{}, e.New(e.CodeVerifyFailed, "fixture owner error"))
+}
+
+func assertValidationProgressRetainsResult(t *testing.T, writer io.Writer, owner error) {
+	t.Helper()
+	var output bytes.Buffer
+	app := validationCLI(func(ctx context.Context, _, _ string, _ lifecycle.QualificationRuntimeOptions) ([]testresults.Output, error) {
+		reporter := validation.ReporterFrom(ctx)
+		if reporter == nil {
+			t.Fatal("runner context carried no progress reporter")
+		}
+		reporter(validation.Progress{Check: "cluster-conformance", Phase: validation.PhaseRunning})
+		phase := validation.PhaseCompleted
+		if owner != nil {
+			phase = validation.PhaseFailed
+		}
+		reporter(validation.Progress{Check: "cluster-conformance", Phase: phase})
+		return []testresults.Output{validationOutput()}, owner
+	}, &output)
+	app.ErrWriter = writer
+	err := app.RunContext(t.Context(), []string{"nvkr", "validate", "--config", "profile.json"})
+	if !errors.Is(err, owner) || e.ExitCode(err) != e.ExitCode(owner) {
+		t.Fatalf("lost owner status: %v", err)
 	}
 	requireCanonicalValidationOutput(t, output.Bytes())
 }
