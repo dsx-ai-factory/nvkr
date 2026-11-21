@@ -20,7 +20,8 @@ func TestMaintainedNVKEOSFetchIsAnonymous(t *testing.T) {
 	const repository = "https://github.com/dsx-ai-factory/nvke.git"
 	const dsxRepository = "https://github.com/dsx-ai-factory/project-dsx-identity"
 	const ovnRepository = "https://github.com/dsx-ai-factory/ovn-kubernetes"
-	publicRepositories := map[string]bool{repository: true, ovnRepository: true}
+	const wliRepository = "https://github.com/dsx-ai-factory/nvidia-workload-identity"
+	publicRepositories := map[string]bool{repository: true, ovnRepository: true, wliRepository: true}
 	environment, err := definition.LoadEnvironment(t.Context(), filepath.Join(root, "../../environments/github-release.yaml"))
 	if err != nil {
 		t.Fatal(err)
@@ -34,7 +35,7 @@ func TestMaintainedNVKEOSFetchIsAnonymous(t *testing.T) {
 			t.Fatal(err)
 		}
 		if _, exists := selected.SourceAccess[dsxRepository]; exists {
-			t.Fatal("temporary SPIRE rollback must not retain unused DSX credential access", path)
+			t.Fatal("public WLI integration must not retain private DSX credential access", path)
 		}
 	}
 	authored, err := definition.LoadDefinition(t.Context(), filepath.Join(root, "definition.yaml"))
@@ -73,8 +74,8 @@ func TestMaintainedNVKEOSFetchIsAnonymous(t *testing.T) {
 			plan := &Plan{Definition: authored, Environment: environment, Builds: []BuildPlan{{Name: output.Name, CatalogSnapshot: cat, Graph: graph}}}
 			publicFetches := make(map[string]int)
 			for _, source := range graph.Nodes {
-				if source.Repo == dsxRepository || source.Component == "dsx-imds-node-attestor-agent" {
-					t.Fatal("temporary SPIRE rollback must not schedule a DSX fetch or build")
+				if source.Repo == dsxRepository {
+					t.Fatal("public WLI integration must not schedule a private DSX fetch")
 				}
 				node := Node{BuildTarget: output.Name, IRNode: source.ID, Kind: NodeBuild}
 				if source.Kind == ir.KindFetch {
@@ -88,8 +89,8 @@ func TestMaintainedNVKEOSFetchIsAnonymous(t *testing.T) {
 					publicFetches[source.Repo]++
 				}
 			}
-			if publicFetches[repository] != 5 || publicFetches[ovnRepository] != 3 || len(publicFetches) != 2 {
-				t.Fatalf("public source fetches = %v, want five NVKE and three OVN fork source closures only", publicFetches)
+			if publicFetches[repository] != 5 || publicFetches[ovnRepository] != 3 || publicFetches[wliRepository] != 1 || len(publicFetches) != 3 {
+				t.Fatalf("public source fetches = %v, want five NVKE, three OVN and one WLI source closure", publicFetches)
 			}
 		})
 	}

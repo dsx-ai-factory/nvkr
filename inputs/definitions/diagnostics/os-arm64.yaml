@@ -12,6 +12,7 @@ metadata:
   name: nvke-os-arm64-kvm
 outputs:
 - components:
+  - dsx-imds-node-attestor-agent
   - nvke-agent-diagnostic
   - nvke-cni-calico-diagnostic
   - nvke-cni-ovn-diagnostic

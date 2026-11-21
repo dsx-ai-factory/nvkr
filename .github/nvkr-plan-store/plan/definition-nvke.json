@@ -542,6 +542,7 @@
         ]
       },
       "components": [
+        "dsx-imds-node-attestor-agent",
         "nvke-agent",
         "nvke-cni-calico",
         "nvke-cni-ovn",
@@ -567,6 +568,7 @@
         ]
       },
       "components": [
+        "dsx-imds-node-attestor-agent",
         "nvke-agent",
         "nvke-cni-calico",
         "nvke-cni-ovn",
@@ -593,6 +595,7 @@
         ]
       },
       "components": [
+        "dsx-imds-node-attestor-agent",
         "nvke-agent",
         "nvke-cni-calico",
         "nvke-cni-ovn",
@@ -619,6 +622,7 @@
         ]
       },
       "components": [
+        "dsx-imds-node-attestor-agent",
         "nvke-agent",
         "nvke-cni-calico",
         "nvke-cni-ovn",
@@ -644,6 +648,7 @@
         ]
       },
       "components": [
+        "dsx-imds-node-attestor-agent",
         "nvke-agent",
         "nvke-cni-calico",
         "nvke-cni-ovn",
@@ -669,6 +674,7 @@
         ]
       },
       "components": [
+        "dsx-imds-node-attestor-agent",
         "nvke-agent",
         "nvke-cni-calico",
         "nvke-cni-ovn",
@@ -695,6 +701,7 @@
         ]
       },
       "components": [
+        "dsx-imds-node-attestor-agent",
         "nvke-agent",
         "nvke-cni-calico",
         "nvke-cni-ovn",
@@ -721,6 +728,7 @@
         ]
       },
       "components": [
+        "dsx-imds-node-attestor-agent",
         "nvke-agent",
         "nvke-cni-calico",
         "nvke-cni-ovn",

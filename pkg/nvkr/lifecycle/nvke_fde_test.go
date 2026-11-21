@@ -56,6 +56,7 @@ func TestNVKEFDEOnlyGeneratedSelection(t *testing.T) {
 		}
 	}
 	wantComponents := strings.Fields(`
+		dsx-imds-node-attestor-agent
 		nvke-agent nvke-cni-calico nvke-cni-ovn nvke-doca-ovs nvke-image-inputs nvke-kubeadm-distro
 		nvke-node-fde-amd64 nvke-patched-installer-iso-amd64 nvke-spire-agent ovn-kube-ubuntu ovn-kubernetes-chart
 		ubuntu-installer-iso-amd64`)
@@ -157,7 +158,7 @@ func TestNVKEIncludesBothNativeFDEImages(t *testing.T) {
 				t.Fatal("missing FDE build", name)
 			}
 			build := plan.Builds[index]
-			wantComponents := []string{"nvke-agent", "nvke-cni-calico", "nvke-cni-ovn", "nvke-doca-ovs", "nvke-image-inputs", "nvke-kubeadm-distro",
+			wantComponents := []string{"dsx-imds-node-attestor-agent", "nvke-agent", "nvke-cni-calico", "nvke-cni-ovn", "nvke-doca-ovs", "nvke-image-inputs", "nvke-kubeadm-distro",
 				name, tc.patched, "nvke-spire-agent", "ovn-kube-ubuntu", "ovn-kubernetes-chart",
 				tc.installer}
 			if build.Platform != "linux/"+tc.arch || !slices.Equal(build.Components, wantComponents) || len(build.ResolvedComponents) != len(wantComponents) {

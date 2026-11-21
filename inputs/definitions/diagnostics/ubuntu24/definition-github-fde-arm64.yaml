@@ -16,6 +16,7 @@ outputs:
     - ../../../catalogs/node-images/variants/native-toolchains.yaml
     - ../../../catalogs/node-images/variants/ubuntu24.json
   components:
+  - dsx-imds-node-attestor-agent
   - nvke-agent
   - nvke-cni-calico
   - nvke-cni-ovn

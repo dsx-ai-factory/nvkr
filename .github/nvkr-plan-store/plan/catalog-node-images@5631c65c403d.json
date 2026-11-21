@@ -2,6 +2,40 @@
   "APIVersion": "nvkr.dev/catalog/v3",
   "Actions": {},
   "Components": {
+    "dsx-imds-node-attestor-agent": {
+      "artifactPath": "nvkr-output/dsx-imds-node-attestor-agent",
+      "buildCommand": [
+        "sh",
+        "-ec",
+        {
+          "file": ".github/nvkr-plan-store/scripts/dsx-imds-node-attestor-agent/build@c3db711d9a0c.sh"
+        }
+      ],
+      "builderType": "oci-hermetic",
+      "commit": "cd76f1d5ab4a887b9577ff601ce7cda52d5003b4",
+      "fromSource": true,
+      "outputType": "host-package",
+      "platforms": [
+        "linux/amd64",
+        "linux/arm64"
+      ],
+      "repo": "https://github.com/dsx-ai-factory/nvidia-workload-identity",
+      "sourceDateEpoch": 1792708538,
+      "tag": "v1.15.0",
+      "toolchainImages": {
+        "amd64": "docker.io/library/golang@sha256:78773c59d6d4ecedc0845b1a8e5379e7bf0e0be62f4ea796e689bbc97dab3ceb",
+        "arm64": "docker.io/library/golang@sha256:7117c9e4e2c0becd23d1dbede3aea73ba91d084847c68e12d7e1fa3d9b3abf20"
+      },
+      "treeHash": "b9c85948e417d42d7529d2306f1b80db61c629ae",
+      "vendorCommand": [
+        "sh",
+        "-ec",
+        {
+          "file": ".github/nvkr-plan-store/scripts/nvidia-workload-identity/vendor@47bdd564b19b.sh"
+        }
+      ],
+      "writeDir": "nvkr-output"
+    },
     "nvke-agent": {
       "artifactPath": "agent/bin/nvke-agent.deb",
       "buildCommand": [
@@ -990,12 +1024,15 @@
         "bash",
         "-ec",
         {
-          "file": ".github/nvkr-plan-store/scripts/nvke-spire-agent/build@880033d43a5b.sh"
+          "file": ".github/nvkr-plan-store/scripts/nvke-spire-agent/build@920bcb1ced74.sh"
         }
       ],
       "builderType": "oci-hermetic",
       "commit": "2cfd00081b468d85a4894ec17e9deac13c9d8169",
       "fromSource": true,
+      "materials": {
+        "imds-agent": "dsx-imds-node-attestor-agent"
+      },
       "outputType": "tarball",
       "platforms": [
         "linux/amd64",
@@ -1225,6 +1262,20 @@
     "name": "node-images"
   },
   "Sources": {
+    "nvidia-workload-identity": {
+      "repo": "https://github.com/dsx-ai-factory/nvidia-workload-identity",
+      "toolchainImagesByArch": {
+        "amd64": "docker.io/library/golang@sha256:78773c59d6d4ecedc0845b1a8e5379e7bf0e0be62f4ea796e689bbc97dab3ceb",
+        "arm64": "docker.io/library/golang@sha256:7117c9e4e2c0becd23d1dbede3aea73ba91d084847c68e12d7e1fa3d9b3abf20"
+      },
+      "vendorCommand": [
+        "sh",
+        "-ec",
+        {
+          "file": ".github/nvkr-plan-store/scripts/nvidia-workload-identity/vendor@47bdd564b19b.sh"
+        }
+      ]
+    },
     "nvke-cni-calico-source": {
       "constraint": "v0.23.0",
       "repo": "https://github.com/dsx-ai-factory/nvke.git",

@@ -5,8 +5,9 @@ The local NVIDIA native KVM Definitions select stock NVKE `v0.23.0` at
 CLI, controller, provisioned provider, profiles, SPIRE packaging and DOCA OVS acquisition.
 The source MachineImage fixture's local QCOW slot moved to
 `http://127.0.0.1:18080/files/images/nvke-node.qcow2`, and the demo's boot projection requires that slot. The release
-incorporates the public upstream SPIRE/TPM packaging fix and revision-4 package;
-there is no separate older SPIRE source selection. NVIDIA OVN image/chart producers
+contains the public upstream SPIRE/TPM packaging fix and revision-4 package source;
+the current adapter requests revision 5 with WLI IMDS and awaits the optional-input
+source pin described below. There is no separate older SPIRE source selection. NVIDIA OVN image/chart producers
 retain `8af51273` / 2.4.2. The custom OVN Debian
 producer changes its actual package metadata and payload paths to `nvke-*` while
 retaining source-compatible virtual package aliases and bounded image import.
@@ -88,9 +89,12 @@ that source selection. The current release's
 [SPIRE package](https://github.com/dsx-ai-factory/nvke/blob/2cfd00081b468d85a4894ec17e9deac13c9d8169/os-image/packages/spire-agent/Makefile)
 uses revision 4 and its
 [locked public SPIRE 1.14.1 and TPM plugin 1.9.0 archives](https://github.com/dsx-ai-factory/nvke/blob/2cfd00081b468d85a4894ec17e9deac13c9d8169/os-image/packages/spire-agent/lock/1.14.1%2Btpm1.9.0.lock).
-That default package does not acquire or provide the DSX IMDS plugin. Native tenants
-select join-token attestation and the site uses TPM. This is the selected release's
-packaging contract, not an older-source workaround or complete native runtime acceptance.
+That source does not acquire or provide the DSX IMDS plugin. The current adapter
+supplies a source-built WLI v1.15.0 material and requests revision 5, but the old
+source ignores it and fails the new packaged-byte check. A pin containing NVKE's
+optional-input contract is required before disk builds can succeed; see
+[ADR-22 reconciliation](adr-22.md#nvidia-workload-identity-agent). Native tenants
+select join-token attestation and the site uses TPM. No new runtime acceptance is claimed.
 
 The shared native host tools select kubectl 1.35.9 on both platforms. This is
 within one minor of the temporary Kind 1.36.1 bootstrap API and the permanent

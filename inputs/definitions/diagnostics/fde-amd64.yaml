@@ -15,6 +15,7 @@ outputs:
     overlays:
     - ../../catalogs/node-images/variants/native-toolchains.yaml
   components:
+  - dsx-imds-node-attestor-agent
   - nvke-agent
   - nvke-cni-calico
   - nvke-cni-ovn

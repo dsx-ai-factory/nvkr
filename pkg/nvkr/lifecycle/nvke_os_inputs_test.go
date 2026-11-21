@@ -87,6 +87,7 @@ func TestNVKEOSExecutionModesSelectArchitectureSpecificDiskMaterials(t *testing.
 				t.Fatalf("cpu_model = %q, want %q", got, test.wantCPU)
 			}
 			if !slices.Equal(plan.Builds[0].Components, []string{
+				"dsx-imds-node-attestor-agent",
 				"nvke-agent-diagnostic", "nvke-cni-calico-diagnostic", "nvke-cni-ovn-diagnostic", "nvke-doca-ovs", "nvke-image-inputs-diagnostic", "nvke-kubeadm-distro-diagnostic",
 				test.root, test.patched, "nvke-spire-agent", "ovn-kube-ubuntu-diagnostic",
 				"ovn-kubernetes-chart-diagnostic", test.installer,

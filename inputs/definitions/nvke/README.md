@@ -231,10 +231,16 @@ actual parent-to-child membership before using the native image.
 OS assembly, agent, Calico, kubeadm, SPIRE packaging and DOCA OVS acquisition all select NVKE `v0.23.0` at
 `2cfd00081b468d85a4894ec17e9deac13c9d8169`. The `nvke-doca-ovs` producer fetches the source-locked DOCA OVS
 `3.5.0` debs for Ubuntu `26.04` (`24.04` under the Ubuntu 24 overlay) and supplies them as the sixth
-image-inputs material, which the source's composer requires. NVIDIA publishes these packages without source. SPIRE stages `1.14.1` and TPM plugin `1.9.0`,
-then packages Debian revision `4` offline before image-input composition and Packer.
-That source-owned packaging excludes DSX IMDS. SPIRE server/container outputs retain their
-separately pinned chart-selected versions. The agent package stamps `v0.23.0`.
+image-inputs material, which the source's composer requires. NVIDIA publishes these packages without source.
+SPIRE stages `1.14.1` and TPM plugin `1.9.0`. The updated package adapter selects the
+WLI v1.15.0 IMDS executable as an authenticated native material, passes its digest
+to NVKE's optional package input, and requests Debian revision `5`. It verifies the
+executable extracted from the Debian package before image-input composition and Packer.
+The current v0.23.0 NVKE pin lacks that optional-input contract: disk builds fail
+closed until the pending NVKE source update lands and the pins advance. TPM remains
+the default attestor; supplying the binary does not select `dsx_imds`.
+SPIRE server/container outputs retain their separately pinned chart-selected versions.
+The agent package stamps `v0.23.0`.
 These updated inputs do not establish a new build, source-review acceptance or runtime result.
 The pinned commit's source-owned direct-Packer contract receives `capture_apt_acquisitions=true` and exports
 `non-fde/apt-acquisitions.tar` or `fde/apt-acquisitions.tar`, which each producer declares through `packer.acquisitionArchive`.

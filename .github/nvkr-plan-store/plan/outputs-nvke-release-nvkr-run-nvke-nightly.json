@@ -556,8 +556,9 @@
   },
   {
     "artifactId": "artifact/nvke-node-fde-amd64/nvke-node-fde-amd64",
-    "buildDigest": "sha256:d8ae881b5c827413b56d34b0370e12e9942bac923c4cdcb0bee5e0491cea7558",
+    "buildDigest": "sha256:5660dc6a670456b6c387b14244b2525f72949b63ecbc89be560c630e40706c5a",
     "components": [
+      "dsx-imds-node-attestor-agent",
       "nvke-agent",
       "nvke-cni-calico",
       "nvke-cni-ovn",
@@ -576,8 +577,9 @@
   },
   {
     "artifactId": "artifact/nvke-node-fde-arm64/nvke-node-fde-arm64",
-    "buildDigest": "sha256:0caffe5b1a6ebbe54a14b8e20f5fa5c3ef2aaabce0ab57a49ad944b536b73cbc",
+    "buildDigest": "sha256:cdb08de02b36a935ac623ed1dc07b5622fd05b15ddc7b885d6173fcf51f67db2",
     "components": [
+      "dsx-imds-node-attestor-agent",
       "nvke-agent",
       "nvke-cni-calico",
       "nvke-cni-ovn",
@@ -596,8 +598,9 @@
   },
   {
     "artifactId": "artifact/nvke-node-fde-ubuntu24-amd64/nvke-node-fde-amd64",
-    "buildDigest": "sha256:b72887ec78cb1261d0d04ed1feb0d97c085e0bb952865fb63548b6c3a0db6f87",
+    "buildDigest": "sha256:7e754dd71eeea4bda45a6a53314ba006f510da4b352c3ceffa6b60b6d33c05b2",
     "components": [
+      "dsx-imds-node-attestor-agent",
       "nvke-agent",
       "nvke-cni-calico",
       "nvke-cni-ovn",
@@ -616,8 +619,9 @@
   },
   {
     "artifactId": "artifact/nvke-node-fde-ubuntu24-arm64/nvke-node-fde-arm64",
-    "buildDigest": "sha256:153d96e6bed3a5f3cf23d597b102107ab4164db237a92cd568b53b65c2b3f297",
+    "buildDigest": "sha256:3004a8832627d794529d192dcbbf316dd4f79b89d8b842675f983ddc2c2863d0",
     "components": [
+      "dsx-imds-node-attestor-agent",
       "nvke-agent",
       "nvke-cni-calico",
       "nvke-cni-ovn",
@@ -636,8 +640,9 @@
   },
   {
     "artifactId": "artifact/nvke-node-image-amd64/nvke-node-image-amd64",
-    "buildDigest": "sha256:5ef0195d2c3ff292dc854a7e571f007fb89c35c41caa702463a5deff52a71738",
+    "buildDigest": "sha256:6322fac1d35719a7faf87e1714a521b4d3277e9e541d58c293aa481165373bfb",
     "components": [
+      "dsx-imds-node-attestor-agent",
       "nvke-agent",
       "nvke-cni-calico",
       "nvke-cni-ovn",
@@ -656,8 +661,9 @@
   },
   {
     "artifactId": "artifact/nvke-node-image-arm64/nvke-node-image",
-    "buildDigest": "sha256:bbadfddcdf1579abd641ddac5fab9aac6160dda7b14ac98987c7b0137eba4222",
+    "buildDigest": "sha256:d9e2749cd15cb1e2ccdbcdd580f555a7101de50cac8194ac7aa5e4af8e103f6d",
     "components": [
+      "dsx-imds-node-attestor-agent",
       "nvke-agent",
       "nvke-cni-calico",
       "nvke-cni-ovn",
@@ -676,8 +682,9 @@
   },
   {
     "artifactId": "artifact/nvke-node-image-ubuntu24-amd64/nvke-node-image-amd64",
-    "buildDigest": "sha256:d913f8d16e1f404b2cb1f4c4545e459f6a04657ba49902b8ae60b163eec1d50e",
+    "buildDigest": "sha256:7f18a8e06505a7ed4c065d339cd73dab64c4bb268c06721159e4832cfe8f4184",
     "components": [
+      "dsx-imds-node-attestor-agent",
       "nvke-agent",
       "nvke-cni-calico",
       "nvke-cni-ovn",
@@ -696,8 +703,9 @@
   },
   {
     "artifactId": "artifact/nvke-node-image-ubuntu24-arm64/nvke-node-image",
-    "buildDigest": "sha256:d810eca8a3ac8934a505b3ba2f87ca1ab3c29712b87946d8fc8a8e2f795f1a48",
+    "buildDigest": "sha256:93504622ca01d6df22c71a321f3bf2aaff8eb6a1559433ee6255e1bdc54122f9",
     "components": [
+      "dsx-imds-node-attestor-agent",
       "nvke-agent",
       "nvke-cni-calico",
       "nvke-cni-ovn",

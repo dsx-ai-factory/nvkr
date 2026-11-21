@@ -354,6 +354,9 @@
   ],
   "catalogDigest": "sha256:84b9ecc3946d2ff92d75a413f45c9fffc7fb54f198589e5da8158ec6f397bbd2",
   "catalogSnapshots": {
+    "sha256:57d04d895816cc6d6e79295defcdd3bee96ca5223ee77edaec119f3e161c994f": {
+      "file": ".github/nvkr-plan-store/plan/catalog-node-images@a153c436d158.json"
+    },
     "sha256:846dcc17957d283482e241ed117d4d61060b1a37930c85f2a799e3de717ba092": {
       "file": ".github/nvkr-plan-store/plan/catalog-runtime-dependencies@d79f8fcceb24.json"
     },
@@ -369,11 +372,8 @@
     "sha256:b6ecdd63bf4f35cbe2cbee75bd573e3afba798e410a7e81cb73d7b4c8a7da8fe": {
       "file": ".github/nvkr-plan-store/plan/catalog-tools@e236018c5f62.json"
     },
-    "sha256:c6864cb2ccc890ba3238641c1bedb4aafe3866f0aa84a091d986f3168316ab33": {
-      "file": ".github/nvkr-plan-store/plan/catalog-node-images@afa5078c36a1.json"
-    },
-    "sha256:db146195c3ef82e670bd5dfdacd63a91fd643e0ca79daf42b18da65e82d67261": {
-      "file": ".github/nvkr-plan-store/plan/catalog-node-images@e71c0a37ae36.json"
+    "sha256:f88d791f4e2e2f0710b24812882008487b72f05b1b0ccae212dfcded9b309a0c": {
+      "file": ".github/nvkr-plan-store/plan/catalog-node-images@5631c65c403d.json"
     }
   },
   "composition": {
@@ -382,7 +382,7 @@
   "definition": {
     "file": ".github/nvkr-plan-store/plan/definition-nvke.json"
   },
-  "definitionDigest": "sha256:d33a37ddc449506de7cbfee154ac8c3ad044dc1926365dbe452cbeb70aae3b02",
+  "definitionDigest": "sha256:5ba4c1e4c99147ee265ef13167b1dae06c533da8c0319686afb26198553d4e49",
   "definitionPath": "inputs/definitions/nvke/nvke.composite.yaml",
   "environment": {
     "file": ".github/nvkr-plan-store/plan/environment-nvke-github-dev-nvkr-dev.json"
@@ -390,7 +390,7 @@
   "environmentDigest": "sha256:6cfc17a822fe089862a222c5a5894abb9434cd5dbc253480b6c2947d46e0d3ed",
   "environmentPath": "inputs/environments/github-development.yaml",
   "generatorVersion": "dev (unknown)",
-  "graphDigest": "sha256:72fce6081c0d6b13c81c8cb181415b2deccfb7b0723b157fab9dfc1662f35149",
+  "graphDigest": "sha256:ec008643b9df4f4c7715b10ae290358e6db442ebb914c90fd7eb64f1a5d1241a",
   "lifecycleOutputs": {
     "file": ".github/nvkr-plan-store/plan/outputs-nvke.json"
   },

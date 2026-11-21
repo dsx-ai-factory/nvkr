@@ -25,20 +25,22 @@ outputs:
     platform: linux/arm64
     format: disk-image
     components:
-      - nvke-agent
-      - nvke-cni-calico
-      - nvke-cni-ovn
-      - nvke-image-inputs
-      - nvke-kubeadm-distro
-      - nvke-node-image
+      - dsx-imds-node-attestor-agent
+      - nvke-agent-diagnostic
+      - nvke-cni-calico-diagnostic
+      - nvke-cni-ovn-diagnostic
+      - nvke-doca-ovs
+      - nvke-image-inputs-diagnostic
+      - nvke-kubeadm-distro-diagnostic
+      - nvke-node-image-diagnostic
       - nvke-patched-installer-iso
       - nvke-spire-agent
-      - ovn-kube-ubuntu
-      - ovn-kubernetes-chart
+      - ovn-kube-ubuntu-diagnostic
+      - ovn-kubernetes-chart-diagnostic
       - ubuntu-installer-iso
 ```
 
-`nvke-node-image` is the disk-producing root. NVKR requires exactly that root and all its direct and
+`nvke-node-image-diagnostic` is the disk-producing root. NVKR requires exactly that root and all its direct and
 transitive material producers. The explicit list repeats information reachable through the catalog graph:
 today this is a selection consistency check. Missing dependencies, unrelated extras and multiple roots
 are errors. **Selecting only the root does not expand its dependencies.**
@@ -52,6 +54,7 @@ The [catalog](https://github.com/dsx-ai-factory/nvkr/blob/main/inputs/catalogs/n
 | `nvke-node-image` | `image-inputs → nvke-image-inputs`; `installer-iso → nvke-patched-installer-iso` |
 | `nvke-image-inputs` | `agent → nvke-agent`; `calico → nvke-cni-calico`; `kubeadm-distro → nvke-kubeadm-distro`; `ovn → nvke-cni-ovn`; `spire-agent → nvke-spire-agent` |
 | `nvke-cni-ovn` | `ovn-chart → ovn-kubernetes-chart`; `ovn-image → ovn-kube-ubuntu` |
+| `nvke-spire-agent` | `imds-agent → dsx-imds-node-attestor-agent` |
 | `nvke-patched-installer-iso` | `installer-source → ubuntu-installer-iso` |
 
 The left side is the consumer's input label; the right side is an exact catalog component key.
