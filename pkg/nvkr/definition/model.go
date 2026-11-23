@@ -183,6 +183,9 @@ type Publication struct {
 	CredentialRef    string            `json:"credentialRef,omitempty"`
 	Anonymous        bool              `json:"anonymous,omitempty"`
 	PlainHTTP        bool              `json:"plainHTTP,omitempty"`
+	// AllowPublicPackages permits public GHCR destinations only with the GitHub
+	// platform token. Omission preserves private/internal package admission.
+	AllowPublicPackages bool `json:"allowPublicPackages,omitempty"`
 }
 
 // NativeToolchain locates an existing local NVKR binary-bundle output.
@@ -461,6 +464,9 @@ func (environment Environment) Validate() error {
 		repository, err := name.NewRepository(prefix, name.StrictValidation)
 		if err != nil || repository.Name() != prefix || strings.ContainsAny(prefix[strings.LastIndex(prefix, "/")+1:], ":@") || strings.Contains(prefix, "@") || publication.Anonymous == (publication.CredentialRef != "") {
 			return e.New(e.CodeInvalidCatalog, "publication requires a canonical untagged repositoryPrefix and exactly one credential mode")
+		}
+		if publication.AllowPublicPackages && (publication.CredentialRef != "github:GITHUB_TOKEN" || repository.RegistryStr() != "ghcr.io" || publication.PlainHTTP || environment.GitLab != nil || environment.Tekton != nil) {
+			return e.New(e.CodeEngineCapability, "publication allowPublicPackages requires the GitHub platform-token GHCR profile")
 		}
 	}
 	if environment.Signing != nil {

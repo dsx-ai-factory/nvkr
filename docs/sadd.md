@@ -142,6 +142,9 @@ These assumptions are subject to the current ADRs and milestone acceptance crite
   Public NVKE inputs are fetched anonymously with vendored dependencies (ADR-18 §8).
 - Workflow ownership, branch protection, and protected publication environments are security controls in v1.
   The consumer trusts the named producer and qualification identities under an explicit issuer policy.
+  For GitHub platform-token publication, the operator configures Write-only package Actions access and
+  disables inheritance. NVKR authenticates package identity, repository linkage and default-private visibility
+  (with an explicit public opt-in), but does not verify roles or prevent deletion by a misconfigured Admin token.
 - Qualified reproduction assumes inputs can be normalized and the execution environment admitted against a
   signed profile. Operators provide the independent conformance evidence and trust policy (ADR-07/08/16).
 - Qualified offline operation requires the retained input/evidence closure and pinned trust material; it is a
