@@ -354,6 +354,9 @@
   ],
   "catalogDigest": "sha256:84b9ecc3946d2ff92d75a413f45c9fffc7fb54f198589e5da8158ec6f397bbd2",
   "catalogSnapshots": {
+    "sha256:4a02391f4c14d5c07f75bee2c1d5465c0561d357dc2fccb7e9f15630ce08a031": {
+      "file": ".github/nvkr-plan-store/plan/catalog-node-images@d459eb9d942b.json"
+    },
     "sha256:846dcc17957d283482e241ed117d4d61060b1a37930c85f2a799e3de717ba092": {
       "file": ".github/nvkr-plan-store/plan/catalog-runtime-dependencies@d79f8fcceb24.json"
     },
@@ -369,11 +372,8 @@
     "sha256:b6ecdd63bf4f35cbe2cbee75bd573e3afba798e410a7e81cb73d7b4c8a7da8fe": {
       "file": ".github/nvkr-plan-store/plan/catalog-tools@e236018c5f62.json"
     },
-    "sha256:c6864cb2ccc890ba3238641c1bedb4aafe3866f0aa84a091d986f3168316ab33": {
-      "file": ".github/nvkr-plan-store/plan/catalog-node-images@afa5078c36a1.json"
-    },
-    "sha256:db146195c3ef82e670bd5dfdacd63a91fd643e0ca79daf42b18da65e82d67261": {
-      "file": ".github/nvkr-plan-store/plan/catalog-node-images@e71c0a37ae36.json"
+    "sha256:bcc5704c08108a3fa4fab9019283c2f7f05174511da2fbd87ac854172de69bdb": {
+      "file": ".github/nvkr-plan-store/plan/catalog-node-images@5e423d310293.json"
     }
   },
   "composition": {

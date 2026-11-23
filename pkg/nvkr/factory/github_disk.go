@@ -81,7 +81,7 @@ func RunGitHubDisk(ctx context.Context, plan *Plan, output string, options GitHu
 	}
 	admission, err := AdmitLocalVMBuild(ctx, plan, root.ID, workspace)
 	if err != nil {
-		return err
+		return githubRunnerCapabilityError(err, "run-disk VM admission")
 	}
 	defer func() { returnErr = joinFactoryCleanupError(returnErr, admission.Close(), "close ARC VM admission") }()
 	_, instruction, err := plan.producerInstruction(root)
@@ -309,6 +309,18 @@ func executeGitHubDiskNodes(ctx context.Context, plan *Plan, stage githubStage, 
 		owner.Nodes = append(owner.Nodes, LocalNodeResult{ID: node.ID, Kind: node.Kind, Status: "ok"})
 	}
 	return complete(ctx)
+}
+
+func githubRunnerCapabilityError(err error, operation string) error {
+	var coded *e.Error
+	if !errors.As(err, &coded) || coded.Code != e.CodeEngineCapability {
+		return err
+	}
+	pod := os.Getenv("RUNNER_NAME")
+	if pod == "" {
+		pod = "unknown"
+	}
+	return e.Wrap(e.CodeEngineCapability, err, "runner-capability fault on ARC pod %q during %s", pod, operation)
 }
 
 func classifyGitHubDiskError(err error, operation string) error {

@@ -374,7 +374,7 @@ func observedHostSatisfiesVM(request LocalVMRequest, observed ObservedHostFacts)
 	for _, resolution := range request.Binding.Capabilities {
 		observedEnabled := slices.Contains(observed.Capabilities, resolution.Name)
 		if resolution.Enabled && !observedEnabled {
-			return e.New(e.CodeEngineCapability,
+			return e.Wrap(e.CodeEngineCapability, observed.capabilityErrors[resolution.Name],
 				"local VM host does not expose selected capability %q",
 				resolution.Name)
 		}
