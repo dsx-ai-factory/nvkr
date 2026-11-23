@@ -581,6 +581,9 @@ components:
         --output type=oci,dest=/src/nvkr-output/ovn-kube-ubuntu.oci.tar,oci-mediatypes=true,rewrite-timestamp=true,name=localhost/nvke/ovn-kubernetes:git-8af51273d52dfa07454435d18d37230e582d797a
     builderType: buildkit-rootless
     fromSource: true
+    patches:
+    - name: patches/ovn-apt-retries.patch
+      sha256: sha256:8f9f5b267faab98b1bd5fac06b8c3b20053e546dbdaf8ab4f37193e0cd9af456
     outputType: oci-image
     platforms:
     - linux/amd64

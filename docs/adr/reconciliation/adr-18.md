@@ -1,5 +1,15 @@
 ## Support by owner
 
+The native ARC pre-transfer check now bounds its shell read/write-open attempts and names the runner pod
+in `engine-capability` failures. Local shell contracts cover invalid devices, access success,
+permission-bootstrap failure and timed-out access; generation contracts retain the check before checkout
+and transfers. It adds no runner interpreter dependency. The helper is unavailable at this early stage,
+so only the later Go-owned admission authenticates API usability and capacity.
+Both ARC Go admission sites also name the pod and phase in engine-capability failures. The Linux
+observer retains the KVM open path and OS error for required-capability admission while allowing
+non-KVM host discovery. Controlled contracts cover the errno chain, unchanged non-capability errors,
+and required versus unselected KVM. Real KVM/ARC execution of this change remains unverified.
+
 ADR-18's 2026-11-20 revision accepts destination staging by digest, with repository-local GHCR
 and platform job tokens as the new-adopter default. It is design only: the current emitter still
 transfers output payloads through private CI storage and excludes destination writers from producer jobs.
@@ -13,7 +23,10 @@ then helper/source/intermediate/diagnostic edges, followed by deletion of the CI
 all `NVKR_CI_STORAGE_*` secrets/variables. Build-only residual edges need explicit transport admission before
 that deletion. No generated workflow or credential configuration changes with this decision. The platform-token profile accepts
 repository linkage and fork-package exposure; the opt-in independent writer needs a distinct stage-only
-credential, never the `nvkr-release` writer. The signed GitLab platform-token profile remains design only; the ordinary
+credential, never the `nvkr-release` writer. The existing hosted publisher now admits the GitHub platform-token
+profile with exact repository linkage and default-private visibility under [ADR-20's implementation boundary](adr-20.md).
+Actions roles and inheritance remain operator responsibilities; this does not implement producer staging or
+switch a maintained lane. The signed GitLab platform-token profile remains design only; the ordinary
 unsigned GitLab implementation and its proposed contract below are distinct. Tekton's cluster-key contract
 is unchanged.
 

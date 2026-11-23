@@ -18,10 +18,10 @@ import (
 const githubRepositoryTokenEnv = "NVKR_CI_REPOSITORY_TOKEN"
 
 // Hosted GHCR publication uses the same package-policy owner as private CI
-// transport, with the publisher's distinct credential. Non-GitHub and generic
+// transport, with the selected publisher credential. Non-GitHub and generic
 // registry execution retain their existing transport contract.
-func admitGitHubPublication(ctx context.Context, target Target, source string,
-	admit func(context.Context, string, []string, cistore.Options) error,
+func admitGitHubPublication(ctx context.Context, target Target, allowPublicPackages bool, source string,
+	admit func(context.Context, string, []string, cistore.PublicationOptions) error,
 ) (string, error) {
 	if os.Getenv("GITHUB_ACTIONS") != "true" {
 		return "", nil
@@ -42,12 +42,16 @@ func admitGitHubPublication(ctx context.Context, target Target, source string,
 		return "", nil
 	}
 	if os.Getenv("GITHUB_SERVER_URL") != "https://github.com" {
-		return "", e.New(e.CodeEngineCapability, "private GHCR publication requires the canonical GitHub runner context")
+		return "", e.New(e.CodeEngineCapability, "GHCR publication requires the canonical GitHub runner context")
 	}
-	options := cistore.Options{
-		Token:           os.Getenv("NVKR_CREDENTIAL"),
-		Username:        os.Getenv("NVKR_REGISTRY_USER"),
-		RepositoryToken: os.Getenv(githubRepositoryTokenEnv),
+	options := cistore.PublicationOptions{
+		Options: cistore.Options{
+			Token:           os.Getenv("NVKR_CREDENTIAL"),
+			Username:        os.Getenv("NVKR_REGISTRY_USER"),
+			RepositoryToken: os.Getenv(githubRepositoryTokenEnv),
+		},
+		PlatformToken:       target.CredentialRef == "github:GITHUB_TOKEN",
+		AllowPublicPackages: allowPublicPackages,
 	}
 	if options.RepositoryToken == "" {
 		return "", e.New(e.CodeTrustPolicyMissing, "hosted GHCR publication requires its separate repository metadata credential")

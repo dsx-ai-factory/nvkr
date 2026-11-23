@@ -148,7 +148,7 @@ func TestOVNLockOnlyPropagation(t *testing.T) {
 		t.Run(flavor, func(t *testing.T) {
 			directory := t.TempDir()
 			original := "../../../inputs/catalogs/ovn/" + flavor
-			if err := os.CopyFS(filepath.Join(directory, "scripts"), os.DirFS(filepath.Join(original, "scripts"))); err != nil {
+			if err := os.CopyFS(directory, os.DirFS(original)); err != nil {
 				t.Fatal(err)
 			}
 			registry, err := os.ReadFile(filepath.Join(original, catalog.RegistryFile))
@@ -161,13 +161,6 @@ func TestOVNLockOnlyPropagation(t *testing.T) {
 			}
 			registry = []byte(strings.ReplaceAll(string(registry), sourceRepo, "https://pin-propagation.example.invalid/ovn"))
 			if err := os.WriteFile(filepath.Join(directory, catalog.RegistryFile), registry, 0o600); err != nil {
-				t.Fatal(err)
-			}
-			lock, err := os.ReadFile(filepath.Join(original, catalog.LockFile))
-			if err != nil {
-				t.Fatal(err)
-			}
-			if err := os.WriteFile(filepath.Join(directory, catalog.LockFile), lock, 0o600); err != nil {
 				t.Fatal(err)
 			}
 			var previous string

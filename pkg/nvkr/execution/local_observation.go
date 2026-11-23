@@ -6,6 +6,7 @@ package execution
 import (
 	"context"
 	"errors"
+	"maps"
 	"os"
 	"slices"
 
@@ -21,6 +22,9 @@ type ObservedHostFacts struct {
 	Platform     HostPlatform     `json:"platform"`
 	Resources    ResourceCapacity `json:"resources"`
 	Capabilities []CapabilityName `json:"capabilities,omitempty"`
+	// Retain unavailable-capability causes for admission without turning ordinary
+	// capability discovery into a failure on hosts that do not select them.
+	capabilityErrors map[CapabilityName]error
 }
 
 // ObserveLocalHost returns one point-in-time native host observation relative to
@@ -115,6 +119,7 @@ func validateObservedHostFacts(observed ObservedHostFacts) error {
 
 func cloneObservedHostFacts(observed ObservedHostFacts) ObservedHostFacts {
 	observed.Capabilities = slices.Clone(observed.Capabilities)
+	observed.capabilityErrors = maps.Clone(observed.capabilityErrors)
 	return observed
 }
 

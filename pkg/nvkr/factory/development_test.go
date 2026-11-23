@@ -264,7 +264,7 @@ func assertDevelopmentRejectsForeignMetadataBeforePublication(t *testing.T, plan
 	})
 	t.Cleanup(func() { remote.DefaultTransport = original })
 	err := executePublishWithAdmission(t.Context(), plan, node, artifacts, io.Discard,
-		func(context.Context, string, []string, cistore.Options) error { return nil })
+		func(context.Context, string, []string, cistore.PublicationOptions) error { return nil })
 	assertFactoryErrorCode(t, err, e.CodeVerifyFailed)
 	if calls != 0 {
 		t.Fatal("stale development metadata reached registry")

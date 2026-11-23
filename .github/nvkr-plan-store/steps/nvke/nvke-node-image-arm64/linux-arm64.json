@@ -1,14 +1,14 @@
 {
   "appliedOverlays": [
     {
-      "inputCatalogDigest": "sha256:3ad15dad0b01c77e75dc295d8f19cad4e39bcb752769d1034d59fbfc43f30e85",
+      "inputCatalogDigest": "sha256:71143de158ec8301b237f234b7b1e23b9e78c092792ca4daa6cb77112327067d",
       "name": "nvke-native-toolchains",
-      "outputCatalogDigest": "sha256:61089dd4c92ad88052aa12b061b87f25c0bb08ed8832e3c1b7400e3c83d77216",
-      "overlayDigest": "sha256:b35554553ff34ca019451770bb53baf6e95d282a1c4903b91251b6b84f94ff1b"
+      "outputCatalogDigest": "sha256:05ad783728f84e948619b1c8aae93dafbe8a4d4296683dbb4d8f9de3b5d6f99d",
+      "overlayDigest": "sha256:8414379e4f660795fe3a9afc382287c713dd22f9da77137ef7bc8e56af29540b"
     }
   ],
-  "buildDigest": "sha256:27fc1f8a54e6820bfc5af8c658562e1ba69ae1e949fb05f969a5dfd7de0d2ae1",
-  "catalogDigest": "sha256:61089dd4c92ad88052aa12b061b87f25c0bb08ed8832e3c1b7400e3c83d77216",
+  "buildDigest": "sha256:b16693aa86bfd5f8c944dd016f9283fe9107ed51911b0209c44c770d6338e042",
+  "catalogDigest": "sha256:05ad783728f84e948619b1c8aae93dafbe8a4d4296683dbb4d8f9de3b5d6f99d",
   "components": [
     "nvke-agent",
     "nvke-cni-calico",
@@ -811,6 +811,13 @@
         ],
         "network": "default",
         "outputType": "oci-image",
+        "patches": [
+          {
+            "content": "diff --git a/dist/images/Dockerfile.ubuntu.nv b/dist/images/Dockerfile.ubuntu.nv\n--- a/dist/images/Dockerfile.ubuntu.nv\n+++ b/dist/images/Dockerfile.ubuntu.nv\n@@ -23,4 +23,5 @@ ARG TARGETARCH\n # Each package source is selected independently. Only Artifactory needs a secret.\n COPY dist/images/install-ovn-ovs.sh /tmp/install-ovn-ovs.sh\n RUN --mount=type=secret,id=artifactory_cert \\\n+    --mount=type=bind,source=dist/images/nvkr-apt-get,target=/usr/local/bin/apt-get \\\n     sh /tmp/install-ovn-ovs.sh && rm /tmp/install-ovn-ovs.sh\n@@ -28,5 +29,6 @@\n COPY dist/images/install-kubectl.sh /tmp/install-kubectl.sh\n-RUN DEBIAN_FRONTEND=noninteractive apt-get update \\\n+RUN --mount=type=bind,source=dist/images/nvkr-apt-get,target=/usr/local/bin/apt-get \\\n+    DEBIAN_FRONTEND=noninteractive apt-get update \\\n && apt-get install -y --no-install-recommends gpg netcat-traditional net-tools nftables iptables iproute2 iputils-arping ncat dnsutils socat \\\n && sh /tmp/install-kubectl.sh && rm /tmp/install-kubectl.sh \\\n && apt-get autoremove -y \\\ndiff --git a/dist/images/nvkr-apt-get b/dist/images/nvkr-apt-get\nnew file mode 100755\n--- /dev/null\n+++ b/dist/images/nvkr-apt-get\n@@ -0,0 +1,25 @@\n+#!/bin/sh\n+# SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.\n+# SPDX-License-Identifier: Apache-2.0\n+set -eu\n+\n+# Build-only bind mount: keep the upstream repositories, versions and trust checks.\n+# Acquire retries cover transient fetches; whole-command retries also cover HTTP\n+# 520, which APT does not classify as transient. Never accept partial index updates.\n+attempt=1\n+while :; do\n+    if /usr/bin/apt-get -o Acquire::Retries=3 \\\n+        -o Acquire::http::Timeout=30 -o Acquire::https::Timeout=30 \\\n+        -o APT::Update::Error-Mode=any \"$@\"; then\n+        exit 0\n+    else\n+        status=$?\n+    fi\n+    if [ \"$attempt\" -ge 3 ]; then\n+        exit \"$status\"\n+    fi\n+    delay=$((attempt * 5))\n+    printf 'apt-get failed (exit %s); retry %s/3 in %ss\\n' \"$status\" \"$((attempt + 1))\" \"$delay\" >&2\n+    sleep \"$delay\"\n+    attempt=$((attempt + 1))\n+done\n",
+            "name": "patches/ovn-apt-retries.patch",
+            "sha256": "sha256:8f9f5b267faab98b1bd5fac06b8c3b20053e546dbdaf8ab4f37193e0cd9af456"
+          }
+        ],
         "platform": "linux/arm64",
         "sourceCommit": "8af51273d52dfa07454435d18d37230e582d797a",
         "sourceDest": "source-cf1266760164ee1f78d52cdae26ac814a7f02404bffbd484b73eda017ef47f2a",
@@ -1440,6 +1447,13 @@
       "commit": "8af51273d52dfa07454435d18d37230e582d797a",
       "fromSource": true,
       "outputType": "oci-image",
+      "patches": [
+        {
+          "content": "diff --git a/dist/images/Dockerfile.ubuntu.nv b/dist/images/Dockerfile.ubuntu.nv\n--- a/dist/images/Dockerfile.ubuntu.nv\n+++ b/dist/images/Dockerfile.ubuntu.nv\n@@ -23,4 +23,5 @@ ARG TARGETARCH\n # Each package source is selected independently. Only Artifactory needs a secret.\n COPY dist/images/install-ovn-ovs.sh /tmp/install-ovn-ovs.sh\n RUN --mount=type=secret,id=artifactory_cert \\\n+    --mount=type=bind,source=dist/images/nvkr-apt-get,target=/usr/local/bin/apt-get \\\n     sh /tmp/install-ovn-ovs.sh && rm /tmp/install-ovn-ovs.sh\n@@ -28,5 +29,6 @@\n COPY dist/images/install-kubectl.sh /tmp/install-kubectl.sh\n-RUN DEBIAN_FRONTEND=noninteractive apt-get update \\\n+RUN --mount=type=bind,source=dist/images/nvkr-apt-get,target=/usr/local/bin/apt-get \\\n+    DEBIAN_FRONTEND=noninteractive apt-get update \\\n && apt-get install -y --no-install-recommends gpg netcat-traditional net-tools nftables iptables iproute2 iputils-arping ncat dnsutils socat \\\n && sh /tmp/install-kubectl.sh && rm /tmp/install-kubectl.sh \\\n && apt-get autoremove -y \\\ndiff --git a/dist/images/nvkr-apt-get b/dist/images/nvkr-apt-get\nnew file mode 100755\n--- /dev/null\n+++ b/dist/images/nvkr-apt-get\n@@ -0,0 +1,25 @@\n+#!/bin/sh\n+# SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.\n+# SPDX-License-Identifier: Apache-2.0\n+set -eu\n+\n+# Build-only bind mount: keep the upstream repositories, versions and trust checks.\n+# Acquire retries cover transient fetches; whole-command retries also cover HTTP\n+# 520, which APT does not classify as transient. Never accept partial index updates.\n+attempt=1\n+while :; do\n+    if /usr/bin/apt-get -o Acquire::Retries=3 \\\n+        -o Acquire::http::Timeout=30 -o Acquire::https::Timeout=30 \\\n+        -o APT::Update::Error-Mode=any \"$@\"; then\n+        exit 0\n+    else\n+        status=$?\n+    fi\n+    if [ \"$attempt\" -ge 3 ]; then\n+        exit \"$status\"\n+    fi\n+    delay=$((attempt * 5))\n+    printf 'apt-get failed (exit %s); retry %s/3 in %ss\\n' \"$status\" \"$((attempt + 1))\" \"$delay\" >&2\n+    sleep \"$delay\"\n+    attempt=$((attempt + 1))\n+done\n",
+          "name": "patches/ovn-apt-retries.patch",
+          "sha256": "sha256:8f9f5b267faab98b1bd5fac06b8c3b20053e546dbdaf8ab4f37193e0cd9af456"
+        }
+      ],
       "platforms": [
         "linux/amd64",
         "linux/arm64"
