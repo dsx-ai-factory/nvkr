@@ -322,7 +322,7 @@ owns its execution and authority boundary.
 _Avoid_: Component producer, qualified verifier, conformance receipt
 
 **Validation profile**:
-Explicit diagnostic configuration selecting a product publication and named check instances with
+The legacy `validate --config` diagnostic configuration selecting a product publication and named check instances with
 separate suite/harness protocols and configuration. Tools are independently selected exact members
 of authenticated catalog-produced executable outputs. Its source and tools policy paths reference the existing
 qualification-policy format for artifact authentication; the profile does not replace those policies.
@@ -331,13 +331,19 @@ Outputs remain descriptive and cannot authorize qualification or promotion.
 _Avoid_: Recipe, test dispatcher framework, verification policy
 
 **Validator catalog**:
-An explicit index of reusable diagnostic validator entries, organized by project, artifact and suite.
-[ADR-24](docs/adr/0024-imported-validator-catalog.md) separates entries from profiles selecting named
-instances and artifact-role bindings. The provisional CLI slice implements strict discovery, local-plan
-admission and frozen dispatch for the existing process-contract and mixed CLI suites. Shared schemas remain
-provisional; published adapters, controller/chart checks and broader migration are deferred. Existing legacy
-validation routes retain their separate admission and capture contracts.
+A directory of validator registrations, organized as `{repository}/{suite-group}/{suite}.yaml`, separate from
+the producer catalog. Each registration describes one suite as a container command: its input roles, test
+origin, execution image and requirements. [ADR-24](docs/adr/0024-imported-validator-catalog.md) selects
+suites by ID or parent path and binds them to outputs of a completed Run. The provisional CLI slice still
+uses an indexed catalog and local-plan profiles until it migrates. Existing legacy validation routes retain
+their separate admission and capture contracts.
 _Avoid_: Producer catalog, upstream test implementation, executable plugin, qualification policy
+
+**TestEnvironment**:
+Diagnostic execution configuration declaring the provider, capabilities, credential bindings and permitted
+network available to one validation invocation; the built-in `local` environment provides Docker. Distinct
+from the lifecycle Environment and Build identity ([ADR-24 §5](docs/adr/0024-imported-validator-catalog.md#5-admit-one-testenvironment-per-invocation)).
+_Avoid_: Environment, runner, provider credentials
 
 **Cluster observation**:
 A scoped, time-bounded record of discovered cluster facts, their sources and collection gaps. Raw AICR
