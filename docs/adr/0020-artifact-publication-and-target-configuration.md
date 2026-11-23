@@ -868,28 +868,24 @@ For the platform-token profile, repository linkage is admitted and the unlinked-
 access can expose packages to forks of a public source repository; that exposure and the loss of independent
 package principals are accepted for this profile. This does not enable fork publication, PR signing or
 untrusted dispatch. Destination visibility is the staged payload's visibility; the platform-token profile does not promise binary
-confidentiality from repository readers or forks. Package identity, repository association, declared visibility
-and effective access must be admitted explicitly; unknown or inaccessible policy fails closed.
+confidentiality from repository readers or forks. Package identity, exact publishing-repository association
+and visibility must be authenticated by the provider; unknown or inaccessible metadata fails closed.
 Destination packages are internal/private by default; an unexpected public package fails admission before
 payload writes. Public destinations require an explicit `publication.allowPublicPackages: true` in the
-Environment. The implementation must add this named boolean field, defaulting to false when omitted, bind
-it into Environment/Plan identity, and enforce it at every destination admission before enabling public
-platform-token publication. This opt-in permits public visibility; it neither changes package visibility nor
-waives identity, access-role, signature or evidence checks. The independent GHCR credential profile retains
+Environment. This boolean defaults to false when omitted, is bound into Environment/Plan identity,
+and is enforced at every destination admission. This opt-in permits public visibility; it neither changes
+package visibility nor waives identity, signature or evidence checks. The independent GHCR credential profile retains
 its private/internal requirement regardless of this opt-in.
 
-The platform-token profile requires the publishing repository's **Manage Actions access** role to be
-**Write**, not **Admin**, on every destination package, including output, evidence, release and development
-attempt packages. Producer and development-branch job tokens must therefore have no package-admin grant
-that permits deleting or restoring released versions. Deletion and restoration remain with a human package
-administrator. Workflow `packages: write` alone does not establish this condition; the package's effective
-Actions role must also be admitted. An Admin, missing, unknown or unverifiable role refuses the profile
-before payload writes. Newly created packages must pass the same admission; automatic creation or a
-metadata-only seed cannot bypass it or leave the workflow with an Admin grant.
-The platform-token profile is not admitted until a verifiable, provider-authenticated Actions-role check
-exists. This decision specifies no such mechanism. An operator statement or record of completing setup
-cannot substitute for the check; the existing visibility/linkage query and workflow permissions do not prove
-the effective Actions role. The profile remains refused until that prerequisite is implemented.
+The operator must disable inherited repository access and set the publishing repository's **Manage Actions
+access** role to **Write**, not **Admin**, on every destination package, including output, evidence and
+release packages. The operator retains deletion and restoration with a human package administrator.
+Workflow `packages: write` alone does not establish this separation. GitHub's public package APIs do not
+expose the repository's Actions role or inheritance setting, so NVKR does not verify them, require an
+operator attestation, or probe deletion/restoration using a canary package. The platform-token profile is
+admitted without a machine role check. Granting Admin or leaving inheritance enabled is an operator
+misconfiguration and accepted operator risk, not an admission failure: a misconfigured job token may delete
+or restore versions. Package identity, association and visibility checks remain mandatory before payload writes.
 
 One-time adopter setup, for each fixed destination package: a human package administrator creates or
 initializes a missing package outside the generated workflow, then uses **Connect repository** on the
@@ -901,9 +897,9 @@ access from repository** before configuring package-level roles. Under **Manage 
 select the publishing repository and set its role to **Write**. Remove or reduce any other grant that gives
 that repository Admin access and retain package administration outside workflow credentials. Repeat this
 setup for newly created fixed packages or changed grants before dispatch. Disposable development-attempt
-names cannot be prepared this way before dispatch; their separate prerequisite below keeps that route refused.
+names require separate setup support; that route remains deferred below.
 Zero configured
-registry secrets does not mean zero package setup. The [pipeline setup guide](../generate-pipeline.md#planned-platform-token-destination-setup)
+registry secrets does not mean zero package setup. The [pipeline setup guide](../generate-pipeline.md#platform-token-destination-setup)
 records this prerequisite; reconciliation owns implementation and provider-validation status.
 
 The fixed `github:NVKR_REGISTRY_WRITE` policy is opt-in for maintained production lanes and external
@@ -938,8 +934,9 @@ admission check is skipped, and errors cannot reuse an earlier successful policy
 Unknown or inaccessible policy fails closed. Public packages fail the independent GHCR profile and fail the
 platform-token profile unless its explicit Environment visibility opt-in is admitted.
 For the independent-credential GHCR profile only, a missing package can receive a metadata-only
-seed before admission. Fixed platform-token packages instead require the human initialization and verified
-Actions Write access described above before dispatch. After an independent-credential seed, API absence alone permits up to six confirmation attempts with
+seed before admission. Fixed platform-token packages instead require human initialization and operator-managed
+Actions Write access as described above before dispatch. A missing platform-token package fails without seeding.
+After an independent-credential seed, API absence alone permits up to six confirmation attempts with
 2-, 4-, 8-, 16- and 32-second cancellation-aware waits. Each API check retains its existing bounded
 availability/rate-limit retries under the caller's operation deadline. A 404 can also hide a package
 that the credential cannot access; retrying it never grants access or bypasses the privacy check.
@@ -1313,9 +1310,9 @@ rebuilding the affected dependency closure; a fresh dispatch does not implicitly
 
 Signed development uses the dedicated development credential profile. Its run/attempt-derived package names
 are not available before dispatch, so the fixed-package setup above cannot admit platform-token development.
-That route remains refused until a per-attempt package-creation and effective Write-role admission mechanism
-is specified and implemented, with deletion/restoration retained by a human package administrator. This is
-an open prerequisite, not an exception to role verification or permission to grant a job token Admin.
+That route remains deferred until per-attempt package setup is specified and implemented. Write-only Actions
+access and disabled inheritance remain operator responsibilities for any future platform-token route;
+there is no machine role-verification prerequisite.
 The dedicated profile's fixed `github:NVKR_DEV_REGISTRY_WRITE`
 reference selects only the development release publisher, with a distinct stage-only writer for producers.
 Generated publishing/signing steps use that secret and `NVKR_DEV_REGISTRY_WRITE_USER`; verification,
@@ -1330,8 +1327,8 @@ package principals or credential isolation from other packages accessible to the
 Only a release job that signs or attests holds `id-token: write`. The grant is at job scope, so that job's
 publication and verification steps share it (ADR-18 §8). For the dedicated-credential profile, the distinct
 default-branch cleanup environment holds the cleanup token; branch execution receives no deletion credential.
-For the platform-token profile, the same exclusion requires the admitted Write-only Actions role on every
-destination package; deletion and restoration stay with a human package administrator, not a workflow token.
+For the platform-token profile, the operator must configure Write-only Actions access on every destination
+package and keep deletion/restoration with a human administrator; NVKR cannot prove that separation.
 
 Development qualification requires the dedicated development credential profile; the default platform-token
 publication profile does not authorize its qualifier/smoke pair.

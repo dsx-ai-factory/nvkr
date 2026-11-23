@@ -2,7 +2,7 @@
   "apiVersion": "nvkr.dev/catalog-overlay/v3",
   "kind": "CatalogOverlay",
   "name": "nvke-os-arm64-tcg-local",
-  "requiresCatalogDigest": "sha256:dfcf866042627ebeb7461f1caf6c11d6457524a112531b3f59c1a2628bacc870",
+  "requiresCatalogDigest": "sha256:8a30daf4dc7a654b1b4a69cc27fdc59fbc7ce7f46246ae712f7f0162b1c117c5",
   "components": {
     "nvke-cni-ovn": {
       "component": {
@@ -140,6 +140,13 @@
         "tag": "v2.4.2",
         "commit": "8af51273d52dfa07454435d18d37230e582d797a",
         "treeHash": "c4a54b0b3b615e5bd6df2d591451d7ab03dffc08",
+        "patches": [
+          {
+            "name": "patches/ovn-apt-retries.patch",
+            "sha256": "sha256:8f9f5b267faab98b1bd5fac06b8c3b20053e546dbdaf8ab4f37193e0cd9af456",
+            "content": "diff --git a/dist/images/Dockerfile.ubuntu.nv b/dist/images/Dockerfile.ubuntu.nv\n--- a/dist/images/Dockerfile.ubuntu.nv\n+++ b/dist/images/Dockerfile.ubuntu.nv\n@@ -23,4 +23,5 @@ ARG TARGETARCH\n # Each package source is selected independently. Only Artifactory needs a secret.\n COPY dist/images/install-ovn-ovs.sh /tmp/install-ovn-ovs.sh\n RUN --mount=type=secret,id=artifactory_cert \\\n+    --mount=type=bind,source=dist/images/nvkr-apt-get,target=/usr/local/bin/apt-get \\\n     sh /tmp/install-ovn-ovs.sh \u0026\u0026 rm /tmp/install-ovn-ovs.sh\n@@ -28,5 +29,6 @@\n COPY dist/images/install-kubectl.sh /tmp/install-kubectl.sh\n-RUN DEBIAN_FRONTEND=noninteractive apt-get update \\\n+RUN --mount=type=bind,source=dist/images/nvkr-apt-get,target=/usr/local/bin/apt-get \\\n+    DEBIAN_FRONTEND=noninteractive apt-get update \\\n \u0026\u0026 apt-get install -y --no-install-recommends gpg netcat-traditional net-tools nftables iptables iproute2 iputils-arping ncat dnsutils socat \\\n \u0026\u0026 sh /tmp/install-kubectl.sh \u0026\u0026 rm /tmp/install-kubectl.sh \\\n \u0026\u0026 apt-get autoremove -y \\\ndiff --git a/dist/images/nvkr-apt-get b/dist/images/nvkr-apt-get\nnew file mode 100755\n--- /dev/null\n+++ b/dist/images/nvkr-apt-get\n@@ -0,0 +1,25 @@\n+#!/bin/sh\n+# SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION \u0026 AFFILIATES. All rights reserved.\n+# SPDX-License-Identifier: Apache-2.0\n+set -eu\n+\n+# Build-only bind mount: keep the upstream repositories, versions and trust checks.\n+# Acquire retries cover transient fetches; whole-command retries also cover HTTP\n+# 520, which APT does not classify as transient. Never accept partial index updates.\n+attempt=1\n+while :; do\n+    if /usr/bin/apt-get -o Acquire::Retries=3 \\\n+        -o Acquire::http::Timeout=30 -o Acquire::https::Timeout=30 \\\n+        -o APT::Update::Error-Mode=any \"$@\"; then\n+        exit 0\n+    else\n+        status=$?\n+    fi\n+    if [ \"$attempt\" -ge 3 ]; then\n+        exit \"$status\"\n+    fi\n+    delay=$((attempt * 5))\n+    printf 'apt-get failed (exit %s); retry %s/3 in %ss\\n' \"$status\" \"$((attempt + 1))\" \"$delay\" \u003e\u00262\n+    sleep \"$delay\"\n+    attempt=$((attempt + 1))\n+done\n"
+          }
+        ],
         "toolchainImage": "moby/buildkit@sha256:80b15f0735e87bab7bf59ec4d695dfb4a7cfb25521cf56dc75d6f256285b63ef",
         "outputType": "oci-image",
         "buildCommand": [

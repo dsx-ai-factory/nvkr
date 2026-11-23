@@ -2,7 +2,7 @@
   "apiVersion": "nvkr.dev/catalog-overlay/v3",
   "kind": "CatalogOverlay",
   "name": "nvke-native-local-kvm",
-  "requiresCatalogDigest": "sha256:dfcf866042627ebeb7461f1caf6c11d6457524a112531b3f59c1a2628bacc870",
+  "requiresCatalogDigest": "sha256:8a30daf4dc7a654b1b4a69cc27fdc59fbc7ce7f46246ae712f7f0162b1c117c5",
   "components": {
     "nvke-agent": {
       "component": {
