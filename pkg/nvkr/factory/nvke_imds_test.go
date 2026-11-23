@@ -16,31 +16,36 @@ import (
 func TestNVKEIMDSNamedOutputEvidence(t *testing.T) {
 	t.Chdir("../../..")
 	const agent = "dsx-imds-node-attestor-agent"
+	// Exercise recorded output identities without fetching source pin sets while
+	// compiling Definitions. Separate graph tests cover authored selection changes.
+	plan := nvkeBaselinePlan(t)
 	for _, family := range []string{"disks", "disks-ubuntu24"} {
 		t.Run(family, func(t *testing.T) {
-			definitionPath := "inputs/definitions/nvke/" + family + ".yaml"
-			environmentPath := "inputs/environments/github-nvke-" + family + ".yaml"
-			doc, err := definition.LoadDefinition(t.Context(), definitionPath)
-			if err != nil {
-				t.Fatal(err)
+			doc := nvkeSplitDefinition(t, "inputs/definitions/nvke/"+family+".yaml")
+			names := map[string]bool{}
+			for _, output := range doc.Outputs {
+				names[output.Name] = true
 			}
-			env, err := definition.LoadEnvironment(t.Context(), environmentPath)
-			if err != nil {
-				t.Fatal(err)
-			}
-			plan, err := CompileDocuments(t.Context(), definitionPath, doc, environmentPath, env, "dev (unknown)")
-			if err != nil {
-				t.Fatal(err)
-			}
-			if len(plan.LifecycleOutputs) != 4 || len(plan.Builds) != 4 {
-				t.Fatal("internal WLI producer changed Release membership")
-			}
+			outputs := 0
 			for _, output := range plan.LifecycleOutputs {
+				if !names[output.Name] {
+					continue
+				}
+				outputs++
 				if output.Kind != definition.OutputDiskImage || !slices.Contains(output.Components, agent) {
 					t.Fatalf("unexpected output or incomplete producer closure: %+v", output)
 				}
 			}
+			var builds []BuildPlan
 			for _, build := range plan.Builds {
+				if names[build.Name] {
+					builds = append(builds, build)
+				}
+			}
+			if len(doc.Outputs) != 4 || outputs != 4 || len(builds) != 4 {
+				t.Fatal("internal WLI producer changed Release membership")
+			}
+			for _, build := range builds {
 				hashes := map[string]string{}
 				for _, component := range build.ResolvedComponents {
 					hashes[component.Name] = pipeline.FileDigest([]byte(build.Name + "/" + component.Name))
@@ -68,7 +73,7 @@ func TestNVKEIMDSNamedOutputEvidence(t *testing.T) {
 				if err := validateDiskBuildDocument(plan, build.Name, agent, pipeline.FileDigest([]byte("substitution")), bom); factoryErrorCode(err) != e.CodeVerifyFailed {
 					t.Fatalf("substituted IMDS subject: %v", err)
 				}
-				for _, sibling := range plan.Builds {
+				for _, sibling := range builds {
 					if sibling.Name != build.Name {
 						if err := validateDiskBuildDocument(plan, sibling.Name, agent, hashes[agent], bom); factoryErrorCode(err) != e.CodeVerifyFailed {
 							t.Fatalf("IMDS evidence reused across named outputs: %v", err)
