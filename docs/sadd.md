@@ -758,7 +758,10 @@ provider controls on the caller. Native preflight and checkout stay explicit in 
 Before checkout or input transfer, disk producers reject missing, symlink or non-character KVM devices.
 If the runner cannot open the fixed device read/write, one bounded noninteractive permission bootstrap
 sets mode 0666 and requires a successful open afterward. Failed mutation or access remains a capability
-rejection. Full helper-owned capacity and held KVM API admission remain required before work.
+rejection. Each shell read/write-open has a five-second timeout and five-second kill grace; failures
+name the ARC runner pod as a runner-capability fault. The early check proves access only.
+Full helper-owned capacity and held KVM API admission remain required before work. ARC admission
+failures identify the pod and phase; unavailable KVM retains its failed open path and OS error.
 [ADR-18 §8](adr/0018-pipeline-ir-and-ci-adapter-emission.md#8-pipeline-attested-generation-and-credential-admission)
 owns which jobs, including finalization and the final Run upload used by the closing summary, stay in the
 entry workflow under fallback partitioning; shared recovery precedes finalization. Static Plan/manifest references and source scheduling by target/consumer cohort

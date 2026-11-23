@@ -1246,28 +1246,32 @@ jobs:
       contents: read
     steps:
       - *check-native-linux-amd64
-      - name: Prepare KVM access before transfer
+      - name: Check runner KVM access before transfer
         timeout-minutes: 1
         run: |-
           set -eu
-          if [ -L /dev/kvm ] || [ ! -c /dev/kvm ]; then
-            printf 'NVKR-E-ENGINE-CAPABILITY: native disk runner lacks /dev/kvm\n' >&2
+          runner_fault() {
+            printf 'NVKR-E-ENGINE-CAPABILITY: runner-capability fault on ARC pod %s: %s\n' "${RUNNER_NAME:-unknown}" "$1" >&2
             exit 29
+          }
+          kvm_access() {
+            /usr/bin/timeout --kill-after=5s 5s /bin/sh -c 'exec 3<>/dev/kvm && exec 3>&-'
+          }
+          if [ -L /dev/kvm ] || [ ! -c /dev/kvm ]; then
+            runner_fault 'missing non-symlink /dev/kvm character device'
           fi
-          if ! (exec 3<>/dev/kvm && exec 3>&-) 2>/dev/null; then
+          if ! kvm_access 2>/dev/null; then
             printf 'Preparing /dev/kvm access on the operator-trusted ARC runner\n'
             if ! /usr/bin/timeout --kill-after=5s 15s /usr/bin/sudo -n -- /usr/bin/chmod 0666 /dev/kvm; then
-              printf 'NVKR-E-ENGINE-CAPABILITY: unable to prepare /dev/kvm access\n' >&2
-              exit 29
+              runner_fault 'unable to prepare /dev/kvm access'
             fi
           fi
-          if ! (exec 3<>/dev/kvm && exec 3>&-); then
-            printf 'NVKR-E-ENGINE-CAPABILITY: runner still cannot open /dev/kvm read/write\n' >&2
+          if ! kvm_access; then
             id >&2 || true
             stat -c 'uid=%u gid=%g mode=%a' /dev/kvm >&2 || true
-            exit 29
+            runner_fault 'cannot open /dev/kvm read/write or access check timed out'
           fi
-          stat -c 'KVM ready: uid=%u gid=%g mode=%a' /dev/kvm || true
+          printf 'KVM access ready on ARC pod %s: %s\n' "${RUNNER_NAME:-unknown}" "$(stat -c 'uid=%u gid=%g mode=%a' /dev/kvm)"
       - *checkout-workflow-source
       - &prepare-stage-nvkr-exec-arc-amd64-kvm
         name: Prepare NVKR runner and job parameters
@@ -1454,28 +1458,32 @@ jobs:
       contents: read
     steps:
       - *check-native-linux-arm64
-      - name: Prepare KVM access before transfer
+      - name: Check runner KVM access before transfer
         timeout-minutes: 1
         run: |-
           set -eu
-          if [ -L /dev/kvm ] || [ ! -c /dev/kvm ]; then
-            printf 'NVKR-E-ENGINE-CAPABILITY: native disk runner lacks /dev/kvm\n' >&2
+          runner_fault() {
+            printf 'NVKR-E-ENGINE-CAPABILITY: runner-capability fault on ARC pod %s: %s\n' "${RUNNER_NAME:-unknown}" "$1" >&2
             exit 29
+          }
+          kvm_access() {
+            /usr/bin/timeout --kill-after=5s 5s /bin/sh -c 'exec 3<>/dev/kvm && exec 3>&-'
+          }
+          if [ -L /dev/kvm ] || [ ! -c /dev/kvm ]; then
+            runner_fault 'missing non-symlink /dev/kvm character device'
           fi
-          if ! (exec 3<>/dev/kvm && exec 3>&-) 2>/dev/null; then
+          if ! kvm_access 2>/dev/null; then
             printf 'Preparing /dev/kvm access on the operator-trusted ARC runner\n'
             if ! /usr/bin/timeout --kill-after=5s 15s /usr/bin/sudo -n -- /usr/bin/chmod 0666 /dev/kvm; then
-              printf 'NVKR-E-ENGINE-CAPABILITY: unable to prepare /dev/kvm access\n' >&2
-              exit 29
+              runner_fault 'unable to prepare /dev/kvm access'
             fi
           fi
-          if ! (exec 3<>/dev/kvm && exec 3>&-); then
-            printf 'NVKR-E-ENGINE-CAPABILITY: runner still cannot open /dev/kvm read/write\n' >&2
+          if ! kvm_access; then
             id >&2 || true
             stat -c 'uid=%u gid=%g mode=%a' /dev/kvm >&2 || true
-            exit 29
+            runner_fault 'cannot open /dev/kvm read/write or access check timed out'
           fi
-          stat -c 'KVM ready: uid=%u gid=%g mode=%a' /dev/kvm || true
+          printf 'KVM access ready on ARC pod %s: %s\n' "${RUNNER_NAME:-unknown}" "$(stat -c 'uid=%u gid=%g mode=%a' /dev/kvm)"
       - *checkout-workflow-source
       - &prepare-stage-nvkr-exec-arc-arm64-kvm
         name: Prepare NVKR runner and job parameters
@@ -1576,28 +1584,32 @@ jobs:
       contents: read
     steps:
       - *check-native-linux-amd64
-      - name: Prepare KVM access before transfer
+      - name: Check runner KVM access before transfer
         timeout-minutes: 1
         run: |-
           set -eu
-          if [ -L /dev/kvm ] || [ ! -c /dev/kvm ]; then
-            printf 'NVKR-E-ENGINE-CAPABILITY: native disk runner lacks /dev/kvm\n' >&2
+          runner_fault() {
+            printf 'NVKR-E-ENGINE-CAPABILITY: runner-capability fault on ARC pod %s: %s\n' "${RUNNER_NAME:-unknown}" "$1" >&2
             exit 29
+          }
+          kvm_access() {
+            /usr/bin/timeout --kill-after=5s 5s /bin/sh -c 'exec 3<>/dev/kvm && exec 3>&-'
+          }
+          if [ -L /dev/kvm ] || [ ! -c /dev/kvm ]; then
+            runner_fault 'missing non-symlink /dev/kvm character device'
           fi
-          if ! (exec 3<>/dev/kvm && exec 3>&-) 2>/dev/null; then
+          if ! kvm_access 2>/dev/null; then
             printf 'Preparing /dev/kvm access on the operator-trusted ARC runner\n'
             if ! /usr/bin/timeout --kill-after=5s 15s /usr/bin/sudo -n -- /usr/bin/chmod 0666 /dev/kvm; then
-              printf 'NVKR-E-ENGINE-CAPABILITY: unable to prepare /dev/kvm access\n' >&2
-              exit 29
+              runner_fault 'unable to prepare /dev/kvm access'
             fi
           fi
-          if ! (exec 3<>/dev/kvm && exec 3>&-); then
-            printf 'NVKR-E-ENGINE-CAPABILITY: runner still cannot open /dev/kvm read/write\n' >&2
+          if ! kvm_access; then
             id >&2 || true
             stat -c 'uid=%u gid=%g mode=%a' /dev/kvm >&2 || true
-            exit 29
+            runner_fault 'cannot open /dev/kvm read/write or access check timed out'
           fi
-          stat -c 'KVM ready: uid=%u gid=%g mode=%a' /dev/kvm || true
+          printf 'KVM access ready on ARC pod %s: %s\n' "${RUNNER_NAME:-unknown}" "$(stat -c 'uid=%u gid=%g mode=%a' /dev/kvm)"
       - *checkout-workflow-source
       - *prepare-stage-nvkr-exec-arc-amd64-kvm
       - *operation-prepare-inputs-part-1
@@ -1700,28 +1712,32 @@ jobs:
       contents: read
     steps:
       - *check-native-linux-arm64
-      - name: Prepare KVM access before transfer
+      - name: Check runner KVM access before transfer
         timeout-minutes: 1
         run: |-
           set -eu
-          if [ -L /dev/kvm ] || [ ! -c /dev/kvm ]; then
-            printf 'NVKR-E-ENGINE-CAPABILITY: native disk runner lacks /dev/kvm\n' >&2
+          runner_fault() {
+            printf 'NVKR-E-ENGINE-CAPABILITY: runner-capability fault on ARC pod %s: %s\n' "${RUNNER_NAME:-unknown}" "$1" >&2
             exit 29
+          }
+          kvm_access() {
+            /usr/bin/timeout --kill-after=5s 5s /bin/sh -c 'exec 3<>/dev/kvm && exec 3>&-'
+          }
+          if [ -L /dev/kvm ] || [ ! -c /dev/kvm ]; then
+            runner_fault 'missing non-symlink /dev/kvm character device'
           fi
-          if ! (exec 3<>/dev/kvm && exec 3>&-) 2>/dev/null; then
+          if ! kvm_access 2>/dev/null; then
             printf 'Preparing /dev/kvm access on the operator-trusted ARC runner\n'
             if ! /usr/bin/timeout --kill-after=5s 15s /usr/bin/sudo -n -- /usr/bin/chmod 0666 /dev/kvm; then
-              printf 'NVKR-E-ENGINE-CAPABILITY: unable to prepare /dev/kvm access\n' >&2
-              exit 29
+              runner_fault 'unable to prepare /dev/kvm access'
             fi
           fi
-          if ! (exec 3<>/dev/kvm && exec 3>&-); then
-            printf 'NVKR-E-ENGINE-CAPABILITY: runner still cannot open /dev/kvm read/write\n' >&2
+          if ! kvm_access; then
             id >&2 || true
             stat -c 'uid=%u gid=%g mode=%a' /dev/kvm >&2 || true
-            exit 29
+            runner_fault 'cannot open /dev/kvm read/write or access check timed out'
           fi
-          stat -c 'KVM ready: uid=%u gid=%g mode=%a' /dev/kvm || true
+          printf 'KVM access ready on ARC pod %s: %s\n' "${RUNNER_NAME:-unknown}" "$(stat -c 'uid=%u gid=%g mode=%a' /dev/kvm)"
       - *checkout-workflow-source
       - *prepare-stage-nvkr-exec-arc-arm64-kvm
       - *operation-prepare-inputs-part-1
@@ -1824,28 +1840,32 @@ jobs:
       contents: read
     steps:
       - *check-native-linux-amd64
-      - name: Prepare KVM access before transfer
+      - name: Check runner KVM access before transfer
         timeout-minutes: 1
         run: |-
           set -eu
-          if [ -L /dev/kvm ] || [ ! -c /dev/kvm ]; then
-            printf 'NVKR-E-ENGINE-CAPABILITY: native disk runner lacks /dev/kvm\n' >&2
+          runner_fault() {
+            printf 'NVKR-E-ENGINE-CAPABILITY: runner-capability fault on ARC pod %s: %s\n' "${RUNNER_NAME:-unknown}" "$1" >&2
             exit 29
+          }
+          kvm_access() {
+            /usr/bin/timeout --kill-after=5s 5s /bin/sh -c 'exec 3<>/dev/kvm && exec 3>&-'
+          }
+          if [ -L /dev/kvm ] || [ ! -c /dev/kvm ]; then
+            runner_fault 'missing non-symlink /dev/kvm character device'
           fi
-          if ! (exec 3<>/dev/kvm && exec 3>&-) 2>/dev/null; then
+          if ! kvm_access 2>/dev/null; then
             printf 'Preparing /dev/kvm access on the operator-trusted ARC runner\n'
             if ! /usr/bin/timeout --kill-after=5s 15s /usr/bin/sudo -n -- /usr/bin/chmod 0666 /dev/kvm; then
-              printf 'NVKR-E-ENGINE-CAPABILITY: unable to prepare /dev/kvm access\n' >&2
-              exit 29
+              runner_fault 'unable to prepare /dev/kvm access'
             fi
           fi
-          if ! (exec 3<>/dev/kvm && exec 3>&-); then
-            printf 'NVKR-E-ENGINE-CAPABILITY: runner still cannot open /dev/kvm read/write\n' >&2
+          if ! kvm_access; then
             id >&2 || true
             stat -c 'uid=%u gid=%g mode=%a' /dev/kvm >&2 || true
-            exit 29
+            runner_fault 'cannot open /dev/kvm read/write or access check timed out'
           fi
-          stat -c 'KVM ready: uid=%u gid=%g mode=%a' /dev/kvm || true
+          printf 'KVM access ready on ARC pod %s: %s\n' "${RUNNER_NAME:-unknown}" "$(stat -c 'uid=%u gid=%g mode=%a' /dev/kvm)"
       - *checkout-workflow-source
       - *prepare-stage-nvkr-exec-arc-amd64-kvm
       - *operation-prepare-inputs-part-1
@@ -1935,28 +1955,32 @@ jobs:
       contents: read
     steps:
       - *check-native-linux-arm64
-      - name: Prepare KVM access before transfer
+      - name: Check runner KVM access before transfer
         timeout-minutes: 1
         run: |-
           set -eu
-          if [ -L /dev/kvm ] || [ ! -c /dev/kvm ]; then
-            printf 'NVKR-E-ENGINE-CAPABILITY: native disk runner lacks /dev/kvm\n' >&2
+          runner_fault() {
+            printf 'NVKR-E-ENGINE-CAPABILITY: runner-capability fault on ARC pod %s: %s\n' "${RUNNER_NAME:-unknown}" "$1" >&2
             exit 29
+          }
+          kvm_access() {
+            /usr/bin/timeout --kill-after=5s 5s /bin/sh -c 'exec 3<>/dev/kvm && exec 3>&-'
+          }
+          if [ -L /dev/kvm ] || [ ! -c /dev/kvm ]; then
+            runner_fault 'missing non-symlink /dev/kvm character device'
           fi
-          if ! (exec 3<>/dev/kvm && exec 3>&-) 2>/dev/null; then
+          if ! kvm_access 2>/dev/null; then
             printf 'Preparing /dev/kvm access on the operator-trusted ARC runner\n'
             if ! /usr/bin/timeout --kill-after=5s 15s /usr/bin/sudo -n -- /usr/bin/chmod 0666 /dev/kvm; then
-              printf 'NVKR-E-ENGINE-CAPABILITY: unable to prepare /dev/kvm access\n' >&2
-              exit 29
+              runner_fault 'unable to prepare /dev/kvm access'
             fi
           fi
-          if ! (exec 3<>/dev/kvm && exec 3>&-); then
-            printf 'NVKR-E-ENGINE-CAPABILITY: runner still cannot open /dev/kvm read/write\n' >&2
+          if ! kvm_access; then
             id >&2 || true
             stat -c 'uid=%u gid=%g mode=%a' /dev/kvm >&2 || true
-            exit 29
+            runner_fault 'cannot open /dev/kvm read/write or access check timed out'
           fi
-          stat -c 'KVM ready: uid=%u gid=%g mode=%a' /dev/kvm || true
+          printf 'KVM access ready on ARC pod %s: %s\n' "${RUNNER_NAME:-unknown}" "$(stat -c 'uid=%u gid=%g mode=%a' /dev/kvm)"
       - *checkout-workflow-source
       - *prepare-stage-nvkr-exec-arc-arm64-kvm
       - *operation-prepare-inputs-part-1
@@ -2046,28 +2070,32 @@ jobs:
       contents: read
     steps:
       - *check-native-linux-amd64
-      - name: Prepare KVM access before transfer
+      - name: Check runner KVM access before transfer
         timeout-minutes: 1
         run: |-
           set -eu
-          if [ -L /dev/kvm ] || [ ! -c /dev/kvm ]; then
-            printf 'NVKR-E-ENGINE-CAPABILITY: native disk runner lacks /dev/kvm\n' >&2
+          runner_fault() {
+            printf 'NVKR-E-ENGINE-CAPABILITY: runner-capability fault on ARC pod %s: %s\n' "${RUNNER_NAME:-unknown}" "$1" >&2
             exit 29
+          }
+          kvm_access() {
+            /usr/bin/timeout --kill-after=5s 5s /bin/sh -c 'exec 3<>/dev/kvm && exec 3>&-'
+          }
+          if [ -L /dev/kvm ] || [ ! -c /dev/kvm ]; then
+            runner_fault 'missing non-symlink /dev/kvm character device'
           fi
-          if ! (exec 3<>/dev/kvm && exec 3>&-) 2>/dev/null; then
+          if ! kvm_access 2>/dev/null; then
             printf 'Preparing /dev/kvm access on the operator-trusted ARC runner\n'
             if ! /usr/bin/timeout --kill-after=5s 15s /usr/bin/sudo -n -- /usr/bin/chmod 0666 /dev/kvm; then
-              printf 'NVKR-E-ENGINE-CAPABILITY: unable to prepare /dev/kvm access\n' >&2
-              exit 29
+              runner_fault 'unable to prepare /dev/kvm access'
             fi
           fi
-          if ! (exec 3<>/dev/kvm && exec 3>&-); then
-            printf 'NVKR-E-ENGINE-CAPABILITY: runner still cannot open /dev/kvm read/write\n' >&2
+          if ! kvm_access; then
             id >&2 || true
             stat -c 'uid=%u gid=%g mode=%a' /dev/kvm >&2 || true
-            exit 29
+            runner_fault 'cannot open /dev/kvm read/write or access check timed out'
           fi
-          stat -c 'KVM ready: uid=%u gid=%g mode=%a' /dev/kvm || true
+          printf 'KVM access ready on ARC pod %s: %s\n' "${RUNNER_NAME:-unknown}" "$(stat -c 'uid=%u gid=%g mode=%a' /dev/kvm)"
       - *checkout-workflow-source
       - *prepare-stage-nvkr-exec-arc-amd64-kvm
       - *operation-prepare-inputs-part-1
@@ -2170,28 +2198,32 @@ jobs:
       contents: read
     steps:
       - *check-native-linux-arm64
-      - name: Prepare KVM access before transfer
+      - name: Check runner KVM access before transfer
         timeout-minutes: 1
         run: |-
           set -eu
-          if [ -L /dev/kvm ] || [ ! -c /dev/kvm ]; then
-            printf 'NVKR-E-ENGINE-CAPABILITY: native disk runner lacks /dev/kvm\n' >&2
+          runner_fault() {
+            printf 'NVKR-E-ENGINE-CAPABILITY: runner-capability fault on ARC pod %s: %s\n' "${RUNNER_NAME:-unknown}" "$1" >&2
             exit 29
+          }
+          kvm_access() {
+            /usr/bin/timeout --kill-after=5s 5s /bin/sh -c 'exec 3<>/dev/kvm && exec 3>&-'
+          }
+          if [ -L /dev/kvm ] || [ ! -c /dev/kvm ]; then
+            runner_fault 'missing non-symlink /dev/kvm character device'
           fi
-          if ! (exec 3<>/dev/kvm && exec 3>&-) 2>/dev/null; then
+          if ! kvm_access 2>/dev/null; then
             printf 'Preparing /dev/kvm access on the operator-trusted ARC runner\n'
             if ! /usr/bin/timeout --kill-after=5s 15s /usr/bin/sudo -n -- /usr/bin/chmod 0666 /dev/kvm; then
-              printf 'NVKR-E-ENGINE-CAPABILITY: unable to prepare /dev/kvm access\n' >&2
-              exit 29
+              runner_fault 'unable to prepare /dev/kvm access'
             fi
           fi
-          if ! (exec 3<>/dev/kvm && exec 3>&-); then
-            printf 'NVKR-E-ENGINE-CAPABILITY: runner still cannot open /dev/kvm read/write\n' >&2
+          if ! kvm_access; then
             id >&2 || true
             stat -c 'uid=%u gid=%g mode=%a' /dev/kvm >&2 || true
-            exit 29
+            runner_fault 'cannot open /dev/kvm read/write or access check timed out'
           fi
-          stat -c 'KVM ready: uid=%u gid=%g mode=%a' /dev/kvm || true
+          printf 'KVM access ready on ARC pod %s: %s\n' "${RUNNER_NAME:-unknown}" "$(stat -c 'uid=%u gid=%g mode=%a' /dev/kvm)"
       - *checkout-workflow-source
       - *prepare-stage-nvkr-exec-arc-arm64-kvm
       - *operation-prepare-inputs-part-1

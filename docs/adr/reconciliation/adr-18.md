@@ -1,5 +1,15 @@
 ## Support by owner
 
+The native ARC pre-transfer check now bounds its shell read/write-open attempts and names the runner pod
+in `engine-capability` failures. Local shell contracts cover invalid devices, access success,
+permission-bootstrap failure and timed-out access; generation contracts retain the check before checkout
+and transfers. It adds no runner interpreter dependency. The helper is unavailable at this early stage,
+so only the later Go-owned admission authenticates API usability and capacity.
+Both ARC Go admission sites also name the pod and phase in engine-capability failures. The Linux
+observer retains the KVM open path and OS error for required-capability admission while allowing
+non-KVM host discovery. Controlled contracts cover the errno chain, unchanged non-capability errors,
+and required versus unselected KVM. Real KVM/ARC execution of this change remains unverified.
+
 ADR-18's 2026-11-20 revision accepts destination staging by digest, with repository-local GHCR
 and platform job tokens as the new-adopter default. Development ARC disks now implement destination
 staging with the dedicated credential profile; other outputs and lanes retain private CI storage.

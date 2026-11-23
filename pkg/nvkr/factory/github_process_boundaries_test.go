@@ -92,7 +92,7 @@ func TestGitHubKVMAccessFailureBranches(t *testing.T) {
 	if err != nil {
 		t.Skip("Bash required")
 	}
-	for _, mode := range []string{"missing", "symlink", "regular file", "already open", "repair succeeds", "sudo fails", "still unopenable"} {
+	for _, mode := range []string{"missing", "symlink", "regular file", "already open", "repair succeeds", "sudo fails", "sudo timeout", "still unopenable", "initial open timeout", "final open timeout"} {
 		t.Run(mode, func(t *testing.T) {
 			root := t.TempDir()
 			device := filepath.Join(root, "device")
@@ -110,47 +110,65 @@ func TestGitHubKVMAccessFailureBranches(t *testing.T) {
 				device = "/dev/null" // Read/write only; no real device permissions are changed.
 			}
 			// Execute the emitted branch structure with a safe character-device fixture.
-			// Override exec's return value to model denied opens; sudo/timeout are
-			// fixtures that record exact arguments and never invoke privileged commands.
+			// Model failed child-shell opens and both timeout bounds without invoking
+			// privileged commands; successful opens still execute the emitted child shell.
 			script := strings.ReplaceAll(githubKVMAccessCheck().Run, "/dev/kvm", device)
 			script = strings.ReplaceAll(script, "/usr/bin/timeout", "fixture_timeout")
 			script = strings.ReplaceAll(script, "/usr/bin/sudo", "fixture_sudo")
 			prefix := `fixture_timeout() {
- [ "$1" = '--kill-after=5s' ] && [ "$2" = '15s' ] || exit 99
+ [ "$1" = '--kill-after=5s' ] || exit 99
+ bound=$2
  shift 2
- "$@"
+ case "$bound" in
+  15s) [ "$1" = fixture_sudo ] || exit 99; "$@" ;;
+  5s)
+   [ "$1" = /bin/sh ] && [ "$2" = -c ] && [ "$3" = 'exec 3<>/dev/null && exec 3>&-' ] || exit 99
+   count=0
+   [ ! -f opens ] || count=$(cat opens)
+   count=$((count + 1))
+   printf '%s' "$count" > opens
+   case "$MODE" in
+    'initial open timeout') [ "$count" != 1 ] || return 124 ;;
+    'final open timeout') [ "$count" = 1 ] || return 124 ;;
+    'already open') ;;
+    'repair succeeds') [ -f repair ] || return 1 ;;
+    *) return 1 ;;
+   esac
+   "$@" ;;
+  *) exit 99 ;;
+ esac
 }
 fixture_sudo() {
  [ "$1" = '-n' ] && [ "$2" = '--' ] && [ "$3" = '/usr/bin/chmod' ] && [ "$4" = '0666' ] && [ "$5" = '/dev/null' ] || exit 98
  printf called > repair
+ [ "$MODE" != 'sudo timeout' ] || return 124
  [ "$MODE" != 'sudo fails' ]
 }
-exec() {
- if [ "$MODE" = 'already open' ]; then return 0; fi
- if [ "$MODE" = 'repair succeeds' ] && [ -f repair ]; then return 0; fi
- return 1
+stat() {
+ printf 'uid=0 gid=108 mode=666\n'
 }
 `
+
 			ctx, cancel := context.WithTimeout(t.Context(), 5*time.Second)
 			defer cancel()
 			command := exec.CommandContext(ctx, bash, "-c", prefix+script)
 			command.Dir = root
-			command.Env = append(os.Environ(), "MODE="+mode)
+			command.Env = append(os.Environ(), "MODE="+mode, "RUNNER_NAME=arc-arm64-kvm-test-runner")
 			output, runErr := command.CombinedOutput()
-			success := mode == "already open" || mode == "repair succeeds"
+			success := mode == "already open" || mode == "repair succeeds" || mode == "initial open timeout"
 			if success {
-				if runErr != nil {
+				if runErr != nil || !bytes.Contains(output, []byte("KVM access ready on ARC pod arc-arm64-kvm-test-runner: uid=0 gid=108 mode=666")) {
 					t.Fatalf("admitted device failed: %v %s", runErr, output)
 				}
 			} else {
 				var exit *exec.ExitError
-				if !errors.As(runErr, &exit) || exit.ExitCode() != e.ExitCode(e.New(e.CodeEngineCapability, "")) || !bytes.Contains(output, []byte(e.CodeEngineCapability)) {
+				if !errors.As(runErr, &exit) || exit.ExitCode() != e.ExitCode(e.New(e.CodeEngineCapability, "")) || !bytes.Contains(output, []byte(string(e.CodeEngineCapability)+": runner-capability fault on ARC pod arc-arm64-kvm-test-runner:")) {
 					t.Fatalf("device failure lost code: %v %s", runErr, output)
 				}
 			}
 			_, err = os.Stat(filepath.Join(root, "repair"))
 			called := err == nil
-			if called != (mode == "repair succeeds" || mode == "sudo fails" || mode == "still unopenable") {
+			if called != (mode == "repair succeeds" || mode == "sudo fails" || mode == "sudo timeout" || mode == "still unopenable" || mode == "initial open timeout") {
 				t.Fatal("repair reached wrong device branch")
 			}
 			if mode == "regular file" {

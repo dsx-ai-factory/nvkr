@@ -147,7 +147,7 @@ func (observation *linuxLocalObservation) observeCurrent(ctx context.Context) (O
 		return ObservedHostFacts{}, err
 	}
 	kvm, err := observation.observeKVM()
-	if err != nil {
+	if err != nil && !unavailableKVMOpen(err) {
 		return ObservedHostFacts{}, err
 	}
 	if err := localObservationContextError(ctx, "observing local Linux execution host"); err != nil {
@@ -162,6 +162,8 @@ func (observation *linuxLocalObservation) observeCurrent(ctx context.Context) (O
 	}
 	if kvm {
 		facts.Capabilities = []CapabilityName{CapabilityKVM}
+	} else if err != nil {
+		facts.capabilityErrors = map[CapabilityName]error{CapabilityKVM: err}
 	}
 	return facts, nil
 }
@@ -260,11 +262,8 @@ func (observation *linuxLocalObservation) observeKVM() (bool, error) {
 		fd, err := observation.kvm.open(kvmDevicePath,
 			unix.O_RDWR|unix.O_CLOEXEC|unix.O_NOFOLLOW|unix.O_NONBLOCK, 0)
 		if err != nil {
-			if errors.Is(err, unix.ENOENT) || errors.Is(err, unix.ENODEV) ||
-				errors.Is(err, unix.ENXIO) || errors.Is(err, unix.EACCES) || errors.Is(err, unix.EPERM) {
-				return false, nil
-			}
-			return false, e.Wrap(e.CodeEngineCapability, err, "opening local KVM device")
+			return false, e.Wrap(e.CodeEngineCapability,
+				&os.PathError{Op: "open", Path: kvmDevicePath, Err: err}, "opening local KVM device read/write")
 		}
 		var stat unix.Stat_t
 		if err := observation.kvm.fstat(fd, &stat); err != nil {
@@ -286,4 +285,11 @@ func (observation *linuxLocalObservation) observeKVM() (bool, error) {
 			"local KVM API version is %d, want %d", version, kvmExpectedVersion)
 	}
 	return true, nil
+}
+
+func unavailableKVMOpen(err error) bool {
+	var pathErr *os.PathError
+	return errors.As(err, &pathErr) && pathErr.Op == "open" && pathErr.Path == kvmDevicePath &&
+		(errors.Is(err, unix.ENOENT) || errors.Is(err, unix.ENODEV) ||
+			errors.Is(err, unix.ENXIO) || errors.Is(err, unix.EACCES) || errors.Is(err, unix.EPERM))
 }

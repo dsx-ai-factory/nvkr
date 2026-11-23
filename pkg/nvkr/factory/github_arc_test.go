@@ -5,9 +5,12 @@ package factory
 
 import (
 	"bytes"
+	"errors"
+	"fmt"
 	"os"
 	"reflect"
 	"strings"
+	"syscall"
 	"testing"
 
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/catalog"
@@ -489,5 +492,33 @@ func TestARCPreparesOutputPublicationWithoutHostedMaterialDownloads(t *testing.T
 				t.Fatal("ARC preparation changed credential boundary")
 			}
 		})
+	}
+}
+
+func TestARCRunnerCapabilityError(t *testing.T) {
+	for _, operation := range []string{"prepare-images VM admission", "run-disk VM admission"} {
+		t.Run(operation, func(t *testing.T) {
+			for _, pod := range []string{"arc-arm64-kvm-test-runner", "", "unsafe\npod"} {
+				t.Run(fmt.Sprintf("%q", pod), func(t *testing.T) {
+					t.Setenv("RUNNER_NAME", pod)
+					cause := &os.PathError{Op: "open", Path: "/dev/kvm", Err: syscall.EACCES}
+					err := githubRunnerCapabilityError(e.Wrap(e.CodeEngineCapability, cause, "VM admission"), operation)
+					wantPod := pod
+					if wantPod == "" {
+						wantPod = "unknown"
+					}
+					if factoryErrorCode(err) != e.CodeEngineCapability || !errors.Is(err, syscall.EACCES) ||
+						!strings.Contains(err.Error(), fmt.Sprintf("runner-capability fault on ARC pod %q during %s", wantPod, operation)) ||
+						!strings.Contains(err.Error(), "open /dev/kvm: permission denied") {
+						t.Fatalf("runner context or errno lost: %v", err)
+					}
+				})
+			}
+		})
+	}
+	for _, err := range []error{nil, e.New(e.CodeTimeout, "deadline"), e.New(e.CodePipelineDrift, "invalid plan"), errors.New("uncoded")} {
+		if got := githubRunnerCapabilityError(err, "admission"); got != err {
+			t.Fatalf("non-capability error changed: %v -> %v", err, got)
+		}
 	}
 }
