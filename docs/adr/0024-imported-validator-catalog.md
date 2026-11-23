@@ -50,8 +50,12 @@ executor, `container-command/v1`, admits each registration's:
 Isolation is executor-owned: the schema has no fields for mounts, devices, privileges, credential values or
 host paths, so a registration cannot weaken it. The baseline is the existing CLI diagnostic container
 (non-root, read-only root and source, all capabilities dropped, no new privileges, offline test phase with the
-artifact mounted read-only). Only a new executor version changes it. Credential and network fields are added
-to `v1` as optional fields once the executor can enforce them; until then such suites cannot be registered.
+artifact mounted read-only). Only a new executor version changes it. Arguments of `command` and
+`acquisition.command`, like environment values, may contain `${inputs.<declared role>.path|version}`; each
+reference is replaced with the bound input's text before the container starts, without shell evaluation, and any
+other `${` text fails loading. Credential and network fields are added to `v1` as optional fields once the
+executor can enforce them; until then such suites cannot be registered. An older reader refuses such a field as
+unknown, and changing a field's meaning needs a new API version.
 
 ### 2. Discover registrations by repository, suite group and suite
 
@@ -59,7 +63,10 @@ A registration lives at `{repository}/{suite-group}/{suite}.yaml`; its ID is tha
 group usually names an artifact (`nvke/nvkectl`) but may be an end-to-end group consuming several. NVKR uses its
 shipped catalog by default; `--validator-catalog <dir>` selects a complete replacement with nothing inherited,
 and `--data` keeps its producer-catalog meaning. Loading is strict and bounded: any unexpected entry, symlink,
-duplicate ID, unknown field or invalid document fails the whole catalog, even when unselected.
+duplicate ID, unknown field or invalid document fails the whole catalog, even when unselected. Readers dispatch
+on exact `apiVersion` and `kind` and refuse duplicate keys, nulls, YAML aliases, anchors, merge keys and
+multi-document streams. A registration has at most 64 input roles, platforms and capabilities, and at most 256
+command arguments and environment bindings.
 
 ```yaml
 apiVersion: nvkr.dev/validator-registration/v1
@@ -94,7 +101,9 @@ before building, and a failed build binds nothing. Validation continues only fro
 
 Lifecycle opens the Run through `CaptureLocalDiagnosticArtifacts`, which checks every output's bytes. Each input
 role binds to exactly one named output with the declared format, a declared platform and one build subject of
-the declared component. Callers supply no artifact paths or digests. Hosted Runs need lifecycle capture first;
+the declared component. Callers supply no artifact paths or digests. An existing Run must be a local Run with
+captured inputs: the default `run local` captures them, and a Run with an explicit `--environment` needs
+`--capture-inputs-root`. Hosted Runs need lifecycle capture first;
 composite Runs stay deferred under ADR-26.
 
 ```sh
@@ -147,7 +156,8 @@ Run opening and the local build path. The CLI and SDK delegate.
 
 Suites run in order. For each: acquire source and image; prepare a private workspace and dependencies; prepare
 runtime resources; stage checked inputs; execute; capture outcome and diagnostics; stop and join; clean up;
-persist the result. Setup and cleanup have bounded timeouts separate from the suite timeout. Cleanup failure is
+persist the result. Timeout and cancellation stop the suite, still run cleanup and are recorded as the suite's
+termination. Setup and cleanup have bounded timeouts separate from the suite timeout. Cleanup failure is
 reported without hiding a suite failure. Suites needing a Kubernetes cluster get an NVKR-managed kind cluster,
 one per suite by default, with cleanup ownership registered before creation. Hardware suites need an explicitly
 supported integration, such as Forge or DSX, with defined resource ownership and cleanup.
@@ -182,7 +192,13 @@ The model replaces the provisional slice in order: discovery, selection and bind
 then the `validators run` route. `validators list|describe` move from `--catalog <index>` to
 `--validator-catalog <dir>`. The index, `nvkr.dev/validator/v1` entries, the `nvke-cli/v1` adapter and
 `--profile` are removed when `validators run` migrates; profiles are never reinterpreted as Run bindings.
-`validate --config` is unchanged. Errors use existing ADR-03 codes; none are added.
+`validate --config` is unchanged.
+
+Errors use existing ADR-03 codes; none are added. Invalid configuration is `invalid-catalog` or `usage`; unknown
+selections and environments `unsupported`; unmet capabilities, platforms and formats, including a bound output
+whose format differs from the registration, `engine-capability`; missing or ambiguous outputs and subjects and
+producer disagreements `verify-failed`; an incomplete Run `gate-unmet`; source acquisition `fetch-failed`; a
+failed suite keeps the current diagnostic's `build-failed`; timeout and cancellation `timeout`.
 
 ## Boundaries
 
