@@ -300,3 +300,19 @@ func TestLocalAndPublishedProfileFieldsCannotMix(t *testing.T) {
 		})
 	}
 }
+
+func TestRunFilesAdmissionRefusalReportsNoCheckProgress(t *testing.T) {
+	profile := profileFixture()
+	profile.Checks[0].Suite = "ai-tests"
+	raw, err := json.Marshal(profile)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var observed []Progress
+	ctx := WithReporter(t.Context(), func(update Progress) { observed = append(observed, update) })
+	_, err = RunFiles(ctx, "", saveProfile(t, raw), lifecycle.QualificationRuntimeOptions{WorkspaceRoot: "/must-not-create"})
+	requireError(t, err, e.CodeUnsupported, "suite")
+	if len(observed) != 0 {
+		t.Fatalf("capability refusal invented progress: %+v", observed)
+	}
+}
