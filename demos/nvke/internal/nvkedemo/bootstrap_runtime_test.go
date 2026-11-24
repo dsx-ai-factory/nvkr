@@ -343,8 +343,15 @@ func TestBootstrapLimaActualLifecycle(t *testing.T) {
 	if runtime.GOOS == "linux" {
 		probe := backend.bind(runner)
 		guest := []string{backend.limactl, "shell", "--tty=false", "bootstrap", "--"}
-		if err := probe.Run(ctx, append(append([]string{}, guest...), "sh", "-c", "command -v python3"), "bootstrap-actual-python", 30*time.Second); err != nil {
-			t.Fatal("selected pilot image lacks the standard Python HTTP fixture prerequisite", err)
+		fixture := filepath.Join(shared, "http-fixture")
+		builder := runner
+		builder.directory, err = os.Getwd()
+		if err != nil {
+			t.Fatal(err)
+		}
+		builder.Env = SetEnv(runner.Env, map[string]string{"CGO_ENABLED": "0", "GOOS": "linux", "GOARCH": runtime.GOARCH, "GOTOOLCHAIN": "local"})
+		if err := builder.Run(ctx, []string{"go", "build", "-o", fixture, "./testdata/bootstrap-http"}, "bootstrap-http-fixture-build", 2*time.Minute); err != nil {
+			t.Fatal(err)
 		}
 		raw, err := probe.Capture(ctx, append(append([]string{}, guest...), "cat", filepath.Join(shared, "marker")), "bootstrap-actual-read", 30*time.Second)
 		if err != nil || string(raw) != string(marker) {
@@ -356,7 +363,7 @@ func TestBootstrapLimaActualLifecycle(t *testing.T) {
 		if raw, err := os.ReadFile(filepath.Join(shared, "returned")); err != nil || string(raw) != "returned" {
 			t.Fatal("backend write did not reach its selected staging mount", err)
 		}
-		server, err := probe.Start(ctx, append(append([]string{}, guest...), "python3", "-u", "-m", "http.server", "30081", "--bind", "0.0.0.0", "--directory", shared), "bootstrap-actual-http")
+		server, err := probe.Start(ctx, append(append([]string{}, guest...), fixture, "0.0.0.0:30081", shared), "bootstrap-actual-http")
 		if err != nil {
 			t.Fatal(err)
 		}

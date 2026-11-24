@@ -148,39 +148,14 @@ func TestRefreshRejectsDriftInADependentBundleBeforePinWork(t *testing.T) {
 // An owner's coded cause must survive the maintenance wrapper: a stage conflict
 // stays a write conflict and drift stays drift, never a generic capability error.
 func TestRegenerateKeepsTheOwnersCodedFailure(t *testing.T) {
-	cfg := validConfig()
-	cfg.DevelopmentEnvironment = "environment-dev.yaml"
-	// The closure reads each Run's Environment to choose its owner; this one opts out of runtime Plans.
-	t.Chdir(t.TempDir())
-	writeFixture(t, cfg.DevelopmentEnvironment, []byte("apiVersion: nvkr.dev/environment/v1\nkind: Environment\nmetadata: {name: dev}\nutilityContainer: busybox@sha256:"+strings.Repeat("a", 64)+"\nutilityPlatform: linux/amd64\ngithubDevelopment: true\n"))
-	for _, tc := range []struct {
-		name         string
-		failEnv      string
-		failOnCheck  bool
-		code         e.Code
-		wantMessages string
-	}{
-		{"production write conflict", cfg.Environment, false, e.CodeWriteConflict, "regeneration failed"},
-		{"development write conflict", cfg.DevelopmentEnvironment, false, e.CodeWriteConflict, "regeneration failed"},
-		{"development drift on recheck", cfg.DevelopmentEnvironment, true, e.CodePipelineDrift, "did not reproduce"},
-	} {
-		t.Run(tc.name, func(t *testing.T) {
-			var wrote []string
-			_, err := regenerate(t.Context(), cfg, "test (deadbeef)", func(_ context.Context, _, environment, _, _, _ string, check bool) (string, error) {
-				if !check {
-					wrote = append(wrote, environment)
-				}
-				if environment == tc.failEnv && check == tc.failOnCheck {
-					return "", e.New(tc.code, "owner failure")
-				}
-				return "sha256:plan", nil
+	for _, code := range []e.Code{e.CodeWriteConflict, e.CodePipelineDrift, e.CodeTimeout} {
+		t.Run(string(code), func(t *testing.T) {
+			_, err := regenerate(t.Context(), validConfig(), "test (deadbeef)", func(context.Context, Config, string, bool) (string, error) {
+				return "", e.New(code, "owner failure")
 			})
-			assertCode(t, err, tc.code)
-			if !strings.Contains(err.Error(), tc.wantMessages) {
+			assertCode(t, err, code)
+			if !strings.Contains(err.Error(), "regeneration failed") || !strings.Contains(err.Error(), "retain the disposable checkout") {
 				t.Fatalf("lost the retained-checkout guidance: %v", err)
-			}
-			if tc.failOnCheck && len(wrote) != 2 {
-				t.Fatalf("every member must be written before the recheck: %v", wrote)
 			}
 		})
 	}
@@ -226,8 +201,9 @@ func TestClosureListsTheMaintainedBundles(t *testing.T) {
 		t.Fatal("the maintained policy does not name its dependent bundles as expected")
 	}
 	wantAdditional := []RunInput{
-		{Definition: "inputs/definitions/nvke/gpu-site.composite.yaml", Environment: "inputs/environments/github-development.yaml", QualificationPolicy: "inputs/policies/nvke-gpu-site-development-qualification.yaml"},
-		{Definition: "inputs/definitions/nvke/gpu-site.composite.yaml", Environment: "inputs/environments/github-nvke-nightly-gpu-site.yaml", QualificationPolicy: "inputs/policies/nvke-nightly-gpu-site-qualification.yaml"},
+		{Definition: "inputs/definitions/nvke/nvke.composite.yaml", Environment: "inputs/environments/github-development.yaml", QualificationPolicy: "inputs/policies/nvke-composite-development-qualification.yaml"},
+		{Definition: "inputs/definitions/nvke/nvke-release.composite.yaml", Environment: "inputs/environments/github-nvke-nightly.yaml", QualificationPolicy: "inputs/policies/nvke-composite-nightly-qualification.yaml"},
+		{Definition: "inputs/definitions/nvidia-workload-identity/imds-agent.yaml", Environment: "inputs/environments/github-wli-imds-agent.yaml"},
 	}
 	if len(cfg.AdditionalRuns) != len(wantAdditional) {
 		t.Fatalf("maintained policy selects %d additional Runs, want %d", len(cfg.AdditionalRuns), len(wantAdditional))
@@ -316,6 +292,7 @@ func TestClosureListsTheMaintainedBundles(t *testing.T) {
 		".github/nvkr-qualification-nvke-nightly",
 		".github/nvkr-run-nvke",
 		".github/nvkr-run-nvke-nightly",
+		".github/nvkr-run-wli-imds-agent",
 	}
 	if !slices.Equal(directories, wantDirectories) {
 		t.Fatalf("closure directories = %v, want %v", directories, wantDirectories)
@@ -328,6 +305,7 @@ func TestClosureListsTheMaintainedBundles(t *testing.T) {
 		".github/workflows/nvkr-qualify-nvke-nightly.yml",
 		".github/workflows/nvkr-run-nvke.yml",
 		".github/workflows/nvkr-run-nvke-nightly.yml",
+		".github/workflows/nvkr-run-wli-imds-agent.yml",
 		".github/workflows/nvkr-smoke-nvke.yml",
 		".github/workflows/nvkr-smoke-nvke-nightly.yml",
 	}

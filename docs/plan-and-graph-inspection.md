@@ -5,7 +5,10 @@ publication routes before executing a Run. These read-only views explain the com
 its changes. They do not observe output bytes, verify a release, or authorize execution.
 
 The Plan in `.github/nvkr-run-nvke/plan.json` is a small index into the repository's shared `.github/nvkr-plan-store/`.
-Start with the store's `index.json` to find catalogs, target steps, graphs and scripts by name and see which bundles share each variant.
+Start with the store's `index.json` to find catalogs, target steps, outputs and scripts by name and see which bundles share each variant.
+The v3 tree omits the artifact graph and records its typed `graphDigest` in the root. Loading derives the
+graph from the verified stored inputs and checks that digest and the complete Plan identity. Use `run graph`
+below to inspect the complete graph; packed Plan exports retain it unchanged.
 The [generated tree guide](https://github.com/dsx-ai-factory/nvkr/blob/main/docs/generated-plan-tree.md) traces workflow job comments through the shared `index.json` to exact producer commands and explains the CI adapter boundary.
 Loading verifies the frozen objects and reconstructs the canonical Plan under [ADR-21's storage contract](https://github.com/dsx-ai-factory/nvkr/blob/main/docs/adr/0021-generated-pipeline-maintenance-and-lifecycle.md#1-the-emitted-pipeline-is-a-generated-artifact-not-an-owned-scaffold). Keep human views
 outside `.github/nvkr-run-nvke/`: that directory admits only manifest-owned generated files. Inspection never
@@ -113,8 +116,8 @@ Save the previous exact Plan before regeneration, then compare it to the regener
 ```sh
 nvkr run plan --plan .github/nvkr-run-nvke/plan.json --json > /tmp/nvkr-plan-before.json
 GOTOOLCHAIN=local go run ./cmd/nvkr run generate \
-  --definition inputs/definitions/nvke/gpu-site.composite.yaml \
-  --environment inputs/environments/github-nvke-gpu-site.yaml --engine github --root .
+  --definition inputs/definitions/nvke/nvke-release.composite.yaml \
+  --environment inputs/environments/github-nvke.yaml --engine github --root .
 nvkr run diff --before /tmp/nvkr-plan-before.json --after .github/nvkr-run-nvke/plan.json
 nvkr run diff --before /tmp/nvkr-plan-before.json --after .github/nvkr-run-nvke/plan.json --details
 nvkr run diff --before /tmp/nvkr-plan-before.json --after .github/nvkr-run-nvke/plan.json --format json

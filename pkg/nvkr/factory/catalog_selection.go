@@ -138,6 +138,9 @@ func (plan Plan) validateCatalogCandidates() error {
 		outputs = append(outputs, internalToolSelection(tool))
 	}
 	for _, output := range outputs {
+		if output.Derived != nil {
+			continue
+		}
 		if output.Catalog != nil {
 			continue
 		}
@@ -166,6 +169,9 @@ func (plan Plan) selectedCatalogs() (map[string]authored.Catalog, error) {
 		outputs = append(outputs, internalToolSelection(tool))
 	}
 	for _, output := range outputs {
+		if output.Derived != nil {
+			continue
+		}
 		var spec authored.Catalog
 		if output.Catalog != nil {
 			spec = *output.Catalog

@@ -4,6 +4,9 @@ This ledger carries no global review date: each row is current as of the change 
 ADR-01–31 own the lane-specific engineering contracts, accepted by njhensley on 2026-11-14
 on the maintainer's own behalf. This acceptance does not resolve operational owner questions or unpause
 the S3 work (#383–#385).
+njhensley accepted the ADR-18 and ADR-20 revisions on 2026-11-20 on the maintainer's own behalf:
+destination staging with platform tokens as the adopter default. Their [execution](adr-18.md) and [publication](adr-20.md) rows distinguish that decision
+from the still-active CI-carrier implementation.
 This ledger owns current implementation and remaining acceptance. Code and contract tests,
 recorded external execution, and organizational approval are separate facts. Historical source and
 schema results do not transfer to a changed candidate.
@@ -12,9 +15,12 @@ schema results do not transfer to a changed candidate.
 test interfaces in the consolidated set. Implementation and local CLI proof
 are tracked below; organizational approval, CI and broader acceptance remain pending.
 
-[ADR-24](../0024-imported-validator-catalog.md) defines an imported-validator catalog, explicit artifact-role
-bindings and versioned diagnostic profiles in the consolidated set. The provisional CLI catalog implements loading, discovery and frozen local-plan dispatch, with contract tests but no new
-actual upstream catalog execution. `validators` (hidden, in development) is the sole NVKR interface for these suites. Published-profile migration and controller/chart adapters remain deferred.
+[ADR-24](../0024-imported-validator-catalog.md), revised 2026-11-20, defines validator registrations discovered
+by path, ordered selection, binding to a completed Run, one TestEnvironment per invocation, the
+`container-command/v1` executor and ValidationResult. Implementation is still the earlier provisional slice: an indexed catalog with loading,
+discovery and frozen local-plan profile dispatch, with contract tests but no new actual upstream catalog
+execution. `validators` (hidden, in development) is the sole NVKR interface for these suites. Migration to the
+registration model, the executor and controller/chart suites remain outstanding.
 
 [ADR-25](../0025-generic-oci-bundles-and-aicr-producers.md) additionally admits generic OCI bundles and
 ordinary pinned AICR producers. Its contract and rendering evidence remain distinct from hosted delivery

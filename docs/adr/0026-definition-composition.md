@@ -15,7 +15,7 @@
   ADR-20 §6 (pipeline-attested publication), ADR-21 (generated bundles and maintenance), ADR-22 (pins).
 - **Scope:** Composing complete, independently owned Definitions into one composite Definition that compiles to
   one complete Plan and produces one Run and one Release whose membership is the exact union of its members'
-  named outputs, including production and development bundles. Reuse of already-published member Releases,
+  named outputs plus explicitly declared composite-owned release-derived outputs, including production and development bundles. Reuse of already-published member Releases,
   nested composites and remote members are deferred and fail closed. Hosted pipeline-attested qualification
   covers the complete composite; local qualification rehearsal and qualified-lane composites remain deferred. The maintained NVKE production path selects the composite under the U10 maintainer cutover below;
   independent consumer acceptance remains a separate evidence requirement.
@@ -59,6 +59,12 @@ members:
 variants:                     # optional; see §3
   - component: <catalog component name>
     members: [<member name>, <member name>]
+derivedOutputs:               # optional; composite-owned bundles
+  - name: <canonical output name>
+    platform: linux/amd64
+    derived:
+      encoding: aicr-inventory-v1
+      outputs: [<member output name>, <member output name>]
 ```
 
 - `members` is nonempty, sorted by `name` and unique. Each entry has exactly these three fields.
@@ -74,7 +80,12 @@ variants:                     # optional; see §3
   exactly these two fields, a canonical component name and at least two members that are sorted, unique and
   listed in `members`. It is the only authored input that admits cross-member producer divergence (§3). It
   selects, overrides and defaults nothing.
-- A composite carries no `catalog`, `sbomTool`, `cosignTool`, `outputs` or any other Definition field. Unknown
+- `derivedOutputs` contains at most 64 declarations sorted by unique canonical name. Each declares only
+  `name`, one concrete `platform`, and the ADR-20 `derived` selection. It creates a source-less bundle;
+  ordinary producer fields are unavailable. Its explicit materials must be ordinary member outputs in the
+  admitted union, possibly across members. Missing materials, member-name collisions, self-reference and
+  references to another derived output fail before catalog access. The composite digest binds every declaration.
+- A composite carries no `catalog`, `sbomTool`, `cosignTool`, ordinary `outputs` or other Definition field. Unknown
   fields, including unknown fields inside a variant, are rejected by strict decoding.
 
 Path inclusion without a digest is rejected: a member edit would silently change the composite's meaning, and a
@@ -110,7 +121,8 @@ consumes unchanged. The derivation is a pure, deterministic function of the comp
 | Input | Rule | Conflict |
 |---|---|---|
 | Named outputs | Disjoint union. Each output declaration is copied unchanged except for catalog path rebasing below. Output names are preserved; there is no prefixing, renaming or namespacing. The union is sorted by name. | The same output name in two members is an error, even if the declarations are identical. There is no deduplication. |
-| Per-output catalog | Without a catalog list, every output receives an explicit stack inherited from its member unless overridden. With a list, an omitted output override stays omitted and selects from the shared effective list under ADR-11. Base and overlay locators are rebased from the member's directory to the composite's directory. Member locators must be relative; absolute locators are rejected, not rebased, matching compile-input capture. | An absolute base or overlay locator, or a rebased locator outside the admitted input root, is an error. |
+| Composite-derived outputs | Append the explicitly declared source-less bundles after member admission. They reference the complete ordinary member union and preserve every member output. Their attribution is composite-owned, with no member name. | Collision with a member output, a missing or incompatible material, or a derived material is an error. |
+| Per-output catalog | Without a catalog list, every ordinary output receives an explicit stack inherited from its member unless overridden. With a list, an omitted ordinary output override stays omitted and selects from the shared effective list under ADR-11. Release-derived outputs retain no catalog stack. Base and overlay locators are rebased from the member's directory to the composite's directory. Member locators must be relative; absolute locators are rejected, not rebased, matching compile-input capture. | An absolute base or overlay locator, or a rebased locator outside the admitted input root, is an error. |
 | Top-level `catalogs` | Every member's optional ordered candidate list, after rebasing, must be identical. It becomes the effective Definition's list; order never breaks a producer collision. | Any difference, including an omitted list in only some members, is an error. |
 | Top-level `catalog` | Every member's top-level catalog stack, after rebasing, must be identical. It becomes the effective Definition's top-level stack. | Any difference is an error. |
 | `sbomTool` | Every member that selects one must select the same value; it becomes the effective `sbomTool`. A member that omits it inherits that shared value, so its outputs get SBOMs inside the composite while its standalone Runs stay unchanged. | Two different selected values are an error. |
@@ -146,25 +158,29 @@ cannot be selected with `--definition` and has no file. `definition inspect` may
 
 | Identity | Family | Binds | Excludes |
 |---|---|---|---|
-| Composite Definition | new `nvkr.composite-definition` | composite `metadata`, the sorted `(name, digest)` member list and the declared variants (omitted when none, so a composite without variants keeps its digest) | member locators (transport, like `DefinitionPath`) |
+| Composite Definition | new `nvkr.composite-definition` | composite `metadata`, the sorted `(name, digest)` member list, declared variants and composite-derived output declarations (optional collections omitted when absent, preserving earlier identities) | member locators (transport, like `DefinitionPath`) |
 | Member Definition | existing `nvkr.definition` | each member exactly as today | — |
 | Effective Definition | existing `nvkr.definition` | the derived v5 Definition | — |
 | Plan | existing `nvkr.run-plan/v1` | as today, plus a `composition` record | — |
-| Per-output Build Digest | existing `nvkr.build` | unchanged (ADR-11 §2) | output names, member attribution |
+| Member-output Build Digest | existing `nvkr.build` | unchanged (ADR-11 §2) | output names, member attribution |
+| Composite-derived Build Digest | existing `nvkr.build` | encoding, exact named material Build Digests and publication namespace (ADR-19 §3) | member attribution |
 | Run, Release content, publication root | existing families | as today, plus the composition binding in their records | — |
 
 The new family is registered in ADR-01 when implemented. A composite's Plan, Run record and publication-root
 metadata carry a **composition record**: the composite digest, the effective Definition digest, every member's
-`(name, digest)`, the declared variants, and for every named output the member that declared it. Plans, Run
+`(name, digest)`, the declared variants and composite-derived declarations, and every output's attribution. Plans, Run
 records and publication roots that carry a composition record use new schema majors; records of plain
 Definitions keep their current schemas and bytes. A record without declared variants omits the field and keeps
 its bytes. A reader that does not admit the new major rejects it. A reader that admits it requires a complete,
-consistent record that recomputes the composite digest: every output attributed to exactly one listed member, no
-unlisted member, and declared variants that name only listed members. Run-record and publication readers stop
-there; they establish the record's identity, membership and attribution and have no effective Definition. Plan
+consistent record that recomputes the composite digest: ordinary member outputs attributed to exactly one
+listed member, no unlisted member, and declared variants that name only listed members. Run-record and publication readers stop
+there; they establish the record's identity, membership and attribution and have no effective Definition. Composite-owned outputs have an empty member field only when
+the identity-bound `derivedOutputs` declaration names them; every such declaration has exactly one attribution
+and names existing member outputs as materials. Member-filtered views exclude these outputs. Plan
 validation has the effective Definition, so it also requires the effective Definition digest to recompute, every
 declared variant member to select its component, and the §3 cross-member producer comparison to hold over the
-Plan's resolved producers; a saved Plan cannot drop a declaration it needs. A consumer that needs those checks
+Plan's resolved producers; a saved Plan cannot drop a declaration it needs. Plan validation also compares each
+composite-derived declaration with the exact effective output, so a substituted effective digest cannot change it. A consumer that needs those checks
 binds the Plan through an exact-input expectation (§10).
 
 Each variant producer is attributed to the member that selected it. Every native build belongs to one named
@@ -175,7 +191,7 @@ plain Definition. Records carry an explicit definition kind so a verifier always
 family; a digest string alone never selects the family.
 
 **Identity invariance.** Composition must not change what an output is. Compiling the composite produces, for
-every output, the same Build Digest and native build records that compiling that output's member alone produces
+every member output, the same Build Digest and native build records that compiling that output's member alone produces
 with the same catalogs. Composition changes Definition, Plan, Run and Release identities; it never changes
 logical Build identity.
 
@@ -196,7 +212,7 @@ observations or evidence, and a successful sibling never satisfies another outpu
 member's output fails the composite Run; there is no partial composite Release and no per-member success.
 
 Publication is the existing ADR-20 §6 route. The Release is one flat publication root whose membership is exactly
-the union of member outputs, with the composition binding of §4 in its signed metadata. It is not a parent of
+the union of member outputs and declared composite-derived outputs, with the composition binding of §4 in its signed metadata. It is not a parent of
 member publication roots and references no member Release. Existing aggregate limits apply to the composite as a
 whole (Plan reader bound, publication object and metadata budgets, workflow size before partitioning); exceeding
 one is the existing coded failure, admitted before output work wherever the existing owner already admits it.
@@ -324,8 +340,10 @@ and owning operation carry that detail.
 
 ## Worked example: the four NVKE families
 
-This historical four-family example is illustrative and is **not** a maintained input. The maintained entry
-point is `inputs/definitions/nvke/gpu-site.composite.yaml`, which selects a larger membership. The digests
+This historical four-family example is illustrative and is **not** a maintained input. Production/nightly use
+`inputs/definitions/nvke/nvke-release.composite.yaml`; development uses
+`inputs/definitions/nvke/nvke.composite.yaml`. Both select the same larger member union; the release
+composite also owns the derived inventory. The digests
 below are the actual `nvkr.definition` digests of the family Definitions at commit `75f154fe`, computed with the existing `Definition.Digest` and the Go toolchain in
 `.go-version`. Until `definition pin` exists, a short program against the existing API reproduces them:
 
@@ -443,6 +461,14 @@ floating-source composite bundle `nvkr-run-nvke-nightly`. The fixed development 
 `nvkr-dev`. The six member Definitions remain the authored owners; the former combined Definition
 and family Environments are retained only as comparison/authoring fixtures, not maintained releases.
 
+On 2026-11-19, njhensley (captain) approved the release-inventory decision as an explicit exception to the
+same-composite selection rule: production and floating-source nightly select `nvke-release.composite.yaml`, which retains the six
+member pins and their 83 payload outputs and declares `aicr-inventory` as the 84th, composite-owned output.
+Development continues to select `nvke.composite.yaml` with its existing 83 outputs and bytes.
+The inventory is derived separately for each production/nightly publication namespace. Development
+attempt relocation remains unsupported for derived outputs; this exception does not change any
+Environment, signer identity, credential or publication prefix.
+
 The previous U10 gate required a complete hosted composite publication, independent consumer
 verification under explicit policy, and one-to-one equivalent output selections and Build Digests
 before retiring the combined path. The accepted historical 83-output publication supplies publication
@@ -519,8 +545,9 @@ Acceptance tests per unit:
   composite output; an origin outside the authored allowlist refused; equal Build Digest sibling refused;
   composite lane recomputed as the minimum of §7; no composite production predicate for reused outputs.
 - **U10 (cutover):** the maintained inventory contains exactly `nvkr-dev`, `nvkr-run-nvke` and
-  `nvkr-run-nvke-nightly`, all selecting the same composite. Preserve all six member Definition digests,
-  all 83 named outputs and their per-output Build Digests against the pre-cutover composite Plans.
+  `nvkr-run-nvke-nightly`. Under the explicit release-inventory exception, production/nightly use the
+  release composite and development keeps the payload-only composite. Preserve all six member Definition
+  digests and all 83 payload Build Digests; require the additional composite-owned inventory in production/nightly.
   Production and nightly have new workflow-bound Environment and Plan identities; development stays
   byte-identical. Retire only the confirmed generated namespaces and the two legacy ARM64 nightly
   Definition files; migrate maintained consumers and maintenance/qualification enrollment. The generic

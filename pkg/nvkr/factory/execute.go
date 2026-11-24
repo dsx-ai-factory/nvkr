@@ -304,11 +304,11 @@ func executeObservationWithHeldDisk(ctx context.Context, plan *Plan, node Node,
 }
 
 func executePublish(ctx context.Context, plan *Plan, node Node, artifacts map[string]Artifact, stdout io.Writer) error {
-	return executePublishWithAdmission(ctx, plan, node, artifacts, stdout, cistore.AdmitPrivatePublication)
+	return executePublishWithAdmission(ctx, plan, node, artifacts, stdout, cistore.AdmitPublication)
 }
 
 func executePublishWithAdmission(ctx context.Context, plan *Plan, node Node, artifacts map[string]Artifact, stdout io.Writer,
-	admit func(context.Context, string, []string, cistore.Options) error,
+	admit func(context.Context, string, []string, cistore.PublicationOptions) error,
 ) error {
 	metadataOnlySigner := PerOutputPublication(plan) && node.Target != "release"
 	expectedOutputs := 1
@@ -366,7 +366,8 @@ func executePublishWithAdmission(ctx context.Context, plan *Plan, node Node, art
 	}
 	// Admit credentials and every metadata-derived destination before consuming
 	// the original preparation. Completion and Push both bind this exact root.
-	expectedRoot, err := admitGitHubPublication(ctx, target, admissionSource, admit)
+	allowPublicPackages := plan.Environment.Publication != nil && plan.Environment.Publication.AllowPublicPackages
+	expectedRoot, err := admitGitHubPublication(ctx, target, allowPublicPackages, admissionSource, admit)
 	if err != nil {
 		return err
 	}

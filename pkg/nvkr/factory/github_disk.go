@@ -63,7 +63,7 @@ func RunGitHubDisk(ctx context.Context, plan *Plan, output string, options GitHu
 	}
 	defer func() { returnErr = joinFactoryCleanupError(returnErr, workspace.Close(), "close ARC workspace") }()
 	var inspectionLog *diskdiagnostic.Collector
-	if githubDiskInspectionRequired(plan) {
+	if githubDiskInspectionRequired(plan, output) {
 		inspectionLog = diskdiagnostic.NewCollector()
 		defer finishGitHubInspectionDiagnostics(ctx, workspace, output, inspectionLog, options)
 	}
@@ -81,7 +81,7 @@ func RunGitHubDisk(ctx context.Context, plan *Plan, output string, options GitHu
 	}
 	admission, err := AdmitLocalVMBuild(ctx, plan, root.ID, workspace)
 	if err != nil {
-		return err
+		return githubRunnerCapabilityError(err, "run-disk VM admission")
 	}
 	defer func() { returnErr = joinFactoryCleanupError(returnErr, admission.Close(), "close ARC VM admission") }()
 	_, instruction, err := plan.producerInstruction(root)
@@ -92,7 +92,7 @@ func RunGitHubDisk(ctx context.Context, plan *Plan, output string, options GitHu
 	// Preparation follows host capability admission and precedes held image
 	// admission. Consumers use the exact pinned reference, never a mutable tag.
 	images := []string{instruction.Toolchain}
-	if githubDiskInspectionRequired(plan) {
+	if githubDiskInspectionRequired(plan, output) {
 		images = append(images, profile.Image)
 	}
 	for _, node := range stage.Nodes {
@@ -123,7 +123,7 @@ func RunGitHubDisk(ctx context.Context, plan *Plan, output string, options GitHu
 	}
 	var inspector *sbom.DiskInspectionRuntime
 	var probeHelper func(context.Context) (func() error, error)
-	if githubDiskInspectionRequired(plan) {
+	if githubDiskInspectionRequired(plan, output) {
 		if profile.HelperTool == "" {
 			inspector, err = openDiskEvidenceRuntime(ctx, plan, plan.Environment.RuntimeBinary(), workspace, inspectionLog)
 			if err != nil {
@@ -232,7 +232,7 @@ func executeAdmittedGitHubDisk(ctx context.Context, plan *Plan, stage githubStag
 			}
 			return e.New(e.CodePipelineDrift, "ARC output has no lifecycle binding")
 		}
-		if inspector == nil && githubDiskInspectionRequired(plan) {
+		if inspector == nil && githubDiskInspectionRequired(plan, stage.DiskOutput) {
 			return completeGitHubDiskWithHelper(ctx, func(ctx context.Context) (func() error, error) {
 				opened, err := owner.openDiskEvidenceRuntime(ctx, plan, plan.Environment.RuntimeBinary(), workspace, inspectionLog)
 				if err != nil {
@@ -311,6 +311,18 @@ func executeGitHubDiskNodes(ctx context.Context, plan *Plan, stage githubStage, 
 	return complete(ctx)
 }
 
+func githubRunnerCapabilityError(err error, operation string) error {
+	var coded *e.Error
+	if !errors.As(err, &coded) || coded.Code != e.CodeEngineCapability {
+		return err
+	}
+	pod := os.Getenv("RUNNER_NAME")
+	if pod == "" {
+		pod = "unknown"
+	}
+	return e.Wrap(e.CodeEngineCapability, err, "runner-capability fault on ARC pod %q during %s", pod, operation)
+}
+
 func classifyGitHubDiskError(err error, operation string) error {
 	var coded *e.Error
 	if err == nil || (errors.As(err, &coded) && coded.Code == e.CodeTimeout) {
@@ -350,8 +362,10 @@ func completeGitHubDiskPublication(ctx context.Context, plan *Plan, expected Lif
 	owner *LocalRunResult, inspector *sbom.DiskInspectionRuntime, inspectionLog *diskdiagnostic.Collector, options GitHubStepOptions,
 ) error {
 	operation := "Inspect, reconcile and package " + expected.Name
-	if diskBuildProvenance(plan) {
+	if diskBuildProvenance(plan, expected.Name) {
 		operation = "Package disk build provenance " + expected.Name
+	} else if plan.Environment.DiskEvidenceFor(expected.Name) == sbom.DiskInstalledPackages {
+		operation = "Inspect installed packages and package " + expected.Name
 	}
 	if err := reportGitHubDiskCompletion(ctx, options, operation, inspectionLog, func(ctx context.Context) error {
 		return CompleteHostedDiskPublication(ctx, plan, expected, owner, inspector)

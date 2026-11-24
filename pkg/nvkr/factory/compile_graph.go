@@ -11,6 +11,7 @@ import (
 
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/buildgraph"
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/catalog"
+	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/delivery"
 	e "github.com/dsx-ai-factory/nvkr/pkg/nvkr/errors"
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/ir"
 )
@@ -19,6 +20,9 @@ import (
 // artifacts and their exact edges from admitted inputs and resolved producers.
 // It ignores the supplied Graph and never mutates the caller's Plan.
 func compileArtifactGraph(plan Plan, tools map[string]catalog.ToolPin, packageSpecs []packageSpec) (ArtifactGraph, error) {
+	if err := plan.Environment.ValidateDiskEvidenceOutputs(plan.Definition); err != nil {
+		return ArtifactGraph{}, err
+	}
 	definition, delivery := plan.Definition, plan.Environment
 	runsOn := defaultUtilityRunner(delivery)
 	plan.Graph = ArtifactGraph{SchemaVersion: ArtifactGraphSchema}
@@ -64,6 +68,9 @@ func compileArtifactGraph(plan Plan, tools map[string]catalog.ToolPin, packageSp
 		}
 	}
 	for _, output := range definition.Outputs {
+		if output.Derived != nil {
+			continue
+		}
 		for _, target := range nativeOutputSelections(output) {
 			build, ok := builds[target.Name]
 			if !ok || build.Graph == nil {
@@ -84,7 +91,14 @@ func compileArtifactGraph(plan Plan, tools map[string]catalog.ToolPin, packageSp
 				if err := admitDiskPublicationProducer(build); err != nil {
 					return ArtifactGraph{}, err
 				}
-				if diskBuildProvenance(&plan) {
+				for _, producer := range build.Graph.Nodes {
+					if producer.Disk != nil {
+						if err := admitDiskPublicationEncryption(&plan, target.Name, producer); err != nil {
+							return ArtifactGraph{}, err
+						}
+					}
+				}
+				if diskBuildProvenance(&plan, target.Name) {
 					continue
 				}
 				host, profile, err := diskPublicationInspectionProfile(build, delivery)
@@ -195,7 +209,7 @@ func compileArtifactGraph(plan Plan, tools map[string]catalog.ToolPin, packageSp
 				inputs = append(inputs, "result/"+input.BuildTarget+"/"+input.Component)
 			}
 		}
-		if spec.Kind == PackageBundle || spec.Kind == PackageDebian {
+		if (spec.Kind == PackageBundle && spec.Derived == nil) || spec.Kind == PackageDebian {
 			for _, id := range append([]string(nil), inputs...) {
 				input := artifacts[id]
 				if nodes[input.Producer].Kind != NodeBuild && !(spec.Kind == PackageBundle && nodes[input.Producer].Kind == NodeAcquire) {
@@ -222,7 +236,7 @@ func compileArtifactGraph(plan Plan, tools map[string]catalog.ToolPin, packageSp
 				inputs = append(inputs, child.ResultArtifactID, child.SBOMArtifactID)
 			}
 		}
-		if spec.Kind == PackageOCI {
+		if spec.Kind == PackageOCI || spec.Derived != nil {
 			inputs = append(inputs, packageProducerResults(inputs, nodes, artifacts)...)
 		}
 		if spec.Kind == PackageOCI || spec.Kind == PackageDiskImage {
@@ -236,6 +250,7 @@ func compileArtifactGraph(plan Plan, tools map[string]catalog.ToolPin, packageSp
 		nodeID := "package/" + spec.Name
 		artifactID := "package/" + spec.Name
 		nodes[nodeID] = Node{ID: nodeID, Kind: NodePackage, PackageKind: spec.Kind,
+			Derived:      spec.Derived.Clone(),
 			HelmImage:    spec.HelmImage,
 			ImageIndex:   spec.ImageIndex.Clone(),
 			Distribution: spec.Distribution, PackageComponent: spec.Component,
@@ -347,23 +362,29 @@ func containsString(values []string, wanted string) bool {
 	return false
 }
 
-// validateCompiledGraph checks the complete compiler-owned operation set after
-// authenticating the authored inputs, catalog snapshots and producer selections.
-func (plan Plan) validateCompiledGraph(packages []packageSpec) error {
+// deriveCompiledGraph is shared by tree reconstruction and graph validation.
+// Its caller must first authenticate the inputs with validateGraphInputs.
+func (plan Plan) deriveCompiledGraph(packages []packageSpec) (ArtifactGraph, error) {
 	for _, build := range plan.Builds {
 		selection, ok := plan.selectionForBuild(build.Name)
 		if !ok {
-			return e.New(e.CodeUnverifiedRef, "build %q has no Definition selection", build.Name)
+			return ArtifactGraph{}, e.New(e.CodeUnverifiedRef, "build %q has no Definition selection", build.Name)
 		}
 		if selection.Catalog == nil && len(plan.Definition.Catalogs) == 0 && build.CatalogDigest != plan.CatalogDigest {
-			return e.New(e.CodeUnverifiedRef, "output %q substitutes the Definition catalog", build.Name)
+			return ArtifactGraph{}, e.New(e.CodeUnverifiedRef, "output %q substitutes the Definition catalog", build.Name)
 		}
 	}
 	tools, err := selectedTools(plan.Definition, plan.Environment, plan.CatalogSnapshot, plan.Builds)
 	if err != nil {
-		return err
+		return ArtifactGraph{}, err
 	}
-	expected, err := compileArtifactGraph(plan, tools, packages)
+	return compileArtifactGraph(plan, tools, packages)
+}
+
+// validateCompiledGraph checks the complete compiler-owned operation set after
+// authenticating the authored inputs, catalog snapshots and producer selections.
+func (plan Plan) validateCompiledGraph(packages []packageSpec) error {
+	expected, err := plan.deriveCompiledGraph(packages)
 	if err != nil {
 		return err
 	}
@@ -384,7 +405,9 @@ func (plan Plan) validateCompiledGraph(packages []packageSpec) error {
 			return e.New(e.CodePipelineDrift, "operation %q differs from compiler-derived operation %q", actual.ID, want.ID)
 		}
 	}
+	var executableMediaType string
 	for i, want := range expected.Artifacts {
+		actual := plan.Graph.Artifacts[i]
 		if plan.workspace != "" {
 			path, err := relocatedFactoryPath(want.Path, plan.workspace)
 			if err != nil {
@@ -392,8 +415,20 @@ func (plan Plan) validateCompiledGraph(packages []packageSpec) error {
 			}
 			want.Path = filepath.ToSlash(path)
 		}
-		if plan.Graph.Artifacts[i] != want {
-			return e.New(e.CodePipelineDrift, "artifact %q differs from compiler-derived artifact %q", plan.Graph.Artifacts[i].ID, want.ID)
+		if want.Kind == "host-package" && want.MediaType == delivery.MediaOctetStream {
+			// Older Plans used the Debian media type for every raw executable.
+			// Accept that complete encoding without admitting mixed encodings
+			// or relaxing any other compiler-derived artifact field.
+			legacyMediaType := artifactMediaType(want.Kind, "")
+			if executableMediaType == "" {
+				executableMediaType = actual.MediaType
+			}
+			if executableMediaType == legacyMediaType {
+				want.MediaType = legacyMediaType
+			}
+		}
+		if actual != want {
+			return e.New(e.CodePipelineDrift, "artifact %q differs from compiler-derived artifact %q", actual.ID, want.ID)
 		}
 	}
 	return nil

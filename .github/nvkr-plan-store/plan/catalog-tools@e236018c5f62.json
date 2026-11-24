@@ -1,0 +1,1521 @@
+{
+  "APIVersion": "nvkr.dev/catalog/v3",
+  "Actions": {},
+  "Components": {
+    "clusterctl": {
+      "commit": "bd8162edfe045c1bb490d431b3acddd568bdb887",
+      "fromSource": false,
+      "outputType": "host-package",
+      "platforms": [
+        "darwin/arm64",
+        "linux/amd64",
+        "linux/arm64"
+      ],
+      "prebuilt": {
+        "evidence": {
+          "none": true
+        },
+        "executables": [
+          {
+            "archiveDigest": "sha256:1a04967e188dcb70124f15508e7941335f3bddc5b456d1ed38d6dc4005c187a2",
+            "executableDigest": "sha256:1a04967e188dcb70124f15508e7941335f3bddc5b456d1ed38d6dc4005c187a2",
+            "executablePath": "clusterctl",
+            "format": "raw",
+            "platform": "darwin/arm64",
+            "url": "https://github.com/kubernetes-sigs/cluster-api/releases/download/v1.13.6/clusterctl-darwin-arm64"
+          },
+          {
+            "archiveDigest": "sha256:1e4019b8ef30fa13993716d28b9fec4072fee1e17ea2cc69cb7c8f232d9b8c2f",
+            "executableDigest": "sha256:1e4019b8ef30fa13993716d28b9fec4072fee1e17ea2cc69cb7c8f232d9b8c2f",
+            "executablePath": "clusterctl",
+            "format": "raw",
+            "platform": "linux/amd64",
+            "url": "https://github.com/kubernetes-sigs/cluster-api/releases/download/v1.13.6/clusterctl-linux-amd64"
+          },
+          {
+            "archiveDigest": "sha256:c3fe61fd44fa63d2efcee2a93432619527909b210a84cda7ee86eea1425de8c2",
+            "executableDigest": "sha256:c3fe61fd44fa63d2efcee2a93432619527909b210a84cda7ee86eea1425de8c2",
+            "executablePath": "clusterctl",
+            "format": "raw",
+            "platform": "linux/arm64",
+            "url": "https://github.com/kubernetes-sigs/cluster-api/releases/download/v1.13.6/clusterctl-linux-arm64"
+          }
+        ]
+      },
+      "repo": "https://github.com/kubernetes-sigs/cluster-api",
+      "sourceDateEpoch": 1788866431,
+      "tag": "v1.13.6"
+    },
+    "clusterctl-installer-local": {
+      "artifactPath": "nvkr-output/clusterctl",
+      "buildCommand": [
+        "bash",
+        "-euc",
+        {
+          "file": ".github/nvkr-plan-store/scripts/clusterctl-installer-local/build@b4bc342daafb.sh"
+        }
+      ],
+      "builderType": "oci-hermetic",
+      "commit": "bd8162edfe045c1bb490d431b3acddd568bdb887",
+      "fromSource": true,
+      "outputType": "raw",
+      "platforms": [
+        "linux/arm64"
+      ],
+      "repo": "https://github.com/kubernetes-sigs/cluster-api",
+      "sourceDateEpoch": 1788866431,
+      "tag": "v1.13.6",
+      "toolchainImages": {
+        "arm64": "docker.io/library/golang@sha256:2bcff0c6ad6e8c5353e8c0d5c7f17bfcc87d667d0169615e34db1acc0db985b9"
+      },
+      "treeHash": "8c584c260a47253fb8ebc5681a7eb894798ace7a",
+      "vendorCommand": [
+        "bash",
+        "-euc",
+        {
+          "file": ".github/nvkr-plan-store/scripts/cluster-api/vendor@9b922ddbf2a1.sh"
+        }
+      ],
+      "versionStamp": {
+        "BUILD_VERSION": "v1.13.6",
+        "GIT_VERSION": "bd8162edfe045c1bb490d431b3acddd568bdb887",
+        "KUBE_GIT_MAJOR": "1",
+        "KUBE_GIT_MINOR": "13"
+      },
+      "writeDir": "nvkr-output"
+    },
+    "helm": {
+      "commit": "3900f434fd3ef2b84065dc04508df48f288dba00",
+      "fromSource": false,
+      "outputType": "host-package",
+      "platforms": [
+        "darwin/arm64",
+        "linux/amd64",
+        "linux/arm64"
+      ],
+      "prebuilt": {
+        "evidence": {
+          "none": true
+        },
+        "executables": [
+          {
+            "archiveDigest": "sha256:d747eb4e28bd2727173d15b759fa0a17822291ec09db7ced3d55af290a3661a2",
+            "executableDigest": "sha256:66f6b8881392bfa15c6c1dceef980426a28709c8122d5dc8a7a29697cad7334c",
+            "executablePath": "darwin-arm64/helm",
+            "format": "tar-gzip",
+            "platform": "darwin/arm64",
+            "url": "https://get.helm.sh/helm-v4.2.4-darwin-arm64.tar.gz"
+          },
+          {
+            "archiveDigest": "sha256:c306b46f719b0a4da32d0f78ee21bf90ce8d602f15b22ab753f0674d1670a7f3",
+            "executableDigest": "sha256:92e191314f44aac173711bb0247c38c727f3ddf65ad16a01c0861d509a63a9e1",
+            "executablePath": "linux-amd64/helm",
+            "format": "tar-gzip",
+            "platform": "linux/amd64",
+            "url": "https://get.helm.sh/helm-v4.2.4-linux-amd64.tar.gz"
+          },
+          {
+            "archiveDigest": "sha256:564de2191b881e9f71b5606b25345821ea1682f06ab90499d3ab22b530176da1",
+            "executableDigest": "sha256:0690653ac2aad19150f0c22383ceb8aaf4fd96666fcfabb9d4641fbf757e0490",
+            "executablePath": "linux-arm64/helm",
+            "format": "tar-gzip",
+            "platform": "linux/arm64",
+            "url": "https://get.helm.sh/helm-v4.2.4-linux-arm64.tar.gz"
+          }
+        ]
+      },
+      "repo": "https://github.com/helm/helm",
+      "sourceDateEpoch": 1786632363,
+      "tag": "v4.2.4"
+    },
+    "helm-installer-local": {
+      "artifactPath": "nvkr-output/helm",
+      "buildCommand": [
+        "bash",
+        "-euc",
+        {
+          "file": ".github/nvkr-plan-store/scripts/helm-installer-local/build@6622f8828759.sh"
+        }
+      ],
+      "builderType": "oci-hermetic",
+      "commit": "3900f434fd3ef2b84065dc04508df48f288dba00",
+      "fromSource": true,
+      "outputType": "raw",
+      "platforms": [
+        "linux/arm64"
+      ],
+      "repo": "https://github.com/helm/helm",
+      "sourceDateEpoch": 1786632363,
+      "tag": "v4.2.4",
+      "toolchainImages": {
+        "arm64": "docker.io/library/golang@sha256:2bcff0c6ad6e8c5353e8c0d5c7f17bfcc87d667d0169615e34db1acc0db985b9"
+      },
+      "treeHash": "16e7ec45b01a241f5011caad2fe8751208a7ba94",
+      "vendorCommand": [
+        "bash",
+        "-euc",
+        {
+          "file": ".github/nvkr-plan-store/scripts/helm/vendor@721a039c1e40.sh"
+        }
+      ],
+      "versionStamp": {
+        "BUILD_VERSION": "v4.2.4",
+        "GIT_VERSION": "3900f434fd3ef2b84065dc04508df48f288dba00"
+      },
+      "writeDir": "nvkr-output"
+    },
+    "helm-operator": {
+      "commit": "05fa37973dc9e42b76e1d2883494c87174b6074f",
+      "fromSource": false,
+      "outputType": "host-package",
+      "platforms": [
+        "linux/amd64",
+        "linux/arm64"
+      ],
+      "prebuilt": {
+        "evidence": {
+          "none": true
+        },
+        "executables": [
+          {
+            "archiveDigest": "sha256:70b2c30a19da4db264dfd68c8a3664e05093a361cefd89572ffb36f8abfa3d09",
+            "executableDigest": "sha256:210d576a6dc04b7864af4b5d9a5af58860bbc03d19174ffeddbd29d01d1b59a9",
+            "executablePath": "linux-amd64/helm",
+            "format": "tar-gzip",
+            "platform": "linux/amd64",
+            "url": "https://get.helm.sh/helm-v4.1.4-linux-amd64.tar.gz"
+          },
+          {
+            "archiveDigest": "sha256:13d03672be289045d2ff00e4e345d61de1c6f21c1257a45955a30e8ae036d8f1",
+            "executableDigest": "sha256:4d6e3a69e6203094d564d5d4e94325b1f7209421dc7e832a96d2510295e03f1d",
+            "executablePath": "linux-arm64/helm",
+            "format": "tar-gzip",
+            "platform": "linux/arm64",
+            "url": "https://get.helm.sh/helm-v4.1.4-linux-arm64.tar.gz"
+          }
+        ]
+      },
+      "repo": "https://github.com/helm/helm",
+      "sourceDateEpoch": 1775710686,
+      "tag": "v4.1.4"
+    },
+    "kind": {
+      "commit": "cda67ef8588f6bfdac5358233f2471cb2149ecaf",
+      "fromSource": false,
+      "outputType": "host-package",
+      "platforms": [
+        "darwin/arm64",
+        "linux/amd64",
+        "linux/arm64"
+      ],
+      "prebuilt": {
+        "evidence": {
+          "none": true
+        },
+        "executables": [
+          {
+            "archiveDigest": "sha256:dca67911095a110c2b5c36e26df6cac860c602033e456c0db47be498cdef1ebb",
+            "executableDigest": "sha256:dca67911095a110c2b5c36e26df6cac860c602033e456c0db47be498cdef1ebb",
+            "executablePath": "kind",
+            "format": "raw",
+            "platform": "darwin/arm64",
+            "url": "https://github.com/kubernetes-sigs/kind/releases/download/v0.32.0/kind-darwin-arm64"
+          },
+          {
+            "archiveDigest": "sha256:50030de23cf40a18505f20426f6a8506bedf13c6e509244bd1fa9463721b0f54",
+            "executableDigest": "sha256:50030de23cf40a18505f20426f6a8506bedf13c6e509244bd1fa9463721b0f54",
+            "executablePath": "kind",
+            "format": "raw",
+            "platform": "linux/amd64",
+            "url": "https://github.com/kubernetes-sigs/kind/releases/download/v0.32.0/kind-linux-amd64"
+          },
+          {
+            "archiveDigest": "sha256:b92cd615e97585de8ddade28ed5cd7feb4248d717c233eea5b03c37298900f5d",
+            "executableDigest": "sha256:b92cd615e97585de8ddade28ed5cd7feb4248d717c233eea5b03c37298900f5d",
+            "executablePath": "kind",
+            "format": "raw",
+            "platform": "linux/arm64",
+            "url": "https://github.com/kubernetes-sigs/kind/releases/download/v0.32.0/kind-linux-arm64"
+          }
+        ]
+      },
+      "repo": "https://github.com/kubernetes-sigs/kind",
+      "sourceDateEpoch": 1780417734,
+      "tag": "v0.32.0"
+    },
+    "kind-installer-local": {
+      "artifactPath": "nvkr-output/kind",
+      "buildCommand": [
+        "bash",
+        "-euc",
+        {
+          "file": ".github/nvkr-plan-store/scripts/kind-installer-local/build@159f5373bea0.sh"
+        }
+      ],
+      "builderType": "oci-hermetic",
+      "commit": "cda67ef8588f6bfdac5358233f2471cb2149ecaf",
+      "fromSource": true,
+      "outputType": "raw",
+      "platforms": [
+        "linux/arm64"
+      ],
+      "repo": "https://github.com/kubernetes-sigs/kind",
+      "sourceDateEpoch": 1780417734,
+      "tag": "v0.32.0",
+      "toolchainImages": {
+        "arm64": "docker.io/library/golang@sha256:2bcff0c6ad6e8c5353e8c0d5c7f17bfcc87d667d0169615e34db1acc0db985b9"
+      },
+      "treeHash": "be4d44635ebcab72f70760c8e04684cbd98d3969",
+      "vendorCommand": [
+        "bash",
+        "-euc",
+        {
+          "file": ".github/nvkr-plan-store/scripts/kind/vendor@9b922ddbf2a1.sh"
+        }
+      ],
+      "versionStamp": {
+        "BUILD_VERSION": "0.32.0",
+        "GIT_VERSION": "cda67ef8588f6bfdac5358233f2471cb2149ecaf"
+      },
+      "writeDir": "nvkr-output"
+    },
+    "kubectl": {
+      "commit": "329000efd0b26bd78155e51e4df449130f0fca00",
+      "fromSource": false,
+      "outputType": "host-package",
+      "platforms": [
+        "darwin/arm64",
+        "linux/amd64",
+        "linux/arm64"
+      ],
+      "prebuilt": {
+        "evidence": {
+          "none": true
+        },
+        "executables": [
+          {
+            "archiveDigest": "sha256:652548e6a9405266c5acd2719703bc8d36befa46e79e151a0d646904aa32c89b",
+            "executableDigest": "sha256:652548e6a9405266c5acd2719703bc8d36befa46e79e151a0d646904aa32c89b",
+            "executablePath": "kubectl",
+            "format": "raw",
+            "platform": "darwin/arm64",
+            "url": "https://dl.k8s.io/release/v1.35.9/bin/darwin/arm64/kubectl"
+          },
+          {
+            "archiveDigest": "sha256:3cfeaf80be482b435b0aa214aff6e0b2c312ee23c0ff20810c75517b6004c6eb",
+            "executableDigest": "sha256:3cfeaf80be482b435b0aa214aff6e0b2c312ee23c0ff20810c75517b6004c6eb",
+            "executablePath": "kubectl",
+            "format": "raw",
+            "platform": "linux/amd64",
+            "url": "https://dl.k8s.io/release/v1.35.9/bin/linux/amd64/kubectl"
+          },
+          {
+            "archiveDigest": "sha256:39c98bca82875d9a9ddfb6f3c5ab17c3f78ea0801230683e538a67d5c053308d",
+            "executableDigest": "sha256:39c98bca82875d9a9ddfb6f3c5ab17c3f78ea0801230683e538a67d5c053308d",
+            "executablePath": "kubectl",
+            "format": "raw",
+            "platform": "linux/arm64",
+            "url": "https://dl.k8s.io/release/v1.35.9/bin/linux/arm64/kubectl"
+          }
+        ]
+      },
+      "repo": "https://github.com/kubernetes/kubernetes",
+      "sourceDateEpoch": 1790183268,
+      "tag": "v1.35.9"
+    },
+    "kubectl-installer-local": {
+      "artifactPath": "nvkr-output/kubectl",
+      "buildCommand": [
+        "bash",
+        "-euc",
+        {
+          "file": ".github/nvkr-plan-store/scripts/kubectl-installer-local/build@24a1679da4f7.sh"
+        }
+      ],
+      "builderType": "oci-hermetic",
+      "commit": "ecf6decece6a6de25a57aad9ba90b6ce580f6f78",
+      "fromSource": true,
+      "outputType": "raw",
+      "platforms": [
+        "linux/arm64"
+      ],
+      "repo": "https://github.com/kubernetes/kubernetes",
+      "sourceDateEpoch": 1776865911,
+      "tag": "v1.36.0",
+      "toolchainImages": {
+        "arm64": "docker.io/library/golang@sha256:2bcff0c6ad6e8c5353e8c0d5c7f17bfcc87d667d0169615e34db1acc0db985b9"
+      },
+      "treeHash": "5cd415ea43f3b052c5d1b97bbfa8870a4fc5d144",
+      "versionStamp": {
+        "BUILD_VERSION": "v1.36.0",
+        "GIT_VERSION": "ecf6decece6a6de25a57aad9ba90b6ce580f6f78",
+        "KUBE_GIT_MAJOR": "1",
+        "KUBE_GIT_MINOR": "36"
+      },
+      "writeDir": "nvkr-output"
+    },
+    "kubectl-operator": {
+      "commit": "0f29094e5b73085e3802ecc1298ecae13866bfe6",
+      "fromSource": false,
+      "outputType": "host-package",
+      "platforms": [
+        "linux/amd64",
+        "linux/arm64"
+      ],
+      "prebuilt": {
+        "evidence": {
+          "none": true
+        },
+        "executables": [
+          {
+            "archiveDigest": "sha256:ebbd080e7c2e275093b55915722043257eb24004363e20acb3c4d71919f88336",
+            "executableDigest": "sha256:ebbd080e7c2e275093b55915722043257eb24004363e20acb3c4d71919f88336",
+            "executablePath": "kubectl",
+            "format": "raw",
+            "platform": "linux/amd64",
+            "url": "https://dl.k8s.io/release/v1.36.3/bin/linux/amd64/kubectl"
+          },
+          {
+            "archiveDigest": "sha256:3d86f24401c41ae5a46ac50eef8865fe891d3647d324a0836f6c63757a126e62",
+            "executableDigest": "sha256:3d86f24401c41ae5a46ac50eef8865fe891d3647d324a0836f6c63757a126e62",
+            "executablePath": "kubectl",
+            "format": "raw",
+            "platform": "linux/arm64",
+            "url": "https://dl.k8s.io/release/v1.36.3/bin/linux/arm64/kubectl"
+          }
+        ]
+      },
+      "repo": "https://github.com/kubernetes/kubernetes",
+      "sourceDateEpoch": 1784743658,
+      "tag": "v1.36.3"
+    },
+    "native-capi-exec-init-image": {
+      "commit": "2cfd00081b468d85a4894ec17e9deac13c9d8169",
+      "fromSource": false,
+      "outputType": "oci-image",
+      "platforms": [
+        "linux/amd64",
+        "linux/arm64"
+      ],
+      "prebuilt": {
+        "digests": {
+          "amd64": "sha256:c26612752c78b18faacd63c7d50f4592c2e7b0f25e0e20e82bd74e465c57ab0d",
+          "arm64": "sha256:e311ae748be7f56ae5cba304bc488f0786df68ee507513f654a5cc8597cffb42"
+        },
+        "evidence": {
+          "none": true
+        },
+        "image": "docker.io/library/alpine@sha256:be2656061b536c1883c4034790e21d0a09c5aaaf51968b89368a3c0371ea2c9a",
+        "imageParentDigest": "sha256:be2656061b536c1883c4034790e21d0a09c5aaaf51968b89368a3c0371ea2c9a"
+      },
+      "repo": "https://github.com/dsx-ai-factory/nvke.git",
+      "sourceDateEpoch": 1793236039,
+      "tag": "v0.23.0"
+    },
+    "native-capi-exec-init-image-main": {
+      "commit": "2cfd00081b468d85a4894ec17e9deac13c9d8169",
+      "fromSource": false,
+      "outputType": "oci-image",
+      "platforms": [
+        "linux/amd64",
+        "linux/arm64"
+      ],
+      "prebuilt": {
+        "digests": {
+          "amd64": "sha256:c26612752c78b18faacd63c7d50f4592c2e7b0f25e0e20e82bd74e465c57ab0d",
+          "arm64": "sha256:e311ae748be7f56ae5cba304bc488f0786df68ee507513f654a5cc8597cffb42"
+        },
+        "evidence": {
+          "none": true
+        },
+        "image": "docker.io/library/alpine@sha256:be2656061b536c1883c4034790e21d0a09c5aaaf51968b89368a3c0371ea2c9a",
+        "imageParentDigest": "sha256:be2656061b536c1883c4034790e21d0a09c5aaaf51968b89368a3c0371ea2c9a"
+      },
+      "repo": "https://github.com/dsx-ai-factory/nvke.git",
+      "sourceDateEpoch": 1793236039,
+      "tag": "v0.23.0"
+    },
+    "native-capi-exec-plugin-image": {
+      "commit": "2cfd00081b468d85a4894ec17e9deac13c9d8169",
+      "fromSource": false,
+      "outputType": "oci-image",
+      "platforms": [
+        "linux/amd64",
+        "linux/arm64"
+      ],
+      "prebuilt": {
+        "digests": {
+          "amd64": "sha256:ef6f2f3c6eb41017fec9b5bdfeb87bea402d606606e16b788305dc9557c85892",
+          "arm64": "sha256:a8904bb463d669541a195ee013937e9a5a457dc999b3245da222858b526660fa"
+        },
+        "evidence": {
+          "none": true
+        },
+        "image": "ghcr.io/spiffe/k8s-spiffe-workload-jwt-exec-auth@sha256:e30e90774e5951f84eb6dfb36f972fead08b64c3bfdc0912c5b15f988e79de3a",
+        "imageParentDigest": "sha256:e30e90774e5951f84eb6dfb36f972fead08b64c3bfdc0912c5b15f988e79de3a"
+      },
+      "repo": "https://github.com/dsx-ai-factory/nvke.git",
+      "sourceDateEpoch": 1793236039,
+      "tag": "v0.23.0"
+    },
+    "native-workload-image": {
+      "commit": "2cfd00081b468d85a4894ec17e9deac13c9d8169",
+      "fromSource": false,
+      "outputType": "oci-image",
+      "platforms": [
+        "linux/amd64",
+        "linux/arm64"
+      ],
+      "prebuilt": {
+        "digests": {
+          "amd64": "sha256:d56c381f961d307a21b3ca004cf1e3910f106644aefb1f43e654c8a56c4fd395",
+          "arm64": "sha256:260479a1cfaf304c4c20da7f8405d3ce313513dcd534bb743257bdd2fe0f3e2d"
+        },
+        "evidence": {
+          "none": true
+        },
+        "image": "docker.io/library/alpine@sha256:294b683cb724975bec92580e1e685676bd4b50bda910ddb8c51d4cabeaec77e6",
+        "imageParentDigest": "sha256:294b683cb724975bec92580e1e685676bd4b50bda910ddb8c51d4cabeaec77e6"
+      },
+      "repo": "https://github.com/dsx-ai-factory/nvke.git",
+      "sourceDateEpoch": 1793236039,
+      "tag": "v0.23.0"
+    },
+    "nerdctl": {
+      "artifactPath": "_output/nerdctl",
+      "buildCommand": [
+        "bash",
+        "-euc",
+        {
+          "file": ".github/nvkr-plan-store/scripts/nerdctl/build@d4f1d26041e4.sh"
+        }
+      ],
+      "builderType": "oci-hermetic",
+      "commit": "9039d5272eb8646d35322b9f4413bdf18ce7231a",
+      "fromSource": true,
+      "outputType": "host-package",
+      "platforms": [
+        "darwin/arm64",
+        "linux/amd64",
+        "linux/arm64"
+      ],
+      "repo": "https://github.com/containerd/nerdctl",
+      "sourceDateEpoch": 1790975074,
+      "tag": "v2.4.1",
+      "toolchainImage": "golang@sha256:5bc7f572bbaa98885a3a1fd9c0aa76b59e3e14e8628bfc316bbfd0c701e4818c",
+      "treeHash": "6475ba71d8f7f2a2d6c2d09cbfbd40b4a1a1f029",
+      "vendorCommand": [
+        "bash",
+        "-euc",
+        {
+          "file": ".github/nvkr-plan-store/scripts/nerdctl/vendor@9b922ddbf2a1.sh"
+        }
+      ],
+      "versionStamp": {
+        "BUILD_VERSION": "v2.4.1",
+        "GIT_VERSION": "9039d5272eb8646d35322b9f4413bdf18ce7231a"
+      },
+      "writeDir": "_output"
+    },
+    "nico-sim": {
+      "artifactPath": "controller/nico-sim/bin/nico-sim",
+      "buildCommand": [
+        "bash",
+        "-euc",
+        {
+          "file": ".github/nvkr-plan-store/scripts/nico-sim/build@ecd931a6d49b.sh"
+        }
+      ],
+      "buildCommandByPlatform": {
+        "darwin/arm64": [
+          "go",
+          "-C",
+          "controller/nico-sim",
+          "build",
+          "-mod=vendor",
+          "-o",
+          "bin/nico-sim",
+          "./cmd/nico-sim"
+        ]
+      },
+      "builderType": "oci-hermetic",
+      "cgo": true,
+      "commit": "2cfd00081b468d85a4894ec17e9deac13c9d8169",
+      "fromSource": true,
+      "outputType": "host-package",
+      "platforms": [
+        "darwin/arm64",
+        "linux/amd64",
+        "linux/arm64"
+      ],
+      "repo": "https://github.com/dsx-ai-factory/nvke.git",
+      "sourceDateEpoch": 1793236039,
+      "tag": "v0.23.0",
+      "toolchainImages": {
+        "amd64": "golang@sha256:957861185dbf29d93668ace41e011d091c6e779953d47f0316ef2cc58e28fe2b",
+        "arm64": "golang@sha256:957861185dbf29d93668ace41e011d091c6e779953d47f0316ef2cc58e28fe2b"
+      },
+      "treeHash": "a377abf5f0d584db9c86cc9981b2fdaa8bb4ac53",
+      "vendorCommand": [
+        "bash",
+        "-euc",
+        {
+          "file": ".github/nvkr-plan-store/scripts/nvke/vendor@d0115796f53e.sh"
+        }
+      ],
+      "writeDir": "controller/nico-sim/bin"
+    },
+    "nico-sim-runtime-assets": {
+      "artifactPath": "controller/nico-sim/bin/nicosim-runtime-assets.tar.gz",
+      "buildCommand": [
+        "bash",
+        "-euc",
+        {
+          "file": ".github/nvkr-plan-store/scripts/nico-sim-runtime-assets/build@8a7d888b41c4.sh"
+        }
+      ],
+      "builderType": "oci-hermetic",
+      "commit": "2cfd00081b468d85a4894ec17e9deac13c9d8169",
+      "fromSource": true,
+      "outputType": "tarball",
+      "platforms": [
+        "darwin/arm64",
+        "linux/amd64",
+        "linux/arm64"
+      ],
+      "repo": "https://github.com/dsx-ai-factory/nvke.git",
+      "sourceDateEpoch": 1793236039,
+      "tag": "v0.23.0",
+      "toolchainImages": {
+        "amd64": "golang@sha256:957861185dbf29d93668ace41e011d091c6e779953d47f0316ef2cc58e28fe2b",
+        "arm64": "golang@sha256:957861185dbf29d93668ace41e011d091c6e779953d47f0316ef2cc58e28fe2b"
+      },
+      "treeHash": "a377abf5f0d584db9c86cc9981b2fdaa8bb4ac53",
+      "vendorCommand": [
+        "bash",
+        "-euc",
+        {
+          "file": ".github/nvkr-plan-store/scripts/nvke/vendor@d0115796f53e.sh"
+        }
+      ],
+      "writeDir": "controller/nico-sim/bin"
+    },
+    "nico-sim-runtime-assets-nicosim": {
+      "artifactPath": "controller/nico-sim/bin/nicosim-runtime-assets.tar.gz",
+      "buildCommand": [
+        "bash",
+        "-euc",
+        {
+          "file": ".github/nvkr-plan-store/scripts/nico-sim-runtime-assets-nicosim/build@c4c1a60cacd2.sh"
+        }
+      ],
+      "builderType": "oci-hermetic",
+      "commit": "2cfd00081b468d85a4894ec17e9deac13c9d8169",
+      "fromSource": true,
+      "outputType": "tarball",
+      "platforms": [
+        "linux/arm64"
+      ],
+      "repo": "https://github.com/dsx-ai-factory/nvke.git",
+      "sourceDateEpoch": 1793236039,
+      "tag": "v0.23.0",
+      "toolchainImages": {
+        "arm64": "ghcr.io/dsx-ai-factory/nvkr/m2-candidate/toolchains/packer-native@sha256:2dcb63fc894ec25f8763d37d5139d904be3f6f42c897ca0dd3b32a51f8d36140"
+      },
+      "treeHash": "a377abf5f0d584db9c86cc9981b2fdaa8bb4ac53",
+      "vendorCommand": [
+        "bash",
+        "-euc",
+        {
+          "file": ".github/nvkr-plan-store/scripts/nvke/vendor@d0115796f53e.sh"
+        }
+      ],
+      "writeDir": "controller/nico-sim/bin"
+    },
+    "nico-simctl": {
+      "artifactPath": "controller/nico-sim/bin/nico-simctl",
+      "buildCommand": [
+        "bash",
+        "-euc",
+        {
+          "file": ".github/nvkr-plan-store/scripts/nico-simctl/build@053587a614b3.sh"
+        }
+      ],
+      "builderType": "oci-hermetic",
+      "commit": "2cfd00081b468d85a4894ec17e9deac13c9d8169",
+      "fromSource": true,
+      "outputType": "host-package",
+      "platforms": [
+        "darwin/arm64",
+        "linux/amd64",
+        "linux/arm64"
+      ],
+      "repo": "https://github.com/dsx-ai-factory/nvke.git",
+      "sourceDateEpoch": 1793236039,
+      "tag": "v0.23.0",
+      "toolchainImages": {
+        "amd64": "golang@sha256:957861185dbf29d93668ace41e011d091c6e779953d47f0316ef2cc58e28fe2b",
+        "arm64": "golang@sha256:957861185dbf29d93668ace41e011d091c6e779953d47f0316ef2cc58e28fe2b"
+      },
+      "treeHash": "a377abf5f0d584db9c86cc9981b2fdaa8bb4ac53",
+      "vendorCommand": [
+        "bash",
+        "-euc",
+        {
+          "file": ".github/nvkr-plan-store/scripts/nvke/vendor@d0115796f53e.sh"
+        }
+      ],
+      "writeDir": "controller/nico-sim/bin"
+    },
+    "nvke-installer-sources": {
+      "artifactPath": "bin/nvke-installer-sources.tar.gz",
+      "buildCommand": [
+        "bash",
+        "-euc",
+        {
+          "file": ".github/nvkr-plan-store/scripts/nvke-installer-sources/build@0d531d2f41f5.sh"
+        }
+      ],
+      "builderType": "oci-hermetic",
+      "commit": "2cfd00081b468d85a4894ec17e9deac13c9d8169",
+      "fromSource": true,
+      "outputType": "tarball",
+      "platforms": [
+        "darwin/arm64",
+        "linux/amd64",
+        "linux/arm64"
+      ],
+      "repo": "https://github.com/dsx-ai-factory/nvke.git",
+      "sourceDateEpoch": 1793236039,
+      "tag": "v0.23.0",
+      "toolchainImage": "golang@sha256:957861185dbf29d93668ace41e011d091c6e779953d47f0316ef2cc58e28fe2b",
+      "treeHash": "a377abf5f0d584db9c86cc9981b2fdaa8bb4ac53",
+      "versionStamp": {
+        "NKECTL_COMMIT": "2cfd00081b468d85a4894ec17e9deac13c9d8169"
+      },
+      "writeDir": "bin"
+    },
+    "nvkectl": {
+      "artifactPath": "cli/bin/nvkectl",
+      "buildCommand": [
+        "bash",
+        "-euc",
+        {
+          "file": ".github/nvkr-plan-store/scripts/nvkectl/build@9a9a3e182b74.sh"
+        }
+      ],
+      "builderType": "oci-hermetic",
+      "commit": "2cfd00081b468d85a4894ec17e9deac13c9d8169",
+      "fromSource": true,
+      "outputType": "host-package",
+      "platforms": [
+        "darwin/arm64",
+        "linux/amd64",
+        "linux/arm64"
+      ],
+      "repo": "https://github.com/dsx-ai-factory/nvke.git",
+      "sourceDateEpoch": 1793236039,
+      "tag": "v0.23.0",
+      "toolchainImage": "golang@sha256:957861185dbf29d93668ace41e011d091c6e779953d47f0316ef2cc58e28fe2b",
+      "treeHash": "a377abf5f0d584db9c86cc9981b2fdaa8bb4ac53",
+      "vendorCommand": [
+        "bash",
+        "-euc",
+        {
+          "file": ".github/nvkr-plan-store/scripts/nvke/vendor@13d9dec06018.sh"
+        }
+      ],
+      "versionStamp": {
+        "NKECTL_COMMIT": "2cfd00081b468d85a4894ec17e9deac13c9d8169",
+        "NKECTL_DATE": "2026-10-29T01:07:19Z"
+      },
+      "writeDir": "cli/bin"
+    },
+    "nvkr-site-identity-helper": {
+      "artifactPath": "bin/nvkr-site-identity-helper",
+      "buildCommand": [
+        "bash",
+        "-euc",
+        {
+          "file": ".github/nvkr-plan-store/scripts/nvkr-site-identity-helper/build@6f53583378e2.sh"
+        }
+      ],
+      "builderType": "oci-hermetic",
+      "commit": "57b44e18f797592af5cfaab0c121e4c209b88619",
+      "fromSource": true,
+      "outputType": "host-package",
+      "platforms": [
+        "linux/amd64",
+        "linux/arm64"
+      ],
+      "repo": "https://github.com/dsx-ai-factory/nvkr.git",
+      "sourceDateEpoch": 1793545370,
+      "tag": "57b44e18f797592af5cfaab0c121e4c209b88619",
+      "toolchainImage": "golang@sha256:957861185dbf29d93668ace41e011d091c6e779953d47f0316ef2cc58e28fe2b",
+      "treeHash": "18d08e01666ba71e444d5bc1ceccaacc1737dd75",
+      "vendorCommand": [
+        "bash",
+        "-euc",
+        {
+          "file": ".github/nvkr-plan-store/scripts/nvkr/vendor@9b922ddbf2a1.sh"
+        }
+      ],
+      "writeDir": "bin"
+    },
+    "oras": {
+      "commit": "210747c29c1d38732b3194878dfd8b5a6b9ad7eb",
+      "fromSource": false,
+      "outputType": "host-package",
+      "platforms": [
+        "darwin/arm64",
+        "linux/amd64",
+        "linux/arm64"
+      ],
+      "prebuilt": {
+        "evidence": {
+          "none": true
+        },
+        "executables": [
+          {
+            "archiveDigest": "sha256:f33fc12753c54172b0d0d19eaa0318d3f90fe9b094d96e8b259c881713c92e1c",
+            "executableDigest": "sha256:4b8a42fc8e7976710eef8b846309b5426aa4d12d0de9dfd691d58507f23cf180",
+            "executablePath": "oras",
+            "format": "tar-gzip",
+            "platform": "darwin/arm64",
+            "url": "https://github.com/oras-project/oras/releases/download/v1.3.3/oras_1.3.3_darwin_arm64.tar.gz"
+          },
+          {
+            "archiveDigest": "sha256:9ce999f8d2de03fc03968b29d743077a58783e545e5eaa53917ca177352d0e59",
+            "executableDigest": "sha256:a9c7694677a72251c89c176331d41b2198d8e85cbaece038bcbc8da0679e1139",
+            "executablePath": "oras",
+            "format": "tar-gzip",
+            "platform": "linux/amd64",
+            "url": "https://github.com/oras-project/oras/releases/download/v1.3.3/oras_1.3.3_linux_amd64.tar.gz"
+          },
+          {
+            "archiveDigest": "sha256:ac7156f93a21e903f7ad606c792f3560f17e0cd0e36365634701b1e7cc4e4eca",
+            "executableDigest": "sha256:f4bdc5f948233b03042734bf679d6926323701f4dcc08de25301af82b648d6f3",
+            "executablePath": "oras",
+            "format": "tar-gzip",
+            "platform": "linux/arm64",
+            "url": "https://github.com/oras-project/oras/releases/download/v1.3.3/oras_1.3.3_linux_arm64.tar.gz"
+          }
+        ]
+      },
+      "repo": "https://github.com/oras-project/oras",
+      "sourceDateEpoch": 1783708065,
+      "tag": "v1.3.3"
+    },
+    "oras-installer-local": {
+      "artifactPath": "nvkr-output/oras",
+      "buildCommand": [
+        "bash",
+        "-euc",
+        {
+          "file": ".github/nvkr-plan-store/scripts/oras-installer-local/build@39ace6588933.sh"
+        }
+      ],
+      "builderType": "oci-hermetic",
+      "commit": "210747c29c1d38732b3194878dfd8b5a6b9ad7eb",
+      "fromSource": true,
+      "outputType": "raw",
+      "platforms": [
+        "linux/arm64"
+      ],
+      "repo": "https://github.com/oras-project/oras",
+      "sourceDateEpoch": 1783708065,
+      "tag": "v1.3.3",
+      "toolchainImages": {
+        "arm64": "docker.io/library/golang@sha256:2bcff0c6ad6e8c5353e8c0d5c7f17bfcc87d667d0169615e34db1acc0db985b9"
+      },
+      "treeHash": "a4b0547c6e18c9abc9b1eac5fb8add27a7c4ce2f",
+      "vendorCommand": [
+        "bash",
+        "-euc",
+        {
+          "file": ".github/nvkr-plan-store/scripts/oras/vendor@9b922ddbf2a1.sh"
+        }
+      ],
+      "versionStamp": {
+        "GIT_VERSION": "210747c29c1d38732b3194878dfd8b5a6b9ad7eb"
+      },
+      "writeDir": "nvkr-output"
+    },
+    "packer": {
+      "commit": "9f42be3f6686a9c00b3b1325fcecbba337b8b93b",
+      "fromSource": false,
+      "outputType": "host-package",
+      "platforms": [
+        "darwin/arm64",
+        "linux/arm64"
+      ],
+      "prebuilt": {
+        "evidence": {
+          "none": true
+        },
+        "executables": [
+          {
+            "archiveDigest": "sha256:d95ba177dd2ebb84d7d155493b4188ec2a519d2c3b041528db5b63a6aff9da80",
+            "executableDigest": "sha256:1729663b9c6e0f7a32fbab6efa5d23dee9d92d61bc319d39eb7198b796e54a8b",
+            "executablePath": "packer",
+            "format": "zip",
+            "platform": "darwin/arm64",
+            "url": "https://releases.hashicorp.com/packer/1.15.4/packer_1.15.4_darwin_arm64.zip"
+          },
+          {
+            "archiveDigest": "sha256:23e6d2e596dd9e2527e0f7bea9aedd26059729375a0d17c462c2621f1b97b82d",
+            "executableDigest": "sha256:147b17e1088be369f4b7d74fb3a5744edf0162632083c58d63c7c41d5a73fd4e",
+            "executablePath": "packer",
+            "format": "zip",
+            "platform": "linux/arm64",
+            "url": "https://releases.hashicorp.com/packer/1.15.4/packer_1.15.4_linux_arm64.zip"
+          }
+        ]
+      },
+      "repo": "https://github.com/hashicorp/packer",
+      "sourceDateEpoch": 1780491485,
+      "tag": "v1.15.4"
+    },
+    "packer-plugin-qemu": {
+      "commit": "cc9522dd1de3bf7e0c2c6eb5cf54ec59803bd13c",
+      "fromSource": false,
+      "outputType": "host-package",
+      "platforms": [
+        "darwin/arm64",
+        "linux/arm64"
+      ],
+      "prebuilt": {
+        "evidence": {
+          "none": true
+        },
+        "executables": [
+          {
+            "archiveDigest": "sha256:3fce2e8b5c3fce0aac5f47f59b81b7ecfffd397532ecd4021ba7b6dfd2935ba6",
+            "executableDigest": "sha256:73440227248a65d23a3084d03846cfe911ca956634e9d961710e01c4f3774d80",
+            "executablePath": "packer-plugin-qemu_v1.1.6_x5.0_darwin_arm64",
+            "format": "zip",
+            "platform": "darwin/arm64",
+            "url": "https://releases.hashicorp.com/packer-plugin-qemu/1.1.6/packer-plugin-qemu_1.1.6_darwin_arm64.zip"
+          },
+          {
+            "archiveDigest": "sha256:81a91755dfbb50317a51652fe3fa68b0253da864374bdf219e4d32ebbe08af58",
+            "executableDigest": "sha256:d672c5b820cb4ce54c8eb6bde1f453b04976935a144f5180f836b6457cd2556c",
+            "executablePath": "packer-plugin-qemu_v1.1.6_x5.0_linux_arm64",
+            "format": "zip",
+            "platform": "linux/arm64",
+            "url": "https://releases.hashicorp.com/packer-plugin-qemu/1.1.6/packer-plugin-qemu_1.1.6_linux_arm64.zip"
+          }
+        ]
+      },
+      "repo": "https://github.com/hashicorp/packer-plugin-qemu",
+      "sourceDateEpoch": 1784198226,
+      "tag": "v1.1.6"
+    },
+    "syft": {
+      "commit": "91a0032987d91b7411b52f6f5c185c5e7f775495",
+      "fromSource": false,
+      "outputType": "host-package",
+      "platforms": [
+        "linux/arm64"
+      ],
+      "prebuilt": {
+        "digests": {
+          "arm64": "sha256:617cef943234e0cae184b4901414ca4059ad6c6923a9c9decb46f49f6a2c6573"
+        },
+        "evidence": {
+          "none": true
+        },
+        "executable": {
+          "archiveDigest": "sha256:a7fd2b784e6664acd44719270574f6cd8c6864fc2b1700bf9099bd1cccda7d7f",
+          "executableDigest": "sha256:617cef943234e0cae184b4901414ca4059ad6c6923a9c9decb46f49f6a2c6573",
+          "executablePath": "syft",
+          "format": "tar-gzip",
+          "platform": "linux/arm64",
+          "url": "https://github.com/anchore/syft/releases/download/v1.51.1/syft_1.51.1_linux_arm64.tar.gz"
+        },
+        "url": "https://github.com/anchore/syft/releases/download/v1.51.1/syft_1.51.1_linux_arm64.tar.gz"
+      },
+      "repo": "https://github.com/anchore/syft",
+      "sourceDateEpoch": 1787847909,
+      "tag": "v1.51.1"
+    },
+    "vmnet-client": {
+      "commit": "c593b89a2e93e92cfe7c5b1189e1eeb2c7977554",
+      "fromSource": false,
+      "outputType": "host-package",
+      "platforms": [
+        "darwin/arm64"
+      ],
+      "prebuilt": {
+        "digests": {
+          "arm64": "sha256:24742a641cd4e884502217fac6f40c4a27a6ffd08682137a69dac21f3cb198f6"
+        },
+        "evidence": {
+          "none": true
+        },
+        "executable": {
+          "archiveDigest": "sha256:bcf37a2631878a24fd02e2bf812b7387d4c4ff0bcee27c3f4be410c040896f8b",
+          "executableDigest": "sha256:24742a641cd4e884502217fac6f40c4a27a6ffd08682137a69dac21f3cb198f6",
+          "executablePath": "opt/vmnet-helper/bin/vmnet-client",
+          "format": "tar-gzip",
+          "platform": "darwin/arm64",
+          "url": "https://github.com/nirs/vmnet-helper/releases/download/v0.10.0/vmnet-helper.tar.gz"
+        },
+        "url": "https://github.com/nirs/vmnet-helper/releases/download/v0.10.0/vmnet-helper.tar.gz"
+      },
+      "repo": "https://github.com/nirs/vmnet-helper",
+      "sourceDateEpoch": 1773407730,
+      "tag": "v0.10.0"
+    },
+    "vmnet-helper": {
+      "commit": "c593b89a2e93e92cfe7c5b1189e1eeb2c7977554",
+      "fromSource": false,
+      "outputType": "host-package",
+      "platforms": [
+        "darwin/arm64"
+      ],
+      "prebuilt": {
+        "digests": {
+          "arm64": "sha256:3075f3297ed2f8edeb2ae058383dc83debc366fb9d7ce3aa0928a8bc51a7f3a6"
+        },
+        "evidence": {
+          "none": true
+        },
+        "executable": {
+          "archiveDigest": "sha256:bcf37a2631878a24fd02e2bf812b7387d4c4ff0bcee27c3f4be410c040896f8b",
+          "executableDigest": "sha256:3075f3297ed2f8edeb2ae058383dc83debc366fb9d7ce3aa0928a8bc51a7f3a6",
+          "executablePath": "opt/vmnet-helper/bin/vmnet-helper",
+          "format": "tar-gzip",
+          "platform": "darwin/arm64",
+          "url": "https://github.com/nirs/vmnet-helper/releases/download/v0.10.0/vmnet-helper.tar.gz"
+        },
+        "url": "https://github.com/nirs/vmnet-helper/releases/download/v0.10.0/vmnet-helper.tar.gz"
+      },
+      "repo": "https://github.com/nirs/vmnet-helper",
+      "sourceDateEpoch": 1773407730,
+      "tag": "v0.10.0"
+    }
+  },
+  "Kind": "SourceBuildRegistry",
+  "Metadata": {
+    "description": "Shared tools domain catalog; explicit producer variants preserve existing build and acquisition contracts.",
+    "name": "tools"
+  },
+  "Sources": {
+    "clusterctl": {
+      "constraint": "1.13.6",
+      "repo": "https://github.com/kubernetes-sigs/cluster-api",
+      "tool": {
+        "executablePath": "clusterctl",
+        "format": "raw",
+        "platforms": [
+          "darwin/arm64",
+          "linux/amd64",
+          "linux/arm64"
+        ],
+        "url": "https://github.com/kubernetes-sigs/cluster-api/releases/download/{{.Tag}}/clusterctl-{{.OS}}-{{.Arch}}"
+      }
+    },
+    "clusterctl-installer-hosted": {
+      "constraint": "1.13.6",
+      "repo": "https://github.com/kubernetes-sigs/cluster-api",
+      "toolchainImagesByArch": {
+        "arm64": "docker.io/library/golang@sha256:2bcff0c6ad6e8c5353e8c0d5c7f17bfcc87d667d0169615e34db1acc0db985b9"
+      },
+      "vendorCommand": [
+        "bash",
+        "-euc",
+        {
+          "file": ".github/nvkr-plan-store/scripts/cluster-api/vendor@9b922ddbf2a1.sh"
+        }
+      ]
+    },
+    "helm": {
+      "constraint": "4.2.4",
+      "repo": "https://github.com/helm/helm",
+      "tool": {
+        "executablePath": "{{.OS}}-{{.Arch}}/helm",
+        "format": "tar-gzip",
+        "platforms": [
+          "darwin/arm64",
+          "linux/amd64",
+          "linux/arm64"
+        ],
+        "url": "https://get.helm.sh/helm-{{.Tag}}-{{.OS}}-{{.Arch}}.tar.gz"
+      }
+    },
+    "helm-installer-local": {
+      "constraint": "4.2.4",
+      "repo": "https://github.com/helm/helm",
+      "toolchainImagesByArch": {
+        "arm64": "docker.io/library/golang@sha256:2bcff0c6ad6e8c5353e8c0d5c7f17bfcc87d667d0169615e34db1acc0db985b9"
+      },
+      "vendorCommand": [
+        "bash",
+        "-euc",
+        {
+          "file": ".github/nvkr-plan-store/scripts/helm/vendor@721a039c1e40.sh"
+        }
+      ]
+    },
+    "helm-operator": {
+      "constraint": "4.1.4",
+      "repo": "https://github.com/helm/helm",
+      "tool": {
+        "executablePath": "{{.OS}}-{{.Arch}}/helm",
+        "format": "tar-gzip",
+        "platforms": [
+          "linux/amd64",
+          "linux/arm64"
+        ],
+        "url": "https://get.helm.sh/helm-{{.Tag}}-{{.OS}}-{{.Arch}}.tar.gz"
+      }
+    },
+    "kind": {
+      "constraint": "0.32.0",
+      "repo": "https://github.com/kubernetes-sigs/kind",
+      "tool": {
+        "executablePath": "kind",
+        "format": "raw",
+        "platforms": [
+          "darwin/arm64",
+          "linux/amd64",
+          "linux/arm64"
+        ],
+        "url": "https://github.com/kubernetes-sigs/kind/releases/download/{{.Tag}}/kind-{{.OS}}-{{.Arch}}"
+      }
+    },
+    "kind-installer-hosted": {
+      "constraint": "0.32.0",
+      "repo": "https://github.com/kubernetes-sigs/kind",
+      "toolchainImagesByArch": {
+        "arm64": "docker.io/library/golang@sha256:2bcff0c6ad6e8c5353e8c0d5c7f17bfcc87d667d0169615e34db1acc0db985b9"
+      },
+      "vendorCommand": [
+        "bash",
+        "-euc",
+        {
+          "file": ".github/nvkr-plan-store/scripts/kind/vendor@9b922ddbf2a1.sh"
+        }
+      ]
+    },
+    "kubectl": {
+      "constraint": "1.35.9",
+      "repo": "https://github.com/kubernetes/kubernetes",
+      "tool": {
+        "executablePath": "kubectl",
+        "format": "raw",
+        "platforms": [
+          "darwin/arm64",
+          "linux/amd64",
+          "linux/arm64"
+        ],
+        "url": "https://dl.k8s.io/release/{{.Tag}}/bin/{{.OS}}/{{.Arch}}/kubectl"
+      }
+    },
+    "kubectl-installer-hosted": {
+      "constraint": "1.36.0",
+      "repo": "https://github.com/kubernetes/kubernetes",
+      "toolchainImagesByArch": {
+        "arm64": "docker.io/library/golang@sha256:2bcff0c6ad6e8c5353e8c0d5c7f17bfcc87d667d0169615e34db1acc0db985b9"
+      }
+    },
+    "kubectl-operator": {
+      "constraint": "1.36.3",
+      "repo": "https://github.com/kubernetes/kubernetes",
+      "tool": {
+        "executablePath": "kubectl",
+        "format": "raw",
+        "platforms": [
+          "linux/amd64",
+          "linux/arm64"
+        ],
+        "url": "https://dl.k8s.io/release/{{.Tag}}/bin/{{.OS}}/{{.Arch}}/kubectl"
+      }
+    },
+    "nerdctl-site": {
+      "constraint": "2.4.1",
+      "repo": "https://github.com/containerd/nerdctl",
+      "toolchainImage": "golang@sha256:5bc7f572bbaa98885a3a1fd9c0aa76b59e3e14e8628bfc316bbfd0c701e4818c",
+      "vendorCommand": [
+        "bash",
+        "-euc",
+        {
+          "file": ".github/nvkr-plan-store/scripts/nerdctl/vendor@9b922ddbf2a1.sh"
+        }
+      ]
+    },
+    "nvke-cli": {
+      "constraint": "v0.23.0",
+      "repo": "https://github.com/dsx-ai-factory/nvke.git",
+      "toolchainImage": "golang@sha256:957861185dbf29d93668ace41e011d091c6e779953d47f0316ef2cc58e28fe2b",
+      "vendorCommand": [
+        "bash",
+        "-euc",
+        {
+          "file": ".github/nvkr-plan-store/scripts/nvke/vendor@13d9dec06018.sh"
+        }
+      ]
+    },
+    "nvke-deploy": {
+      "constraint": "v0.23.0",
+      "repo": "https://github.com/dsx-ai-factory/nvke.git",
+      "toolchainImage": "golang@sha256:957861185dbf29d93668ace41e011d091c6e779953d47f0316ef2cc58e28fe2b"
+    },
+    "nvke-nicosim": {
+      "constraint": "v0.23.0",
+      "repo": "https://github.com/dsx-ai-factory/nvke.git",
+      "toolchainImagesByArch": {
+        "amd64": "golang@sha256:957861185dbf29d93668ace41e011d091c6e779953d47f0316ef2cc58e28fe2b",
+        "arm64": "golang@sha256:957861185dbf29d93668ace41e011d091c6e779953d47f0316ef2cc58e28fe2b"
+      },
+      "vendorCommand": [
+        "bash",
+        "-euc",
+        {
+          "file": ".github/nvkr-plan-store/scripts/nvke/vendor@d0115796f53e.sh"
+        }
+      ]
+    },
+    "nvke-nicosim-nicosim": {
+      "constraint": "v0.23.0",
+      "repo": "https://github.com/dsx-ai-factory/nvke.git",
+      "toolchainImagesByArch": {
+        "arm64": "ghcr.io/dsx-ai-factory/nvkr/m2-candidate/toolchains/packer-native@sha256:2dcb63fc894ec25f8763d37d5139d904be3f6f42c897ca0dd3b32a51f8d36140"
+      },
+      "vendorCommand": [
+        "bash",
+        "-euc",
+        {
+          "file": ".github/nvkr-plan-store/scripts/nvke/vendor@d0115796f53e.sh"
+        }
+      ]
+    },
+    "nvkr-site-identity": {
+      "constraint": "*",
+      "repo": "https://github.com/dsx-ai-factory/nvkr.git",
+      "toolchainImage": "golang@sha256:957861185dbf29d93668ace41e011d091c6e779953d47f0316ef2cc58e28fe2b",
+      "vendorCommand": [
+        "bash",
+        "-euc",
+        {
+          "file": ".github/nvkr-plan-store/scripts/nvkr/vendor@9b922ddbf2a1.sh"
+        }
+      ]
+    },
+    "oras": {
+      "constraint": "1.3.3",
+      "repo": "https://github.com/oras-project/oras",
+      "tool": {
+        "executablePath": "oras",
+        "format": "tar-gzip",
+        "platforms": [
+          "darwin/arm64",
+          "linux/amd64",
+          "linux/arm64"
+        ],
+        "url": "https://github.com/oras-project/oras/releases/download/{{.Tag}}/oras_{{.Version}}_{{.OS}}_{{.Arch}}.tar.gz"
+      }
+    },
+    "oras-installer-hosted": {
+      "constraint": "1.3.3",
+      "repo": "https://github.com/oras-project/oras",
+      "toolchainImagesByArch": {
+        "arm64": "docker.io/library/golang@sha256:2bcff0c6ad6e8c5353e8c0d5c7f17bfcc87d667d0169615e34db1acc0db985b9"
+      },
+      "vendorCommand": [
+        "bash",
+        "-euc",
+        {
+          "file": ".github/nvkr-plan-store/scripts/oras/vendor@9b922ddbf2a1.sh"
+        }
+      ]
+    },
+    "packer": {
+      "constraint": "1.15.4",
+      "repo": "https://github.com/hashicorp/packer",
+      "tool": {
+        "executablePath": "packer",
+        "format": "zip",
+        "platforms": [
+          "darwin/arm64",
+          "linux/arm64"
+        ],
+        "url": "https://releases.hashicorp.com/packer/{{.Version}}/packer_{{.Version}}_{{.OS}}_{{.Arch}}.zip"
+      }
+    },
+    "packer-plugin-qemu": {
+      "constraint": "1.1.6",
+      "repo": "https://github.com/hashicorp/packer-plugin-qemu",
+      "tool": {
+        "executablePath": "packer-plugin-qemu_v1.1.6_x5.0_{{.OS}}_{{.Arch}}",
+        "format": "zip",
+        "platforms": [
+          "darwin/arm64",
+          "linux/arm64"
+        ],
+        "url": "https://releases.hashicorp.com/packer-plugin-qemu/{{.Version}}/packer-plugin-qemu_{{.Version}}_{{.OS}}_{{.Arch}}.zip"
+      }
+    },
+    "syft": {
+      "constraint": "1.51.1",
+      "repo": "https://github.com/anchore/syft",
+      "tool": {
+        "executablePath": "syft",
+        "format": "tar-gzip",
+        "platform": "linux/arm64",
+        "url": "https://github.com/anchore/syft/releases/download/{{.Tag}}/syft_{{.Version}}_linux_arm64.tar.gz"
+      }
+    },
+    "vmnet-client": {
+      "constraint": "0.10.0",
+      "repo": "https://github.com/nirs/vmnet-helper",
+      "tool": {
+        "executablePath": "opt/vmnet-helper/bin/vmnet-client",
+        "format": "tar-gzip",
+        "platform": "darwin/arm64",
+        "url": "https://github.com/nirs/vmnet-helper/releases/download/{{.Tag}}/vmnet-helper.tar.gz"
+      }
+    },
+    "vmnet-helper": {
+      "constraint": "0.10.0",
+      "repo": "https://github.com/nirs/vmnet-helper",
+      "tool": {
+        "executablePath": "opt/vmnet-helper/bin/vmnet-helper",
+        "format": "tar-gzip",
+        "platform": "darwin/arm64",
+        "url": "https://github.com/nirs/vmnet-helper/releases/download/{{.Tag}}/vmnet-helper.tar.gz"
+      }
+    }
+  },
+  "ToolPlatforms": {
+    "clusterctl": [
+      {
+        "archiveDigest": "sha256:1a04967e188dcb70124f15508e7941335f3bddc5b456d1ed38d6dc4005c187a2",
+        "executableDigest": "sha256:1a04967e188dcb70124f15508e7941335f3bddc5b456d1ed38d6dc4005c187a2",
+        "executablePath": "clusterctl",
+        "format": "raw",
+        "platform": "darwin/arm64",
+        "url": "https://github.com/kubernetes-sigs/cluster-api/releases/download/v1.13.6/clusterctl-darwin-arm64"
+      },
+      {
+        "archiveDigest": "sha256:1e4019b8ef30fa13993716d28b9fec4072fee1e17ea2cc69cb7c8f232d9b8c2f",
+        "executableDigest": "sha256:1e4019b8ef30fa13993716d28b9fec4072fee1e17ea2cc69cb7c8f232d9b8c2f",
+        "executablePath": "clusterctl",
+        "format": "raw",
+        "platform": "linux/amd64",
+        "url": "https://github.com/kubernetes-sigs/cluster-api/releases/download/v1.13.6/clusterctl-linux-amd64"
+      },
+      {
+        "archiveDigest": "sha256:c3fe61fd44fa63d2efcee2a93432619527909b210a84cda7ee86eea1425de8c2",
+        "executableDigest": "sha256:c3fe61fd44fa63d2efcee2a93432619527909b210a84cda7ee86eea1425de8c2",
+        "executablePath": "clusterctl",
+        "format": "raw",
+        "platform": "linux/arm64",
+        "url": "https://github.com/kubernetes-sigs/cluster-api/releases/download/v1.13.6/clusterctl-linux-arm64"
+      }
+    ],
+    "helm": [
+      {
+        "archiveDigest": "sha256:d747eb4e28bd2727173d15b759fa0a17822291ec09db7ced3d55af290a3661a2",
+        "executableDigest": "sha256:66f6b8881392bfa15c6c1dceef980426a28709c8122d5dc8a7a29697cad7334c",
+        "executablePath": "darwin-arm64/helm",
+        "format": "tar-gzip",
+        "platform": "darwin/arm64",
+        "url": "https://get.helm.sh/helm-v4.2.4-darwin-arm64.tar.gz"
+      },
+      {
+        "archiveDigest": "sha256:c306b46f719b0a4da32d0f78ee21bf90ce8d602f15b22ab753f0674d1670a7f3",
+        "executableDigest": "sha256:92e191314f44aac173711bb0247c38c727f3ddf65ad16a01c0861d509a63a9e1",
+        "executablePath": "linux-amd64/helm",
+        "format": "tar-gzip",
+        "platform": "linux/amd64",
+        "url": "https://get.helm.sh/helm-v4.2.4-linux-amd64.tar.gz"
+      },
+      {
+        "archiveDigest": "sha256:564de2191b881e9f71b5606b25345821ea1682f06ab90499d3ab22b530176da1",
+        "executableDigest": "sha256:0690653ac2aad19150f0c22383ceb8aaf4fd96666fcfabb9d4641fbf757e0490",
+        "executablePath": "linux-arm64/helm",
+        "format": "tar-gzip",
+        "platform": "linux/arm64",
+        "url": "https://get.helm.sh/helm-v4.2.4-linux-arm64.tar.gz"
+      }
+    ],
+    "helm-operator": [
+      {
+        "archiveDigest": "sha256:70b2c30a19da4db264dfd68c8a3664e05093a361cefd89572ffb36f8abfa3d09",
+        "executableDigest": "sha256:210d576a6dc04b7864af4b5d9a5af58860bbc03d19174ffeddbd29d01d1b59a9",
+        "executablePath": "linux-amd64/helm",
+        "format": "tar-gzip",
+        "platform": "linux/amd64",
+        "url": "https://get.helm.sh/helm-v4.1.4-linux-amd64.tar.gz"
+      },
+      {
+        "archiveDigest": "sha256:13d03672be289045d2ff00e4e345d61de1c6f21c1257a45955a30e8ae036d8f1",
+        "executableDigest": "sha256:4d6e3a69e6203094d564d5d4e94325b1f7209421dc7e832a96d2510295e03f1d",
+        "executablePath": "linux-arm64/helm",
+        "format": "tar-gzip",
+        "platform": "linux/arm64",
+        "url": "https://get.helm.sh/helm-v4.1.4-linux-arm64.tar.gz"
+      }
+    ],
+    "kind": [
+      {
+        "archiveDigest": "sha256:dca67911095a110c2b5c36e26df6cac860c602033e456c0db47be498cdef1ebb",
+        "executableDigest": "sha256:dca67911095a110c2b5c36e26df6cac860c602033e456c0db47be498cdef1ebb",
+        "executablePath": "kind",
+        "format": "raw",
+        "platform": "darwin/arm64",
+        "url": "https://github.com/kubernetes-sigs/kind/releases/download/v0.32.0/kind-darwin-arm64"
+      },
+      {
+        "archiveDigest": "sha256:50030de23cf40a18505f20426f6a8506bedf13c6e509244bd1fa9463721b0f54",
+        "executableDigest": "sha256:50030de23cf40a18505f20426f6a8506bedf13c6e509244bd1fa9463721b0f54",
+        "executablePath": "kind",
+        "format": "raw",
+        "platform": "linux/amd64",
+        "url": "https://github.com/kubernetes-sigs/kind/releases/download/v0.32.0/kind-linux-amd64"
+      },
+      {
+        "archiveDigest": "sha256:b92cd615e97585de8ddade28ed5cd7feb4248d717c233eea5b03c37298900f5d",
+        "executableDigest": "sha256:b92cd615e97585de8ddade28ed5cd7feb4248d717c233eea5b03c37298900f5d",
+        "executablePath": "kind",
+        "format": "raw",
+        "platform": "linux/arm64",
+        "url": "https://github.com/kubernetes-sigs/kind/releases/download/v0.32.0/kind-linux-arm64"
+      }
+    ],
+    "kubectl": [
+      {
+        "archiveDigest": "sha256:652548e6a9405266c5acd2719703bc8d36befa46e79e151a0d646904aa32c89b",
+        "executableDigest": "sha256:652548e6a9405266c5acd2719703bc8d36befa46e79e151a0d646904aa32c89b",
+        "executablePath": "kubectl",
+        "format": "raw",
+        "platform": "darwin/arm64",
+        "url": "https://dl.k8s.io/release/v1.35.9/bin/darwin/arm64/kubectl"
+      },
+      {
+        "archiveDigest": "sha256:3cfeaf80be482b435b0aa214aff6e0b2c312ee23c0ff20810c75517b6004c6eb",
+        "executableDigest": "sha256:3cfeaf80be482b435b0aa214aff6e0b2c312ee23c0ff20810c75517b6004c6eb",
+        "executablePath": "kubectl",
+        "format": "raw",
+        "platform": "linux/amd64",
+        "url": "https://dl.k8s.io/release/v1.35.9/bin/linux/amd64/kubectl"
+      },
+      {
+        "archiveDigest": "sha256:39c98bca82875d9a9ddfb6f3c5ab17c3f78ea0801230683e538a67d5c053308d",
+        "executableDigest": "sha256:39c98bca82875d9a9ddfb6f3c5ab17c3f78ea0801230683e538a67d5c053308d",
+        "executablePath": "kubectl",
+        "format": "raw",
+        "platform": "linux/arm64",
+        "url": "https://dl.k8s.io/release/v1.35.9/bin/linux/arm64/kubectl"
+      }
+    ],
+    "kubectl-operator": [
+      {
+        "archiveDigest": "sha256:ebbd080e7c2e275093b55915722043257eb24004363e20acb3c4d71919f88336",
+        "executableDigest": "sha256:ebbd080e7c2e275093b55915722043257eb24004363e20acb3c4d71919f88336",
+        "executablePath": "kubectl",
+        "format": "raw",
+        "platform": "linux/amd64",
+        "url": "https://dl.k8s.io/release/v1.36.3/bin/linux/amd64/kubectl"
+      },
+      {
+        "archiveDigest": "sha256:3d86f24401c41ae5a46ac50eef8865fe891d3647d324a0836f6c63757a126e62",
+        "executableDigest": "sha256:3d86f24401c41ae5a46ac50eef8865fe891d3647d324a0836f6c63757a126e62",
+        "executablePath": "kubectl",
+        "format": "raw",
+        "platform": "linux/arm64",
+        "url": "https://dl.k8s.io/release/v1.36.3/bin/linux/arm64/kubectl"
+      }
+    ],
+    "oras": [
+      {
+        "archiveDigest": "sha256:f33fc12753c54172b0d0d19eaa0318d3f90fe9b094d96e8b259c881713c92e1c",
+        "executableDigest": "sha256:4b8a42fc8e7976710eef8b846309b5426aa4d12d0de9dfd691d58507f23cf180",
+        "executablePath": "oras",
+        "format": "tar-gzip",
+        "platform": "darwin/arm64",
+        "url": "https://github.com/oras-project/oras/releases/download/v1.3.3/oras_1.3.3_darwin_arm64.tar.gz"
+      },
+      {
+        "archiveDigest": "sha256:9ce999f8d2de03fc03968b29d743077a58783e545e5eaa53917ca177352d0e59",
+        "executableDigest": "sha256:a9c7694677a72251c89c176331d41b2198d8e85cbaece038bcbc8da0679e1139",
+        "executablePath": "oras",
+        "format": "tar-gzip",
+        "platform": "linux/amd64",
+        "url": "https://github.com/oras-project/oras/releases/download/v1.3.3/oras_1.3.3_linux_amd64.tar.gz"
+      },
+      {
+        "archiveDigest": "sha256:ac7156f93a21e903f7ad606c792f3560f17e0cd0e36365634701b1e7cc4e4eca",
+        "executableDigest": "sha256:f4bdc5f948233b03042734bf679d6926323701f4dcc08de25301af82b648d6f3",
+        "executablePath": "oras",
+        "format": "tar-gzip",
+        "platform": "linux/arm64",
+        "url": "https://github.com/oras-project/oras/releases/download/v1.3.3/oras_1.3.3_linux_arm64.tar.gz"
+      }
+    ],
+    "packer": [
+      {
+        "archiveDigest": "sha256:d95ba177dd2ebb84d7d155493b4188ec2a519d2c3b041528db5b63a6aff9da80",
+        "executableDigest": "sha256:1729663b9c6e0f7a32fbab6efa5d23dee9d92d61bc319d39eb7198b796e54a8b",
+        "executablePath": "packer",
+        "format": "zip",
+        "platform": "darwin/arm64",
+        "url": "https://releases.hashicorp.com/packer/1.15.4/packer_1.15.4_darwin_arm64.zip"
+      },
+      {
+        "archiveDigest": "sha256:23e6d2e596dd9e2527e0f7bea9aedd26059729375a0d17c462c2621f1b97b82d",
+        "executableDigest": "sha256:147b17e1088be369f4b7d74fb3a5744edf0162632083c58d63c7c41d5a73fd4e",
+        "executablePath": "packer",
+        "format": "zip",
+        "platform": "linux/arm64",
+        "url": "https://releases.hashicorp.com/packer/1.15.4/packer_1.15.4_linux_arm64.zip"
+      }
+    ],
+    "packer-plugin-qemu": [
+      {
+        "archiveDigest": "sha256:3fce2e8b5c3fce0aac5f47f59b81b7ecfffd397532ecd4021ba7b6dfd2935ba6",
+        "executableDigest": "sha256:73440227248a65d23a3084d03846cfe911ca956634e9d961710e01c4f3774d80",
+        "executablePath": "packer-plugin-qemu_v1.1.6_x5.0_darwin_arm64",
+        "format": "zip",
+        "platform": "darwin/arm64",
+        "url": "https://releases.hashicorp.com/packer-plugin-qemu/1.1.6/packer-plugin-qemu_1.1.6_darwin_arm64.zip"
+      },
+      {
+        "archiveDigest": "sha256:81a91755dfbb50317a51652fe3fa68b0253da864374bdf219e4d32ebbe08af58",
+        "executableDigest": "sha256:d672c5b820cb4ce54c8eb6bde1f453b04976935a144f5180f836b6457cd2556c",
+        "executablePath": "packer-plugin-qemu_v1.1.6_x5.0_linux_arm64",
+        "format": "zip",
+        "platform": "linux/arm64",
+        "url": "https://releases.hashicorp.com/packer-plugin-qemu/1.1.6/packer-plugin-qemu_1.1.6_linux_arm64.zip"
+      }
+    ]
+  },
+  "Tools": {
+    "syft": {
+      "archiveDigest": "sha256:a7fd2b784e6664acd44719270574f6cd8c6864fc2b1700bf9099bd1cccda7d7f",
+      "executableDigest": "sha256:617cef943234e0cae184b4901414ca4059ad6c6923a9c9decb46f49f6a2c6573",
+      "executablePath": "syft",
+      "format": "tar-gzip",
+      "platform": "linux/arm64",
+      "url": "https://github.com/anchore/syft/releases/download/v1.51.1/syft_1.51.1_linux_arm64.tar.gz"
+    },
+    "vmnet-client": {
+      "archiveDigest": "sha256:bcf37a2631878a24fd02e2bf812b7387d4c4ff0bcee27c3f4be410c040896f8b",
+      "executableDigest": "sha256:24742a641cd4e884502217fac6f40c4a27a6ffd08682137a69dac21f3cb198f6",
+      "executablePath": "opt/vmnet-helper/bin/vmnet-client",
+      "format": "tar-gzip",
+      "platform": "darwin/arm64",
+      "url": "https://github.com/nirs/vmnet-helper/releases/download/v0.10.0/vmnet-helper.tar.gz"
+    },
+    "vmnet-helper": {
+      "archiveDigest": "sha256:bcf37a2631878a24fd02e2bf812b7387d4c4ff0bcee27c3f4be410c040896f8b",
+      "executableDigest": "sha256:3075f3297ed2f8edeb2ae058383dc83debc366fb9d7ce3aa0928a8bc51a7f3a6",
+      "executablePath": "opt/vmnet-helper/bin/vmnet-helper",
+      "format": "tar-gzip",
+      "platform": "darwin/arm64",
+      "url": "https://github.com/nirs/vmnet-helper/releases/download/v0.10.0/vmnet-helper.tar.gz"
+    }
+  }
+}

@@ -7,6 +7,8 @@ import (
 	"context"
 	"errors"
 	"os"
+	"strings"
+	"syscall"
 	"testing"
 	"time"
 
@@ -591,5 +593,41 @@ func TestLocalVMAdmissionPreservesTimeoutWhenCleanupAlsoFails(t *testing.T) {
 	})
 	if errorCode(err) != nvkrerr.CodeTimeout || !errors.Is(err, context.Canceled) || !errors.Is(err, closeFailure) {
 		t.Fatalf("error = %v, want %s wrapping cancellation and close failure", err, nvkrerr.CodeTimeout)
+	}
+}
+
+func TestLocalVMAdmissionPreservesUnavailableKVMReason(t *testing.T) {
+	for _, test := range []struct {
+		name    string
+		policy  CapabilityPolicy
+		enabled bool
+	}{
+		{"required", CapabilityRequired, true},
+		{"preferred enabled", CapabilityPreferred, true},
+		{"preferred disabled", CapabilityPreferred, false},
+		{"forbidden", CapabilityForbidden, false},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			request := testLocalVMRequest(t, test.policy, test.enabled)
+			facts := testVMFacts(false)
+			facts.capabilityErrors = map[CapabilityName]error{
+				CapabilityKVM: &os.PathError{Op: "open", Path: "/dev/kvm", Err: syscall.EACCES},
+			}
+			lease := testVMLease(t, facts)
+			admission, err := admitLocalVM(t.Context(), request, openLocalWorkspace(t), fakeVMObserver{lease: lease})
+			if test.enabled {
+				if errorCode(err) != nvkrerr.CodeEngineCapability || !errors.Is(err, syscall.EACCES) ||
+					!strings.Contains(err.Error(), "open /dev/kvm: permission denied") || admission != nil || !lease.closed {
+					t.Fatalf("required KVM admission lost open failure or retained handles: %v", err)
+				}
+				return
+			}
+			if err != nil {
+				t.Fatalf("unselected KVM blocked admission: %v", err)
+			}
+			if err := admission.Close(); err != nil {
+				t.Fatal(err)
+			}
+		})
 	}
 }

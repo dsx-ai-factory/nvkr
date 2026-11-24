@@ -129,8 +129,9 @@ func cmdRun() *cli.Command {
 type localLifecycleExecutor func(context.Context, *lifecycle.PreparedRun, lifecycle.LocalOptions) (*lifecycle.Run, error)
 
 func cmdRunWithLocalExecutor(executeLocal localLifecycleExecutor) *cli.Command {
-	generationFlags := append(append(lifecycleInputFlags(), commandPresentationFlags()...), &cli.StringFlag{Name: "engine", Value: factory.EngineGitHub, Usage: "CI adapter: github or tekton"})
+	generationFlags := append(append(lifecycleInputFlags(), commandPresentationFlags()...), &cli.StringFlag{Name: "engine", Value: factory.EngineGitHub, Usage: "CI adapter: github, tekton, or gitlab (proposed; maintainer review pending)"})
 	return &cli.Command{Name: "run", Usage: "plan, generate, and execute Definition runs", Subcommands: []*cli.Command{
+		cmdRunFinalizeGitLab(),
 		{Name: "finalize", Hidden: true, Usage: "finalize one generated hosted Run from restored carriers", Flags: append(lifecycleInputFlags(),
 			&cli.StringFlag{Name: "plan", Required: true}, &cli.StringFlag{Name: "attempt", Required: true},
 			&cli.StringFlag{Name: "workspace", Value: ".nvkr/factory"}, &cli.StringFlag{Name: "out", Value: ".nvkr/run.json"},
@@ -147,6 +148,23 @@ func cmdRunWithLocalExecutor(executeLocal localLifecycleExecutor) *cli.Command {
 			}
 			fmt.Printf("hosted Run %s: %s (%d observed outputs)\n", run.Attempt, run.Status, len(run.Observed))
 			return nil
+		}},
+		{Name: "generate-set", Hidden: true, Usage: "regenerate a coordinated maintained bundle inventory", Flags: []cli.Flag{
+			&cli.StringFlag{Name: "inventory", Required: true},
+			&cli.StringFlag{Name: "group"},
+			&cli.StringFlag{Name: "root", Value: "."},
+			&cli.StringFlag{Name: "projection-pilot", Hidden: true},
+		}, Action: func(c *cli.Context) error {
+			if err := rejectUnusedArguments(c, "inventory"); err != nil {
+				return err
+			}
+			if c.IsSet("projection-pilot") {
+				var err error
+				if c.Context, err = selectProjectionPilot(c.Context, c.String("projection-pilot"), factory.EngineGitHub); err != nil {
+					return err
+				}
+			}
+			return qualification.GenerateInventory(c.Context, c.String("inventory"), c.String("group"), factoryGeneratorVersion(), c.String("root"))
 		}},
 		cmdRunPlan(),
 		cmdArtifactTestInputs(),
@@ -169,6 +187,9 @@ func cmdRunWithLocalExecutor(executeLocal localLifecycleExecutor) *cli.Command {
 			view, err := selectCommandPresentation(c)
 			if err != nil {
 				return err
+			}
+			if err := admitGitLabGenerationFlags(c); err != nil {
+				return showCommandResult(c, view, commandDisplay{Title: "Run generation", Note: "Generation failed; no execution or release acceptance."}, err)
 			}
 			if c.IsSet("projection-pilot") {
 				if c.Context, err = selectProjectionPilot(c.Context, c.String("projection-pilot"), c.String("engine")); err != nil {

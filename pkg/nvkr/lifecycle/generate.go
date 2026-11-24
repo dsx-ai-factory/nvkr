@@ -33,22 +33,23 @@ func GenerateRuntimeSourceFiles(ctx context.Context, definitionPath, environment
 }
 
 func generateFiles(ctx context.Context, definitionPath, environmentPath, generatorVersion, engine, root string, check, runtimePlan bool, sourceCommit ...string) (string, error) {
+	// GitLab has its own native invocation and transfer admission. GitHub's
+	// runtime/source refresh and diagnostic projection cannot supply it, even
+	// when a caller requests check mode. Refuse before loading authored inputs.
+	if strings.EqualFold(strings.TrimSpace(engine), factory.EngineGitLab) {
+		if runtimePlan {
+			return "", e.New(e.CodeEngineCapability, "GitLab generation does not support runtime Plan or source refresh")
+		}
+		if factory.ProjectionAdapterSelected(ctx) {
+			return "", e.New(e.CodeEngineCapability, "GitLab generation does not support the GitHub projection pilot")
+		}
+	}
 	if err := factory.ValidateGenerationEngine(engine); err != nil {
 		return "", err
 	}
-	if runtimePlan && factory.ProjectionAdapterSelected(ctx) {
-		return "", e.New(e.CodeEngineCapability, "runtime Plan refresh is unavailable for a selected projection adapter")
-	}
 	if runtimePlan {
-		environment, err := LoadEnvironment(ctx, environmentPath)
-		if err != nil {
+		if err := admitRuntimeGeneration(ctx, environmentPath, check, sourceCommit); err != nil {
 			return "", err
-		}
-		if !environment.GitHubRuntimePlan {
-			return "", e.New(e.CodeEngineCapability, "runtime Plan preparation requires githubRuntimePlan")
-		}
-		if environment.GitHubRuntimeSource != nil && len(sourceCommit) == 0 && !check {
-			return "", e.New(e.CodeUnpinnedSource, "runtime source preparation requires an exact source commit")
 		}
 	}
 	plan, err := CompileFiles(ctx, definitionPath, environmentPath, generatorVersion)
@@ -75,11 +76,9 @@ func generateFiles(ctx context.Context, definitionPath, environmentPath, generat
 		}
 	}
 	if runtimePlan {
-		if len(plan.Environment.GitHubRuntimeSources) != 0 && !check {
-			plan, err = factory.FreezeRuntimeSources(ctx, root, definitionPath, environmentPath, generatorVersion)
-			if err != nil {
-				return "", err
-			}
+		plan, err = freezeRuntimeGeneration(ctx, plan, root, definitionPath, environmentPath, generatorVersion, check)
+		if err != nil {
+			return "", err
 		}
 		if err := factory.PrepareGitHubRuntimeBundle(ctx, plan, root, check); err != nil {
 			return "", err
@@ -95,4 +94,42 @@ func generateFiles(ctx context.Context, definitionPath, environmentPath, generat
 		return plan.Digest()
 	}
 	return factory.Generate(ctx, plan, engine, root, check)
+}
+
+// CompileRuntimeGeneration preserves the runtime owner's input admission and
+// source freeze for coordinated generation. It writes no generated bundle;
+// the caller must admit the compiled Plan against its committed provider bundle.
+func CompileRuntimeGeneration(ctx context.Context, definitionPath, environmentPath, generatorVersion, root string, check bool) (*factory.Plan, error) {
+	if err := admitRuntimeGeneration(ctx, environmentPath, check, nil); err != nil {
+		return nil, err
+	}
+	plan, err := CompileFiles(ctx, definitionPath, environmentPath, generatorVersion)
+	if err != nil {
+		return nil, err
+	}
+	return freezeRuntimeGeneration(ctx, plan, root, definitionPath, environmentPath, generatorVersion, check)
+}
+
+func admitRuntimeGeneration(ctx context.Context, environmentPath string, check bool, sourceCommit []string) error {
+	if factory.ProjectionAdapterSelected(ctx) {
+		return e.New(e.CodeEngineCapability, "runtime Plan refresh is unavailable for a selected projection adapter")
+	}
+	environment, err := LoadEnvironment(ctx, environmentPath)
+	if err != nil {
+		return err
+	}
+	if !environment.GitHubRuntimePlan {
+		return e.New(e.CodeEngineCapability, "runtime Plan preparation requires githubRuntimePlan")
+	}
+	if environment.GitHubRuntimeSource != nil && len(sourceCommit) == 0 && !check {
+		return e.New(e.CodeUnpinnedSource, "runtime source preparation requires an exact source commit")
+	}
+	return nil
+}
+
+func freezeRuntimeGeneration(ctx context.Context, plan *factory.Plan, root, definitionPath, environmentPath, generatorVersion string, check bool) (*factory.Plan, error) {
+	if len(plan.Environment.GitHubRuntimeSources) != 0 && !check {
+		return factory.FreezeRuntimeSources(ctx, root, definitionPath, environmentPath, generatorVersion)
+	}
+	return plan, nil
 }

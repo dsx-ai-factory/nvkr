@@ -16,6 +16,7 @@ import (
 
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/canonical"
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/containerruntime"
+	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/derivedoutput"
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/development"
 	e "github.com/dsx-ai-factory/nvkr/pkg/nvkr/errors"
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/execution"
@@ -77,14 +78,15 @@ type Catalog struct {
 // DefinitionOutput is a named artifact slot frozen before a run. Components
 // selects exact outputs of one build; format selects the standard envelope.
 type DefinitionOutput struct {
-	Name       string      `json:"name"`
-	Platform   string      `json:"platform,omitempty"`
-	Platforms  []string    `json:"platforms,omitempty"`
-	Catalog    *Catalog    `json:"catalog,omitempty"`
-	Components []string    `json:"components,omitempty"`
-	Format     string      `json:"format"`
-	APT        *APTOutput  `json:"apt,omitempty"`
-	Helm       *HelmOutput `json:"helm,omitempty"`
+	Derived    *derivedoutput.Selection `json:"derived,omitempty"`
+	Name       string                   `json:"name"`
+	Platform   string                   `json:"platform,omitempty"`
+	Platforms  []string                 `json:"platforms,omitempty"`
+	Catalog    *Catalog                 `json:"catalog,omitempty"`
+	Components []string                 `json:"components,omitempty"`
+	Format     string                   `json:"format"`
+	APT        *APTOutput               `json:"apt,omitempty"`
+	Helm       *HelmOutput              `json:"helm,omitempty"`
 }
 
 // HelmOutput maps chart image slots to named OCI outputs. Repository locations
@@ -104,6 +106,9 @@ type Environment struct {
 	// Tekton selects the explicit cluster execution and signer trust contract.
 	// It contains public configuration only; credentials stay in scoped Secrets.
 	Tekton *TektonExecution `json:"tekton,omitempty"`
+	// GitLab explicitly selects native runner routes for the GitLab adapter.
+	// Runner selectors and bootstrap pins are configuration, not runtime proof.
+	GitLab *GitLab `json:"gitlab,omitempty"`
 	// GitHubBundle selects an independent generated workflow namespace; empty
 	// preserves the original generated Run paths. Paths are never authored.
 	GitHubBundle string `json:"githubBundle,omitempty"`
@@ -127,6 +132,8 @@ type Environment struct {
 	GitHubARC string `json:"githubARC,omitempty"`
 	// DiskEvidence selects the NVKE producer-evidence contract; empty requires deep inspection.
 	DiskEvidence string `json:"diskEvidence,omitempty"`
+	// DiskEvidenceOverrides selects an explicit evidence contract for an exact disk output.
+	DiskEvidenceOverrides map[string]string `json:"diskEvidenceOverrides,omitempty"`
 	// GitHubDispatchBranches adds exact branch names to default-branch manual execution.
 	GitHubDispatchBranches []string                         `json:"githubDispatchBranches,omitempty"`
 	APIVersion             string                           `json:"apiVersion"`
@@ -176,6 +183,9 @@ type Publication struct {
 	CredentialRef    string            `json:"credentialRef,omitempty"`
 	Anonymous        bool              `json:"anonymous,omitempty"`
 	PlainHTTP        bool              `json:"plainHTTP,omitempty"`
+	// AllowPublicPackages permits public GHCR destinations only with the GitHub
+	// platform token. Omission preserves private/internal package admission.
+	AllowPublicPackages bool `json:"allowPublicPackages,omitempty"`
 }
 
 // NativeToolchain locates an existing local NVKR binary-bundle output.
@@ -262,7 +272,7 @@ func (definition Definition) Validate() error {
 			if len(output.Components) != 1 {
 				return e.New(e.CodeInvalidCatalog, "definition Helm output %q requires exactly one source archive or acquired chart component", output.Name)
 			}
-		} else if len(output.Components) == 0 {
+		} else if len(output.Components) == 0 && output.Derived == nil {
 			return e.New(e.CodeInvalidCatalog, "definition output %q requires components", output.Name)
 		}
 		if output.Format == OutputOCI && len(output.Components) != 1 {
@@ -306,6 +316,9 @@ func (definition Definition) Validate() error {
 		previous = output.Name
 	}
 
+	if err := definition.validateDerivedOutputs(); err != nil {
+		return err
+	}
 	return definition.validateInternalTools()
 }
 
@@ -381,14 +394,17 @@ func (environment Environment) Validate() error {
 	if err := validateGitHubRunners(environment.GitHubRunners, environment.RunsOn); err != nil {
 		return err
 	}
+	if err := environment.validateGitLab(); err != nil {
+		return err
+	}
 	if len(environment.GitHubDispatchBranches) > 32 {
 		return e.New(e.CodeInvalidCatalog, "too many GitHub dispatch branches")
 	}
 	if environment.GitHubARC != "" && environment.GitHubARC != "native-kvm-v1" {
 		return e.New(e.CodeEngineCapability, "unsupported GitHub ARC policy %q", environment.GitHubARC)
 	}
-	if environment.DiskEvidence != "" && (environment.DiskEvidence != "build-provenance-v1" || environment.GitHubARC != "native-kvm-v1" || environment.Publication == nil) {
-		return e.New(e.CodeEngineCapability, "disk evidence mode requires the explicit native ARC publication route")
+	if err := environment.validateDiskEvidence(); err != nil {
+		return err
 	}
 	previousBranch := ""
 	for _, branch := range environment.GitHubDispatchBranches {
@@ -448,6 +464,9 @@ func (environment Environment) Validate() error {
 		repository, err := name.NewRepository(prefix, name.StrictValidation)
 		if err != nil || repository.Name() != prefix || strings.ContainsAny(prefix[strings.LastIndex(prefix, "/")+1:], ":@") || strings.Contains(prefix, "@") || publication.Anonymous == (publication.CredentialRef != "") {
 			return e.New(e.CodeInvalidCatalog, "publication requires a canonical untagged repositoryPrefix and exactly one credential mode")
+		}
+		if publication.AllowPublicPackages && (publication.CredentialRef != "github:GITHUB_TOKEN" || repository.RegistryStr() != "ghcr.io" || publication.PlainHTTP || environment.GitLab != nil || environment.Tekton != nil) {
+			return e.New(e.CodeEngineCapability, "publication allowPublicPackages requires the GitHub platform-token GHCR profile")
 		}
 	}
 	if environment.Signing != nil {

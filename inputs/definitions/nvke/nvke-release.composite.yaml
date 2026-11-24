@@ -1,0 +1,54 @@
+# SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# SPDX-License-Identifier: Apache-2.0
+
+# Member digests are machine-maintained: run `nvkr definition pin --definition` on this file after a member edit.
+apiVersion: nvkr.dev/composite-definition/v1
+kind: CompositeDefinition
+metadata:
+  name: nvke-release
+  description: Publish NVKE and its package-derived inventory as one Release.
+members:
+  - name: aicr-nvke-gb200
+    definition: ../aicr/nvke-gb200.yaml
+    digest: sha256:06013783f5647a30e988f297adfd3c83941b0d5d4e9973b72372810b0d90eae2
+  - name: nvke-core
+    definition: core.yaml
+    digest: sha256:2e5fe8538411eb9504238011100499d8dfd0ed889616d687641b6f5c5184f7fe
+  - name: nvke-disks
+    definition: disks.yaml
+    digest: sha256:6d0770da5060e5a17620ee6678f16218172234b76f65a95fa37dd1c53fdec7b5
+  - name: nvke-disks-ubuntu24
+    definition: disks-ubuntu24.yaml
+    digest: sha256:4590053e9d1e607e9b37faf697a72d93237cebe3ba7139527b106da6715c61cf
+  - name: nvke-services
+    definition: services.yaml
+    digest: sha256:3a3f5c2ac3ef6edaf6fdf2edf577e65dbcabccac3370e9647996202e57aaf8a0
+  - name: nvke-telemetry
+    definition: telemetry.yaml
+    digest: sha256:70fd73fd73541e434538163de5a4518fcf7082702f48e52e0abbef24a6a0cace
+# The Ubuntu 24.04 overlay replaces these components, so the two disk families resolve different producers for them.
+variants:
+  - component: nvke-agent
+    members: [nvke-disks, nvke-disks-ubuntu24]
+  - component: nvke-doca-ovs
+    members: [nvke-disks, nvke-disks-ubuntu24]
+  - component: nvke-node-fde-amd64
+    members: [nvke-disks, nvke-disks-ubuntu24]
+  - component: nvke-node-fde-arm64
+    members: [nvke-disks, nvke-disks-ubuntu24]
+  - component: nvke-node-image
+    members: [nvke-disks, nvke-disks-ubuntu24]
+  - component: nvke-node-image-amd64
+    members: [nvke-disks, nvke-disks-ubuntu24]
+  - component: ubuntu-installer-iso
+    members: [nvke-disks, nvke-disks-ubuntu24]
+  - component: ubuntu-installer-iso-amd64
+    members: [nvke-disks, nvke-disks-ubuntu24]
+
+# Derived only after the named member packages complete in this publication namespace.
+derivedOutputs:
+  - name: aicr-inventory
+    platform: linux/amd64
+    derived:
+      encoding: aicr-inventory-v1
+      outputs: [controller-chart, nktp, nvke-controller, postgresql, spire, spire-crds, temporal]

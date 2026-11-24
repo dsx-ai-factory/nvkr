@@ -148,12 +148,13 @@ the legacy published-artifact consumer. The maintained signed candidate is the c
 ## Dispatch a complete floating GPU-site candidate
 
 The generated `nvkr-run-nvke-nightly.yml` producer uses the complete
-[GPU-site composite](../inputs/definitions/nvke/gpu-site.composite.yaml) with its own
-[Environment](../inputs/environments/github-nvke-nightly-gpu-site.yaml). On first dispatch
+[release composite](../inputs/definitions/nvke/nvke-release.composite.yaml), including its derived inventory, with its own
+[Environment](../inputs/environments/github-nvke-nightly.yaml). On first dispatch
 it freezes main once for `dsx-ai-factory/nvke`, `dsx-ai-factory/ovn-kubernetes`,
 `dsx-ai-factory/cluster-api-provider-nico` and `NVIDIA/aicr`. Toolchains, acquired
-dependencies and the Rancher source remain pinned. The production GPU-site workflow,
-namespace and pins are separate and unchanged.
+dependencies and the Rancher source remain pinned. Production retains its separate workflow and pins;
+future production releases publish below `ghcr.io/dsx-ai-factory/nvkr/candidate/nvke`. References to any
+releases already published remain unchanged.
 
 After maintainer configuration and merge to main, dispatch the generated producer:
 
@@ -168,9 +169,10 @@ A retry restores the original same-Run artifact; it fails if that artifact has e
 Use a new dispatch to select newer main commits. Workflow topology or recipe changes
 still require reviewed regeneration.
 
-Publication is confined to `ghcr.io/dsx-ai-factory/nvkr/nightly/gpu-site` and its derived
-output repositories. The independent
-[qualification policy](../inputs/policies/nvke-nightly-gpu-site-qualification.yaml)
+Publication is confined to `ghcr.io/dsx-ai-factory/nvkr/nightly/nvke` and its derived
+output repositories for future releases. Any artifacts already published under `nightly/gpu-site` remain at their original
+paths; digest-pinned consumers must retain the original reference for those releases. The independent
+[qualification policy](../inputs/policies/nvke-composite-nightly-qualification.yaml)
 generates a complete-composite qualifier and native smoke pair. Finalization and
 qualification replay the saved inputs and exact Git commits without re-resolving main.
 Artifact checks and smoke do not establish GPU-site deployment or exact-byte reproduction.

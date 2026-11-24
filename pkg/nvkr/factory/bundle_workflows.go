@@ -17,7 +17,9 @@ import (
 // They must be prior-manifest-owned for retirement; unowned leftovers fail closed.
 // Other producer namespaces and operator-authored workflows remain independent.
 func checkGeneratedWorkflowContents(ctx context.Context, root string, bundle *GeneratedBundle) error {
-	if bundle.Engine == EngineTekton {
+	if bundle.Engine == EngineTekton || bundle.Engine == EngineGitLab {
+		// The GitLab include lives inside its already inventoried ownership root.
+		// It owns no siblings in the operator's root configuration or GitHub tree.
 		return nil
 	}
 	const relative = ".github/workflows"

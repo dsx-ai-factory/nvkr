@@ -27,16 +27,22 @@ and an in-cluster registry. The [Tekton guide](../docs/generate-pipeline.md#tekt
 lists prerequisites, trust scope and retained evidence. The GitHub acceptance workflow runs this same
 command; it needs no publishing secrets. This explicit integration test fails when prerequisites are absent.
 
-`ci-test-shard.py` discovers the ordinary Go suite and partitions it across the Merge Gate's fifteen
+`test-gitlab-docker.sh` runs the single-output NVKE CLI Definition through a real GitLab server and
+Docker-executor Runner. It requires a local native AMD64/ARM64 Docker daemon, four CPUs and 12 GiB RAM.
+The [development guide](../DEVELOPMENT.md#test-the-gitlab-adapter-against-a-real-server) describes owned
+resources, token isolation, HTTPS trust, API submission and retained evidence. It is opt-in and fails
+when prerequisites are absent. This is an ordinary unsigned build, not signing or qualification.
+
+`go run ./internal/citestshard` discovers the ordinary Go suite and partitions it across the Merge Gate's nineteen
 test jobs. It includes examples and fuzz seed tests, and requires exact completion of the discovered
 selection. New packages and tests need no allowlist update. `make test-shard` reproduces one matrix
 entry; `make test` still runs the full suite. Each child command may retain at most 32 MiB of stdout;
 exceeding that limit fails the shard and stops its process group while preserving diagnostics already
-read. `ci-test-summary.py` summarizes the retained Go JSON events. Partition, completeness, parser and
+read. `ci-test-summary.jq` summarizes the retained Go JSON events. Partition, completeness, parser and
 small offline Go composition contracts run with `make test-ci-tools`; the Go fixture exercises every
 matrix entry without rebuilding the product suite.
 
-`check-status-restated.py BASE [HEAD]` backs the rule that validation status lives in the
+`go run ./internal/checkstatus BASE [HEAD]` backs the rule that validation status lives in the
 [reconciliation ledger](../docs/adr/reconciliation/README.md). It fails when a Markdown line added since the
 merge base, outside the ledger directory and `docs/evidence/`, matches one of a fixed list of status phrases
 taken from fixed review findings. Other phrasings pass, it cannot judge whether a sentence is true, and it
@@ -121,13 +127,19 @@ results from committed regressions.
 
 ## Definition → Run
 
-`generate-maintained.py` drives `make workflows-generate` and `make workflows-check` from
-`inputs/policies/maintained-generation.json`. That authored list selects every maintained Plan bundle and
-the default qualifier policy. Contract tests compare the list with committed Plans and manifests, so a
-new bundle must enter the same image-access contract. Group-specific Make targets use this list too.
+`make workflows-generate` invokes `generate-maintained.sh`, which coordinates writes through
+`run generate-set` with
+`inputs/policies/maintained-generation.json`, then regenerates the catalog-refresh workflow.
+`make nvke-generate` and `make pipeline-dev-generate` regenerate that complete producer/qualifier set too:
+shared stable records require coordinated owners even when only one group motivated the edit.
+The read-only `workflows-check`, `nvke-check` and `pipeline-dev-check` targets retain their respective
+all/group scopes through `generate-maintained.sh`. Contract tests compare the authored inventory with
+committed Plans and manifests, so a new bundle must enter the same image-access contract.
+The inventory `runtime` flag selects runtime admission only for checks. Writes regenerate the reviewed
+baseline without freezing dispatch-time source heads; the Environment owns runtime policy.
 
 For repository pipeline changes, `make pipeline-dev-run PIPELINE_DEV_REPO=owner/repo` checks the generated
-development bundle and calls `pipeline-dev.py`. The helper requires a clean named branch matching the
+development bundle and calls `pipeline-dev.sh`. The helper requires a clean named branch matching the
 remote commit and an active registered `nvkr-dev.yml`, then dispatches that branch explicitly. It performs
 no commit, push, environment-policy update or registry cleanup. `--check` runs only its provider preflight.
 See [pipeline development](../DEVELOPMENT.md#test-pipeline-changes-on-a-feature-branch) for full NVKE branch
@@ -174,7 +186,7 @@ NVKE_LOCAL_CLONE=/path/to/nvke scripts/demo-m1-local.sh
 ```
 
 `demo-m1-local.sh` generates and checks its three-output GitHub bundle in a fresh temporary directory,
-whose path it prints for inspection. The repository's committed bundle selects the 34-output NVKE candidate.
+whose path it prints for inspection. The repository's committed bundle selects the 83-output NVKE composite.
 The local walkthrough publishes to its loopback registry using dry-run signing. Local attempts are immutable and
 `unqualified-local-execution`; plans remain `static-unqualified`. See the
 [M1 walkthrough and acceptance limits](../demos/m1-local.md).
@@ -262,10 +274,10 @@ Signer-policy rejection is covered by the owning consumer contract tests.
 `verify-native-toolchains.sh` shares the committed-pin and candidate native checks.
 The [toolchain maintenance workflow](../docs/toolchain-maintenance.md) delegates subject admission,
 publication, read-back and authored pin changes to `pkg/nvkr/toolchainmaintenance`, then regenerates
-through the existing owners. `propose-toolchain-refresh.py` publishes only the checked review diff with
-the repository App. `report-native-toolchains.py` compares measured manifests with
-committed pins and routes actionable reports to one labeled tracking issue; both
-scripts' offline behavior tests run with `make test-ci-tools`.
+through the existing owners. Its internal Go adapter publishes only the checked review diff with
+the repository App, compares measured manifests with committed pins, and routes actionable reports
+to one labeled tracking issue. The ordinary Go suite covers these comparison, routing, and proposal
+contracts without live GitHub writes.
 
 The ARM64 build/publish/consume nightly cycle is retired. `nightly-build.sh` and
 `TestNightlyPublishedCandidate` remain as uninvoked legacy code pending removal;

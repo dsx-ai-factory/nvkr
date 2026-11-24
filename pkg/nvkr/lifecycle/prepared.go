@@ -119,6 +119,7 @@ func cloneArtifacts(source []Artifact) []Artifact {
 
 func cloneArtifact(artifact Artifact) Artifact {
 	clone := artifact
+	clone.Derived = artifact.Derived.Clone()
 	clone.ImageIndex = artifact.ImageIndex.Clone()
 	clone.Components = append([]string(nil), artifact.Components...)
 	if artifact.Disk != nil {

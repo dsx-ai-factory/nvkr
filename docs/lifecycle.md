@@ -266,7 +266,7 @@ presentation flags.
 ```sh
 bin/nvkr definition inspect --definition docs/examples/nvke-module-tags/definition.yaml --ui=tui
 bin/nvkr run graph --plan .github/nvkr-run-nvke/plan.json --ui=tui
-bin/nvkr catalog list --data inputs/catalogs/nvke --ui=tui
+bin/nvkr catalog list --catalog inputs/catalogs/nvke --ui=tui
 ```
 
 Graph and release browsers start with an output overview when their supplied
@@ -392,9 +392,10 @@ an unavailable stronger scope never falls back to weaker verification.
 
 For disk outputs, `VerificationPolicy.minimumDiskEvidence` is included in the policy digest. Pipeline-attested
 verification defaults to `build-provenance-v1`, accepting signed producer/material evidence without an inspected
-disk inventory. Use `--minimum-disk-evidence strict` to require inspected evidence. The
-SDK exposes `DiskEvidenceStrict` and `DiskEvidenceBuildProvenance`. Qualified verification defaults to strict
-and cannot opt into the producer-only mode. Authenticity enforces the same minimum against signed evidence
+disk inventory. Use `--minimum-disk-evidence packages` to require installed-package inventory,
+or `strict` to require full content/material reconciliation. The SDK exposes `DiskEvidenceStrict`,
+`DiskEvidencePackages` and `DiskEvidenceBuildProvenance`. Qualified verification defaults to strict
+and cannot opt into either weaker mode. Authenticity enforces the same minimum against signed evidence
 and metadata; it does not inspect or re-hash the disk.
 
 The CLI expresses build-evidence acceptance as `--scope artifact-publication`. On Linux, with a pinned cosign
@@ -609,8 +610,9 @@ then includes a separate failed `source-lifetime` diagnostic and an overall fail
 pin and other artifact checks keep their actual results. This extra diagnostic appears only on final
 source-admission failure. Successful reports retain the six artifact checks above. Always inspect the
 returned error or command exit status; diagnostic data alone never proves receipt issuance.
-Payload digests remain distinct from OCI delivery-container subjects, and disk results explicitly retain
-producer-only scope without content inspection.
+Payload digests remain distinct from OCI delivery-container subjects. Disk results derive their scope
+from the authenticated evidence mode: producer-only, installed packages without file-integrity/material
+reconciliation, or strict content/material reconciliation. The report does not perform new disk inspection.
 
 An incomplete evidence traversal is labeled as a failure of the complete publication in every output's
 signed-evidence diagnostic. Output-specific signature failures remain visible alongside that global failure;
@@ -716,7 +718,7 @@ publishes outcomes to the results index of ADR-31, but no generated job runs it 
 Add `--qualification-policy qualification.yaml` to the normal `run generate` invocation to generate the
 qualifier and its native smoke worker alongside the producer. The worker is a generated reusable GitHub
 Actions workflow; the operator does not write or maintain a separate worker implementation. The maintained
-candidate supplies `inputs/policies/nvke-gpu-site-qualification.yaml` and emits `.github/workflows/nvkr-qualify-nvke.yml`
+candidate supplies `inputs/policies/nvke-composite-qualification.yaml` and emits `.github/workflows/nvkr-qualify-nvke.yml`
 and `.github/workflows/nvkr-smoke-nvke.yml`. The same invocation with `--check` compares
 all owned bytes without writing. The separately owned qualification manifest records both workflow files;
 hand edits and unowned files are not silently overwritten. The worker is a fixed same-repository reusable
@@ -737,7 +739,7 @@ The independent policy extends the artifact-check policy with these decisions:
 | `smoke.nonToolMembers` | Exact output/member pairs for non-executable runtime-assets archives in mixed executable bundles |
 | `outsideMVPSuites` / `requiredSuites` | Unevaluated external suites, or a requirement that currently blocks qualification |
 
-The [maintained-candidate policy](https://github.com/dsx-ai-factory/nvkr/blob/main/inputs/policies/nvke-gpu-site-qualification.yaml)
+The [maintained-candidate policy](https://github.com/dsx-ai-factory/nvkr/blob/main/inputs/policies/nvke-composite-qualification.yaml)
 contains concrete verifier/native-image pins and exact output scope. Review those independent trust selections
 with the generated workflows before merge. Other Definitions need their own matching scope and native pins;
 the candidate policy is not a wildcard approval. The trust policy belongs to the operator, not the producing

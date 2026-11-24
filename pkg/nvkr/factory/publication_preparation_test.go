@@ -44,7 +44,7 @@ func TestPublicationRejectsPrivacyBeforeReadingOriginalPreparation(t *testing.T)
 			calls := 0
 			var log bytes.Buffer
 			err := executePublishWithAdmission(t.Context(), plan, node, artifacts, &log,
-				func(context.Context, string, []string, cistore.Options) error {
+				func(context.Context, string, []string, cistore.PublicationOptions) error {
 					calls++
 					return e.New(e.CodeTrustPolicyMissing, "fixture private admission denied")
 				})
@@ -96,7 +96,7 @@ func TestPublicationRejectsControlsSubstitutedDuringPrivacyAdmission(t *testing.
 	calls := 0
 	var log bytes.Buffer
 	err := executePublishWithAdmission(t.Context(), plan, node, artifacts, &log,
-		func(context.Context, string, []string, cistore.Options) error {
+		func(context.Context, string, []string, cistore.PublicationOptions) error {
 			calls++
 			if calls == 1 {
 				original := artifacts[attestedEvidenceMetadataID(first)].Path

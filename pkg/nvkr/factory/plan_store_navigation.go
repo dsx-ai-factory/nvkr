@@ -35,7 +35,15 @@ type planStoreWorkflow struct {
 
 // Reconstruct navigation from each published bundle's manifest-owned records.
 // This is a generation/drift operation; ordinary Plan loads never consult it.
-func planStoreNavigation(ctx context.Context, root string, owners map[string]planStoreOwner, incoming *GeneratedBundle) (map[string][]planStoreJobVariant, error) {
+func planStoreNavigation(ctx context.Context, root string, owners map[string]planStoreOwner, incoming []*GeneratedBundle) (map[string][]planStoreJobVariant, error) {
+	selected := map[string]*GeneratedBundle{}
+	repairs := &GeneratedBundle{Files: map[string][]byte{}}
+	for _, bundle := range incoming {
+		selected[bundle.ManifestPath] = bundle
+		for name, raw := range bundle.Files {
+			repairs.Files[name] = raw
+		}
+	}
 	bundles := map[string]bool{}
 	for _, owner := range owners {
 		for _, bundle := range owner.Bundles {
@@ -51,13 +59,13 @@ func planStoreNavigation(ctx context.Context, root string, owners map[string]pla
 		bundle := &GeneratedBundle{Engine: EngineGitHub, WorkflowPath: layout.workflowPath, PlanPath: layout.planPath, ManifestPath: layout.manifestPath}
 		var files map[string][]byte
 		var err error
-		if incoming != nil && incoming.ManifestPath == bundle.ManifestPath {
-			files = make(map[string][]byte, len(incoming.Files))
-			for name, raw := range incoming.Files {
+		if next := selected[bundle.ManifestPath]; next != nil {
+			files = make(map[string][]byte, len(next.Files))
+			for name, raw := range next.Files {
 				files[name] = raw
 			}
 		} else {
-			files, err = readPlanStoreNavigation(ctx, root, bundle, incoming)
+			files, err = readPlanStoreNavigation(ctx, root, bundle, repairs)
 			if err != nil {
 				return nil, err
 			}

@@ -145,8 +145,8 @@ fixture_git tag v1.1.0
 
 step '1 / 4' 'Pin the source'
 printf 'The catalog names the source and the build command. NVKR locks the exact commit.\n'
-command_line catalog pin --dir catalog --tag "v$VERSION" hello
-logged pin "$NVKR" catalog pin --dir catalog --tag "v$VERSION" hello
+command_line catalog pin --catalog catalog --tag "v$VERSION" hello
+logged pin "$NVKR" catalog pin --catalog catalog --tag "v$VERSION" hello
 printf '  v%s -> %s\n' "$VERSION" "$(fixture_git rev-parse --short=12 "v$VERSION")"
 printf '  Build command: substitute the pinned version into hello.sh, then make it executable.\n'
 

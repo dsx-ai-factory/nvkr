@@ -3,8 +3,12 @@
 Turn a Definition and Environment into a reviewable pipeline bundle. A **Definition** selects the named
 outputs to build; an **Environment** supplies execution, publication, and signing settings. This walkthrough
 uses the three-output NVKE tutorial: a CLI executable, a container image, and a Helm chart.
-The walkthrough uses GitHub Actions. [Tekton cluster execution](#tekton-cluster-execution) uses the same
-Plan and runner with explicit cluster trust.
+The walkthrough uses GitHub Actions. [Native GitLab execution](#native-gitlab-execution) uses the bounded
+unsigned profile; [Tekton cluster execution](#tekton-cluster-execution) uses explicit cluster trust.
+Both retain the same Plan and shared execution owners.
+
+This walkthrough's GitHub Environment selects `github:GITHUB_TOKEN` for publication. Before dispatch,
+complete the [platform-token destination setup](#platform-token-destination-setup) for its release packages.
 
 Start at the repository root with `bin/nvkr` built as described in the [quickstart](quickstart.md#build-only-the-cli).
 Run these commands in the same terminal. They write to a temporary directory, leaving the repository's
@@ -147,7 +151,7 @@ Invalid bytes, unsafe archive entries, filesystem or cleanup failures stop immed
 destination replacement are outside the retry boundary. Error reports include only a fixed category,
 chunk number and byte counts, keeping provider URLs and response bodies out of logs.
 
-Production registry access uses separate credentials from CI storage. Configure repository secret
+The maintained independent-credential publication profile uses registry credentials separate from CI storage. Configure repository secret
 `NVKR_REGISTRY_READ` and variable `NVKR_REGISTRY_READ_USER` for a package reader covering release,
 toolchain and smoke-image packages. Configure secret `NVKR_REGISTRY_WRITE` and variable
 `NVKR_REGISTRY_WRITE_USER` in the protected `nvkr-release` environment for publication, signing and
@@ -156,7 +160,7 @@ write-capable PAT into the reader secret does not narrow its authority. The exis
 remain unchanged. Native image access scopes its reader to manifest preflight and per-job preparation.
 
 The repository-level `NVKR_REGISTRY_READ` secret and `NVKR_REGISTRY_READ_USER` variable are also
-required for private native toolchain and smoke-image pulls in development and legacy
+required for private native toolchain and smoke-image pulls in development and
 `github:GITHUB_TOKEN` output-publication profiles. Development output credentials do not replace this
 shared image reader. A missing reader refuses the pull; there is no workflow-token fallback.
 The entry workflow passes both reader values explicitly into composite actions, scoped to preflight
@@ -165,7 +169,13 @@ configs on each selected runner placement before producers can start. These poin
 download no layers and do not replace per-job pulls or runtime byte/platform checks. A failed reader
 check stops producer fan-out; source and publication credentials are never fallback readers.
 
-For each existing storage, release, toolchain and smoke-image package, an administrator must:
+The following checklist applies to private CI-storage, toolchain and smoke-image packages, and to release
+destinations using the independent-credential publication profile. For `github:GITHUB_TOKEN` release
+destinations, follow [platform-token destination setup](#platform-token-destination-setup) instead:
+that profile requires the publishing-repository connection and a **Write** Actions grant.
+
+For each package covered by this checklist, an administrator must:
+
 1. Keep visibility private (or internal only when enterprise-wide access is intended).
 2. Disable repository permission inheritance and remove the source-repository connection.
 3. Remove the source repository under **Manage Actions access**, including explicit grants.
@@ -177,7 +187,7 @@ before changing repository visibility. Replacing a token does not revoke existin
 Do not revoke grants needed by an active old workflow: migrate credentials, merge and validate the new
 workflow, then retire the old access. Existing dispatched runs retain their original workflow code.
 
-To enter credentials securely from a local terminal (the commands prompt without printing the secret):
+To enter independent-profile credentials securely from a local terminal (the commands prompt without printing the secret):
 
 ```sh
 gh secret set NVKR_REGISTRY_READ --repo dsx-ai-factory/nvkr
@@ -187,7 +197,7 @@ gh variable set NVKR_REGISTRY_WRITE_USER --repo dsx-ai-factory/nvkr --env nvkr-r
 ```
 
 Before making the source public, verify hidden package grants and anonymous, unrelated-user and fork access
-for storage, toolchain and release packages. Previously retained Actions artifacts, caches, active runs and
+for packages covered by the independent-credential checklist above. Previously retained Actions artifacts, caches, active runs and
 old workflow refs also require separate handling; this change does not migrate or delete historical payloads.
 Compiled-output caches and CodeQL database uploads are disabled. Candidate OS builds retain private files
 only for the exact trusted workflow commit, so arbitrary candidate code cannot access a later storage writer.
@@ -334,6 +344,57 @@ workflow. Producer jobs retain explicit dependencies and separate results; produ
 callable workflows remain deferred. The optional qualification bundle has its own fixed reusable native
 worker and selected-platform matrix (ADR-21).
 
+## Platform-token destination setup
+
+The accepted [destination-staging decision](https://github.com/dsx-ai-factory/nvkr/blob/main/docs/adr/0020-artifact-publication-and-target-configuration.md#destination-staging-and-release-by-reference)
+defines the adopter default using the publishing repository's GHCR namespace and job tokens, with no configured
+publication secrets. Private native toolchain and smoke-image pulls still require the independent image reader
+described above. Select `publication.credentialRef: github:GITHUB_TOKEN` and a `publication.repositoryPrefix`
+at or beneath `ghcr.io/<owner>/<publishing-repository>`. Packages are published beneath that prefix.
+This profile is admitted for the existing hosted publisher;
+producer destination staging remains a separate migration. The instructions above describe the maintained private-carrier and independent-credential setup;
+the [publication implementation boundary](https://github.com/dsx-ai-factory/nvkr/blob/main/docs/adr/reconciliation/adr-20.md)
+tracks the migration. Maintained lanes retain their explicit independent credentials.
+Destinations default to internal/private visibility; an unexpected public package must stop publication.
+The Environment field `publication.allowPublicPackages: true` is the explicit public-visibility opt-in;
+omission or `false` admits only internal/private packages. The field is bound to Environment and Plan identity
+and checked for every output, evidence and release destination before payload writes. It does not change
+package visibility. This opt-in is supported only for the GitHub platform-token GHCR profile;
+independent credentials continue to require private/internal packages.
+
+Before using the platform-token profile, a human package administrator must perform this one-time setup
+for each fixed destination package, including output, evidence and release packages:
+
+1. Create or initialize a missing package outside the generated workflow, using the human administrator's
+   access. Do not rely on the producer workflow to create an already-admitted package.
+2. On the package landing page, use **Connect repository**, select the publishing repository, and confirm
+   the connection. This is the [package-linking procedure](https://docs.github.com/en/packages/learn-github-packages/connecting-a-repository-to-a-package)
+   admitted by ADR-20; it establishes repository association separately from the Actions access grant.
+3. Open **Package settings** and disable **Inherit access from repository** so package-level roles apply.
+4. Under **Manage Actions access**, add or select the publishing repository and set its role to **Write**,
+   not **Admin**.
+5. Remove or reduce any other grant giving that repository Admin access. Keep package administration with
+   a human administrator and outside workflow credentials.
+
+Granting a public publishing repository access to a private package can expose that package to forks of
+the repository. The platform-token profile accepts this exposure; see
+[ADR-20's adopter-default policy](https://github.com/dsx-ai-factory/nvkr/blob/main/docs/adr/0020-artifact-publication-and-target-configuration.md#adopter-default-and-independent-credentials).
+
+Write-only Actions access and disabled inheritance are the operator's responsibility. The workflow's
+`packages: write` permission does not prove them. Granting Admin or leaving inheritance enabled may allow
+the job token to delete or restore released versions; that misconfiguration is the operator's risk.
+NVKR does not verify these settings, request an operator attestation, or create canary packages to probe
+permissions. It admits the profile without a role check. Its provider-authenticated package identity,
+publishing-repository association and visibility checks still fail closed. Missing packages fail without
+seeding; initialize and configure each fixed package before dispatch. Avoiding configured publication secrets
+still requires this package setup and does not replace private-image reader credentials; these instructions change no live setting.
+
+GitHub's [package REST schema](https://docs.github.com/en/rest/packages/packages#get-a-package-for-an-organization)
+does not expose Actions roles or inheritance. Its [Packages GraphQL API](https://docs.github.com/en/packages/learn-github-packages/deleting-and-restoring-a-package#packages-api-support)
+does not support registries with granular permissions such as GHCR. Signed development
+uses the dedicated credential profile: its run/attempt-derived package names cannot be prepared before
+dispatch. Platform-token development remains deferred until per-attempt package setup is specified and implemented.
+
 ## Tekton cluster execution
 
 Select `--engine tekton` with an Environment containing `tekton` configuration. Generation writes
@@ -367,6 +428,113 @@ in-cluster registry and test-only keys, selects the maintained core Definition's
 publication, signing, qualification, transport faults and cancellation. Set `NVKR_TEKTON_EVIDENCE` to an
 external directory to retain public reports; keys and kubeconfig stay in disposable scratch storage.
 See [reconciliation](https://github.com/dsx-ai-factory/nvkr/blob/main/docs/adr/reconciliation/adr-18.md) for the exact externally exercised scope.
+
+## Native GitLab execution
+
+The GitLab extension is proposed for maintainer review; it does not inherit acceptance from the existing ADR headers.
+Select `--engine gitlab` with the intended Definition and an Environment that explicitly declares `gitlab`.
+Repeat generation with the same inputs, generator identity and `--check` to check the complete bundle.
+The GitHub walkthrough's Environment is not a GitLab configuration. Keep authored inputs and generation
+under review before committing or invoking the pipeline.
+
+By default, only the project's authenticated default branch and `push` or `web` pipelines are admitted.
+Explicitly list any additional branch in `gitlab.additionalRefs` and any other source, such as `api`,
+`merge_request_event` or `parent_pipeline`, in `gitlab.pipelineSources`. These are exact selectors, not
+patterns. Tags and debug modes are refused. When merge-request events are selected, an open merge
+request suppresses the duplicate push pipeline. If publication is configured, the branch must also be
+protected: generated rules check the native flag and runtime verifies protection through the provider API.
+Changing a pipeline variable cannot substitute for that authenticated branch check.
+Supported source names are `api`, `merge_request_event`, `parent_pipeline`, `pipeline`, `push`,
+`schedule`, `trigger`, `web` and `webide`; other source names fail admission.
+
+The Environment supplies these provider settings; values are public configuration and credential references,
+never credential contents:
+
+| Setting | Required selection |
+|---|---|
+| `gitlab.apiURL` | Exact HTTPS provider API base ending in `/api/v4`, without credentials, query or fragment |
+| `gitlab.projectID` | Exact positive native project ID |
+| `gitlab.certificateAuthority` | Optional explicit PEM CA, at most 64 KiB; replaces system roots and is bound into the Plan |
+| `gitlab.additionalRefs` | Optional sorted unique exact branch names in addition to the provider-authenticated default branch; no patterns |
+| `gitlab.pipelineSources` | Optional sorted unique supported native source names; omission admits only `push` and `web` |
+| `gitlab.apiReadCredentialRef` | `gitlab:VARIABLE_NAME` naming the separately provisioned API reader |
+| `gitlab.apiReadCredentialKind` | Explicit `private-token` or `job-token` authentication mechanism |
+| `gitlab.runners` | Explicit native `linux/amd64` and/or `linux/arm64` routes covering every resolved operation and the utility platform |
+| Each route's `tags` and `bootstrapImage` | Sorted unique literal runner tags and an immutable digest-pinned OCI bootstrap image |
+
+Provide the exact Go release selected by the generator's bootstrap, a matching native Linux host and the
+selected container runtime. Bootstrap checks Go and host architecture before source compilation with
+`GOTOOLCHAIN=local`. The runner comes from checkout source or the generator's own exact module version
+and checksum contract. Declared producer/vendor/utility images require anonymous immutable access.
+GitLab has no hosted-runner default: operators provision runners matching the authored tags. These tags
+select placement; they prove neither capacity nor runtime compatibility. GitHub labels and
+`GITHUB_*` invocation variables cannot substitute for native GitLab context.
+
+Declare the provider CA explicitly for private PKI. An explicit `certificateAuthority` replaces system
+roots for API, carriers and isolated GitLab registry traffic. Without it, NVKR permits system roots only
+when `SSL_CERT_FILE` and `SSL_CERT_DIR` are unset. These routes connect directly and ignore ambient proxy
+settings. This leaves ordinary non-isolated registry behavior unchanged.
+
+Generation owns only `.gitlab/nvkr-run/pipeline.yml`, `.gitlab/nvkr-run/plan.json` and
+`.gitlab/nvkr-run/manifest.json`. Keep the root `.gitlab-ci.yml` operator-owned, containing only one local
+include of `.gitlab/nvkr-run/pipeline.yml`. Additional root jobs, variables, includes or policy overrides
+are refused by execution admission. The project must use its default root CI configuration. Review and
+commit the root and complete generated bundle together; never hand-edit generated members. The profile
+uses native GitLab pipeline invocation and adds no cron or trigger API. Debug tracing and service debugging
+must be off. The bounded projection permits at most 256 operations and 50 needs per job.
+
+Reserve `GIT_STRATEGY=clone`, `FF_DISABLE_UMASK_FOR_DOCKER_EXECUTOR=true` and
+`FF_GIT_URLS_WITHOUT_TOKENS=true` for the generated checkout policy. [GitLab variable precedence](https://docs.gitlab.com/ci/variables/#ci-cd-variable-precedence)
+allows project, group and pipeline variables to override YAML defaults, including job-level defaults.
+Before submitting the pipeline, remove conflicting keys from **Settings > CI/CD > Variables** at the
+project and inherited group levels, and from schedules, triggers, API/run-pipeline variables and any
+applicable policy. Do not override these keys through Runner configuration. An override such as
+`GIT_STRATEGY=empty` prevents checkout; disabling the umask switch can change generated-file modes.
+`run generate --check` verifies committed bytes, not these external settings, and cannot establish
+the prerequisite. Runtime additionally requires the token-free URL flag to remain `true` and checks
+the raw root Git config and effective local/include config for the actual job and API-reader token bytes
+before provider or build work. This is a bounded credential check, not a repository-wide secret audit.
+Remove the override and start a fresh pipeline; never repair its checkout with chmod.
+
+Use the provider-supplied current job's `CI_JOB_TOKEN` for current-job authentication. Separately provision
+the API reader named by the Environment for project metadata including `default_branch`, pipeline
+metadata, current job enumeration and original-job artifact downloads. Publication additionally requires
+read access to `repository/branches/<exact-ref>` for authenticated branch protection.
+Selecting a credential kind does not grant endpoint permissions. NVKR does not introspect token grants
+or verify least-privilege scopes. Provision a project-limited read-only private-token reader (such as
+`read_api`), without write or broader account grants; an overprivileged token is not refused solely for
+its scopes. Keep API access and masking/protection
+policy scoped to the intended project and permitted pipeline sources; never put tokens in authored inputs,
+generated Plans or logs. The optional API-reader job-token route has instance-specific permission requirements;
+consult the [credential-access ledger](https://github.com/dsx-ai-factory/nvkr/blob/main/docs/adr/reconciliation/adr-18.md#gitlab-ordinary-unsigned-profile)
+before choosing it. A separately provisioned `private-token` reader is the alternative mechanism.
+
+Artifact downloads may follow one authenticated provider redirect to a different HTTPS storage host,
+without forwarding API credentials. Selecting the provider also trusts its storage destinations; use
+runner egress policy when additional destination restrictions are required.
+
+The provider authenticates the exact current job and pipeline, then consumers fetch original producer
+outcomes and digest-bound carriers. They retain original job IDs across retries and reject substituted,
+failed, skipped, missing or corrupt members. The always-scheduled finalizer rechecks the complete closure,
+recompiles the exact authored inputs and writes the shared immutable Run record. A missing final Run
+record proves neither success nor absence of remote effects. The recorded complete or failed Run includes
+the authenticated GitLab API, project, pipeline, finalizer job, commit, ref and source as descriptive metadata;
+it grants no provider or publication authority when reloaded.
+
+This profile stays unsigned and `static-unqualified`. Optional publication selects HTTPS OCI transport,
+either anonymous or the exact `publication.credentialRef: gitlab:CI_JOB_TOKEN` with anonymous access off.
+That publication token is separate from API-reader provisioning. Every publication selection requires a
+provider-authenticated protected branch. The authenticated route confines all
+repositories to the provider-reported current project registry and independently reads back the complete
+published closure. It supplies byte integrity, not signer or qualification acceptance.
+Signing, stronger evidence lanes, disk outputs, private-source and private execution-image routes,
+native-toolchain/runtime-source profiles, unsupported execution requirements, arbitrary runtime setup,
+variables/services, storage extensions, object-store copying and user-selected image aliases fail admission.
+GitHub-specific runtime/source refresh, qualification generation, catalog maintenance and the diagnostic
+projection pilot are also outside this profile. The
+[GitLab execution ledger](https://github.com/dsx-ai-factory/nvkr/blob/main/docs/adr/reconciliation/adr-18.md#gitlab-ordinary-unsigned-profile)
+and [publication ledger](https://github.com/dsx-ai-factory/nvkr/blob/main/docs/adr/reconciliation/adr-20.md#gitlab-ordinary-unsigned-publication)
+own exact validation and external acceptance scope.
 
 ## Diagnostic projection pilot
 

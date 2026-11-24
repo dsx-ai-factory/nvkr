@@ -52,7 +52,7 @@ func (plan Plan) validateLifecyclePlans() error {
 	}
 	previous := ""
 	for i, output := range plan.LifecycleOutputs {
-		required, err := outputRequirements(plan.Definition.Outputs[i], builds)
+		required, err := allOutputRequirements(plan.Definition.Outputs[i], plan.Definition, plan.Environment, builds)
 		if err != nil {
 			return err
 		}
@@ -60,6 +60,13 @@ func (plan Plan) validateLifecyclePlans() error {
 			return e.New(e.CodeUnverifiedRef, "lifecycle output %q differs from its exact Definition requirements", output.Name)
 		}
 		artifact, ok := artifacts[output.ArtifactID]
+		if output.Derived != nil {
+			if !ok || artifact.Kind != PackageBundle || artifact.Name != output.Name || output.Name <= previous || !reflect.DeepEqual(nodes[artifact.Producer].Derived, output.Derived) {
+				return e.New(e.CodeUnverifiedRef, "derived output %q lacks its exact package operation", output.Name)
+			}
+			previous = output.Name
+			continue
+		}
 		if output.ImageIndex != nil {
 			if !ok || artifact.Kind != PackageImage || artifact.Name != output.Name || artifact.MediaType != "application/vnd.oci.image.index.v1+json" || output.Name <= previous {
 				return e.New(e.CodeUnverifiedRef, "image index output %q lacks exact aggregate artifact", output.Name)

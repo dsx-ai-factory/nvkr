@@ -39,20 +39,23 @@ func TestNVKEControllerPinnedChartFilename(t *testing.T) {
 			}
 			var declarations struct {
 				Components map[string]struct {
-					Source       string `yaml:"source"`
-					ArtifactPath string `yaml:"artifactPath"`
+					Source string `yaml:"source"`
 				} `yaml:"components"`
 			}
 			if err := yaml.Unmarshal(raw, &declarations); err != nil {
 				t.Fatal(err)
 			}
-			component, ok := declarations.Components[tc.component]
+			declaration, declared := declarations.Components[tc.component]
+			component, ok := cat.Components[tc.component]
 			version := catalog.NormalizeVersion(pin.Tag)
 			artifact := "charts/nvke-controller-" + version + ".tgz"
-			if !ok || component.Source != tc.source || component.ArtifactPath != artifact {
+			if !declared || declaration.Source != tc.source || !ok || component.ArtifactPath != artifact {
 				t.Fatalf("controller chart must use source %q and pinned upstream artifact %q, got %+v", tc.source, artifact, component)
 			}
-			command := strings.Join(cat.Components[tc.component].BuildCommand, " ")
+			if component.Tag != pin.Tag || component.Commit != pin.Commit || component.TreeHash != pin.TreeHash || component.SourceDate != pin.SourceDateEpoch {
+				t.Fatal("resolved chart does not retain the selected source pin")
+			}
+			command := strings.Join(component.BuildCommand, " ")
 			for _, required := range []string{"controller/deploy/charts/controller", "--version=" + version, "--app-version=" + catalog.StripTagPrefix(pin.Tag), "--destination=charts/"} {
 				if !slices.Contains(strings.Fields(command), required) {
 					t.Fatalf("controller chart packaging must retain %q, got %q", required, command)

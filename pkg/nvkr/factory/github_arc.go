@@ -20,27 +20,31 @@ import (
 // Only disk producers need it; a build-only finalizer on ARC does not use KVM.
 func githubKVMAccessCheck() githubStep {
 	return githubStep{
-		Name:           "Prepare KVM access before transfer",
+		Name:           "Check runner KVM access before transfer",
 		TimeoutMinutes: 1,
 		Run: fmt.Sprintf(`set -eu
-if [ -L /dev/kvm ] || [ ! -c /dev/kvm ]; then
-  printf 'NVKR-E-ENGINE-CAPABILITY: native disk runner lacks /dev/kvm\n' >&2
+runner_fault() {
+  printf 'NVKR-E-ENGINE-CAPABILITY: runner-capability fault on ARC pod %%s: %%s\n' "${RUNNER_NAME:-unknown}" "$1" >&2
   exit %[1]d
+}
+kvm_access() {
+  /usr/bin/timeout --kill-after=5s 5s /bin/sh -c 'exec 3<>/dev/kvm && exec 3>&-'
+}
+if [ -L /dev/kvm ] || [ ! -c /dev/kvm ]; then
+  runner_fault 'missing non-symlink /dev/kvm character device'
 fi
-if ! (exec 3<>/dev/kvm && exec 3>&-) 2>/dev/null; then
+if ! kvm_access 2>/dev/null; then
   printf 'Preparing /dev/kvm access on the operator-trusted ARC runner\n'
   if ! /usr/bin/timeout --kill-after=5s 15s /usr/bin/sudo -n -- /usr/bin/chmod 0666 /dev/kvm; then
-    printf 'NVKR-E-ENGINE-CAPABILITY: unable to prepare /dev/kvm access\n' >&2
-    exit %[1]d
+    runner_fault 'unable to prepare /dev/kvm access'
   fi
 fi
-if ! (exec 3<>/dev/kvm && exec 3>&-); then
-  printf 'NVKR-E-ENGINE-CAPABILITY: runner still cannot open /dev/kvm read/write\n' >&2
+if ! kvm_access; then
   id >&2 || true
   stat -c 'uid=%%u gid=%%g mode=%%a' /dev/kvm >&2 || true
-  exit %[1]d
+  runner_fault 'cannot open /dev/kvm read/write or access check timed out'
 fi
-stat -c 'KVM ready: uid=%%u gid=%%g mode=%%a' /dev/kvm || true`, e.ExitCode(e.New(e.CodeEngineCapability, "KVM access unavailable"))),
+printf 'KVM access ready on ARC pod %%s: %%s\n' "${RUNNER_NAME:-unknown}" "$(stat -c 'uid=%%u gid=%%g mode=%%a' /dev/kvm)"`, e.ExitCode(e.New(e.CodeEngineCapability, "KVM access unavailable"))),
 	}
 }
 
@@ -141,7 +145,7 @@ func admitSharedExecutionRequirements(plan *Plan, adapter string) error {
 				return err
 			}
 			if !GitHubDiskBuildOnly(plan) {
-				if err := admitDiskPublicationEncryption(plan, instruction); err != nil {
+				if err := admitDiskPublicationEncryption(plan, build.Name, instruction); err != nil {
 					return err
 				}
 			}
@@ -158,7 +162,7 @@ func admitSharedExecutionRequirements(plan *Plan, adapter string) error {
 			if !strings.Contains(instruction.Toolchain, "@sha256:") {
 				return e.New(e.CodeUnpinnedInput, "ARC disk toolchain requires a published native OCI digest")
 			}
-			if githubDiskInspectionRequired(plan) {
+			if githubDiskInspectionRequired(plan, build.Name) {
 				_, profile, err := diskPublicationInspectionProfile(build, plan.Environment)
 				if err != nil {
 					return err
@@ -166,7 +170,7 @@ func admitSharedExecutionRequirements(plan *Plan, adapter string) error {
 				if err := requireProductionDiskScratch(profile); err != nil {
 					return err
 				}
-				if err := validateDiskScannerSelection(plan, platform, profile.ScannerDigest); err != nil {
+				if err := validateSelectedDiskScanner(plan, platform, profile.ScannerDigest); err != nil {
 					return err
 				}
 			}

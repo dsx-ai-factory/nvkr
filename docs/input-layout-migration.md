@@ -47,7 +47,8 @@ The two retained focused Definitions keep their existing JSON paths and exact pr
 
 | Target Definition | Purpose |
 |---|---|
-| `nvke/gpu-site.composite.yaml` | Sole maintained NVKE product entry point; six pinned members own its selections |
+| `nvke/nvke-release.composite.yaml` | Maintained production/nightly entry point; six pinned members plus the derived release inventory |
+| `nvke/nvke.composite.yaml` | Maintained development entry point; the same six pinned members without the release inventory |
 | `demo/arm64-nvidia-tcg.yaml` | Complete ARM64 NVIDIA OVN demo with local TCG disk production |
 | `demo/arm64-upstream-tcg.yaml` | Complete ARM64 upstream OVN diagnostic demo with local TCG disk production |
 | `diagnostics/os-amd64.yaml` | One native AMD64 plain disk and its required material closure |
@@ -62,9 +63,9 @@ label that permits source or producer substitution.
 
 | Target Environment | Purpose |
 |---|---|
-| `github-nvke-gpu-site.yaml` | Main-only signed publication for the NVKE composite |
+| `github-nvke.yaml` | Main-only signed publication for the NVKE composite |
 | `github-development.yaml` | Feature-branch signed development publication with existing isolation and retention |
-| `github-nvke-nightly-gpu-site.yaml` | Floating-source composite nightly with its exact bundle and signer identities |
+| `github-nvke-nightly.yaml` | Floating-source composite nightly with its exact bundle and signer identities |
 | `local-arm64-tcg.yaml` | Local ARM64 Docker/TCG demo, without publication or signing |
 | `local-linux-arm64-kvm.yaml` | Local native ARM64 Docker/KVM diagnostics and admitted demo execution |
 | `local-linux-amd64-kvm.yaml` | Local native AMD64 Docker/KVM diagnostics |
@@ -97,7 +98,7 @@ test and demonstration has an accepted successor; it does not authorize silently
 
 | Original Definition | Relocated now | Conditional target or successor | Remaining disposition |
 |---|---|---|---|
-| Combined NVKE Definition | `inputs/definitions/nvke/definition.yaml` | `nvke/gpu-site.composite.yaml` | Retain only as comparison/authoring fixture; combined publication retired under ADR-26 U10 without claiming output equivalence |
+| Combined NVKE Definition | `inputs/definitions/nvke/definition.yaml` | `nvke/nvke.composite.yaml` | Retain only as comparison/authoring fixture; combined publication retired under ADR-26 U10 without claiming output equivalence |
 | `nvke-nightly-arm64/definition.json` | Retired 2026-11-17 | No maintained successor for this exact selection | Retired under ADR-26 U10; local TCG diagnostics retain their own selections |
 | `nvke-nightly-upstream-ovn-arm64/definition.json` | Retired 2026-11-17 | No maintained successor for this exact selection | Retired under ADR-26 U10; local upstream TCG diagnostic retained |
 | `nvke-local-dev-arm64/definition.json` | `inputs/definitions/demo/arm64-nvidia-tcg.json` | `demo/arm64-nvidia-tcg.yaml` | Merge; preserve the complete 29-output selection while reconciling its site/tool baseline with KVM |
@@ -112,10 +113,10 @@ test and demonstration has an accepted successor; it does not authorize silently
 | `nvke-local-dev-arm64/definition-simulator.json` | `inputs/definitions/diagnostics/demo-arm64/simulator.json` | `demo/arm64-nvidia-tcg.yaml` | Retire after caller migration; do not claim the complete demo replaces the fast simulator loop until callers adopt it |
 | `nvke-local-dev-arm64/definition-site.json` | `inputs/definitions/diagnostics/demo-arm64/site.json` | `demo/arm64-nvidia-tcg.yaml` | Retire after caller migration; retain the five-artifact source/interface relationship in tests |
 | `nvke-local-dev-arm64/definition-tools.json` | `inputs/definitions/diagnostics/demo-arm64/tools.json` | `diagnostics/demo-arm64/tools.json` | Retain supported; preserve the focused tool selection and source-built Helm contract |
-| `nvke-controller/definition-amd64.yaml` | `inputs/definitions/diagnostics/controller-amd64.yaml` | `nvke/gpu-site.composite.yaml` | Retire after caller migration; differently named native outputs are not aliases for aggregate release outputs |
-| `nvke-controller/definition-arm64.yaml` | `inputs/definitions/diagnostics/controller-arm64.yaml` | `nvke/gpu-site.composite.yaml` | Retire after caller migration; preserve native image/chart binding tests |
+| `nvke-controller/definition-amd64.yaml` | `inputs/definitions/diagnostics/controller-amd64.yaml` | `nvke/nvke.composite.yaml` | Retire after caller migration; differently named native outputs are not aliases for aggregate release outputs |
+| `nvke-controller/definition-arm64.yaml` | `inputs/definitions/diagnostics/controller-arm64.yaml` | `nvke/nvke.composite.yaml` | Retire after caller migration; preserve native image/chart binding tests |
 | `nvke-controller/definition-profiles.yaml` | `inputs/definitions/diagnostics/controller-profiles.yaml` | No equivalent supported target yet | Retain transitional as a fixture example; its runnable profile payload is not the release's config-only fixture |
-| `nvke-deploy/definition.yaml` | `docs/examples/nvke-deploy/definition.yaml` | `nvke/gpu-site.composite.yaml` | Retain transitional as a nine-output example; CLI and runnable fixture-profile selection differ from the main release |
+| `nvke-deploy/definition.yaml` | `docs/examples/nvke-deploy/definition.yaml` | `nvke/nvke.composite.yaml` | Retain transitional as a nine-output example; CLI and runnable fixture-profile selection differ from the main release |
 | `nvke-ovn-source/definition.yaml` | `inputs/definitions/diagnostics/ovn.yaml` | `demo/arm64-nvidia-tcg.yaml` | Retain transitional as a standalone producer example; its AMD64 outputs have no equivalent in the ARM64 demo targets |
 | `nvke-v1/definition.yaml` | `docs/examples/nvke-module-tags/definition.yaml` | Existing generic quickstart, or a deliberately retained NVKE tutorial | Retire after caller migration; the three-output tutorial's historical producers and artifact names are not release aliases |
 
@@ -134,7 +135,7 @@ publication, signing, credential or runtime policies interchangeable.
 
 | Original Environment | Relocated now | Conditional target or successor | Remaining disposition |
 |---|---|---|---|
-| Combined production Environment | `inputs/environments/github-release.yaml` | `github-nvke-gpu-site.yaml` | Old Environment retained only as comparison/authoring fixture; composite publication uses its own exact signer identity |
+| Combined production Environment | `inputs/environments/github-release.yaml` | `github-nvke.yaml` | Old Environment retained only as comparison/authoring fixture; composite publication uses its own exact signer identity |
 | Combined development Environment | `inputs/environments/github-development.yaml` | `github-development.yaml` | Retain supported for the composite; preserve development mode and its distinct credentials, signer and namespace |
 | `nvke-nightly-arm64/environment-github.json` | `inputs/environments/github-nightly-nvidia.json` | None for the retired producer | Retain only as comparison/authoring fixture; no maintained nightly bundle |
 | `nvke-nightly-upstream-ovn-arm64/environment-github.json` | `inputs/environments/github-nightly-upstream.json` | None for the retired producer | Retain only as comparison/authoring fixture; no maintained nightly bundle |
@@ -142,10 +143,10 @@ publication, signing, credential or runtime policies interchangeable.
 | `nvke-os/environment-local-linux-arm64-docker.yaml` | `inputs/environments/local-linux-arm64-kvm.yaml` | `local-linux-arm64-kvm.yaml` | Seed; verify demo admission before presenting it as a replacement for other ARM64 environments |
 | `nvke-os/environment-local-linux-amd64-docker.yaml` | `inputs/environments/local-linux-amd64-kvm.yaml` | `local-linux-amd64-kvm.yaml` | Seed; preserve AMD64 utility/runtime pins and KVM contract |
 | `nvke-fde/environment-github.yaml` | `inputs/environments/github-diagnostics.yaml` | `github-diagnostics.yaml` | Seed; preserve build-only policy and current branch admission until separately reviewed |
-| `nvke-deploy/environment-github.yaml` | `docs/examples/nvke-deploy/environment-github.yaml` | `github-nvke-gpu-site.yaml` | Retire after caller migration; current discovery tag, namespace and aggregate publication behavior differ |
+| `nvke-deploy/environment-github.yaml` | `docs/examples/nvke-deploy/environment-github.yaml` | `github-nvke.yaml` | Retire after caller migration; current discovery tag, namespace and aggregate publication behavior differ |
 | `nvke-deploy/environment-local.yaml` | `docs/examples/nvke-deploy/environment-local.yaml` | `local-linux-amd64-kvm.yaml` or retained deploy example | Retain transitional; current non-disk utility pin and no-publication policy must not change implicitly |
 | `nvke-ovn-source/environment-github.yaml` | `inputs/environments/github-ovn-diagnostics.yaml` | Retained OVN producer example | Retain transitional; its fork source-access grant and publication contract are not covered by a renamed nightly policy |
-| `nvke-v1/environment-github.yaml` | `docs/examples/nvke-module-tags/environment-github.yaml` | `github-nvke-gpu-site.yaml` or retained tutorial | Retire after caller migration; current namespace/publication behavior differs |
+| `nvke-v1/environment-github.yaml` | `docs/examples/nvke-module-tags/environment-github.yaml` | `github-nvke.yaml` or retained tutorial | Retire after caller migration; current namespace/publication behavior differs |
 | `nvke-v1/environment-github-dev.yaml` | `docs/examples/nvke-module-tags/environment-github-dev.yaml` | `docs/examples/nvke-module-tags/environment-github-dev.yaml` (repository-relative) | Retain supported; preserve build-only development without signing or publication |
 | `nvke-v1/environment-local.yaml` | `docs/examples/nvke-module-tags/environment-local.yaml` | Retained tutorial, until its caller is retired | Retain transitional; anonymous local HTTP registry and dry-run signing have no equivalent among the eight targets |
 

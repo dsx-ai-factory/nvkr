@@ -48,12 +48,24 @@ signer roles, digest-bound transport and publication, and independent artifact q
 the shared Plan, runner and lifecycle gates with explicit cluster public keys and native per-task runtimes.
 Reconciliation records external acceptance separately from that design and provider-authentication tests.
 
+ADR-18's proposed ordinary GitLab extension projects the same complete Plan onto explicit native Linux runner routes.
+The provider API authenticates current jobs and original artifact carriers; shared owners retain producer
+execution, exact named-output membership and Run finalization. Optional bounded HTTPS publication checks the
+complete returned byte closure under ADR-20. This route stays unsigned and `static-unqualified`, including
+after publication; neither provider authentication nor byte integrity supplies signing or qualification authority.
+ADR-21 separates the fixed generated include namespace from the operator-owned root pipeline. The
+[GitLab ledger](adr/reconciliation/adr-18.md#gitlab-ordinary-unsigned-profile) owns implementation and acceptance status.
+
 The tool and its catalogs are separate products: the tool owns resolution and verification rules; catalogs
 provide reusable component producers and pins, including tool releases and GitHub actions.
 Explicit digest-pinned fragments share authored declarations before resolution; each catalog retains its own
 complete lock. Snapshot capture includes those fragment bytes and replay remains confined to captured inputs.
 File-backed build/vendor argv operands expand to exact bytes during catalog loading and join that captured
 closure; their paths do not enter resolved command identities (ADR-22).
+Opt-in source-derived argv/path bindings and complete source-bound producer copies retain explicit producer
+contracts. Catalog-family maintenance prepares selected pins, overlay predecessors and consumer bundles
+before guarded commitment, preserving independently selected cohorts (ADR-21/22). It generates static
+authored bundles; runtime source freezing and release authorization remain separate owners.
 [ADR-22](adr/0022-catalog-pinning-and-the-lock-contract.md#github-action-dependencies) owns how generated
 Runs bind action commits from the catalog lock. Definitions declare named deliverable outputs once.
 An optional ordered catalog list supplies complete producer selections for outputs without an override;
@@ -77,11 +89,11 @@ trusted-code integration results remain outside product lifecycle and v1
 qualification acceptance (ADR-16/18).
 
 [ADR-24](adr/0024-imported-validator-catalog.md) separates imported-validator discovery from upstream
-test ownership and binds named artifact roles through explicit diagnostic profiles. The provisional CLI
-slice implements strict loading/discovery and frozen local-plan dispatch through the existing execution
-owners; native upstream catalog execution remains unexercised. Shared schema stabilization, published
-adapters and controller/chart integration are deferred. Existing CLI and legacy validation diagnostics
-retain their separate admission and result contracts; catalog registration grants no qualification authority.
+test ownership: registered container commands select named outputs of a completed Run and execute in one
+admitted TestEnvironment through a single executor with fixed isolation. Implementation status,
+including the provisional slice it replaces, is recorded in [reconciliation](adr/reconciliation/adr-24.md).
+Existing CLI and legacy validation diagnostics retain their separate admission and result contracts;
+catalog registration grants no qualification authority.
 
 [ADR-26](adr/0026-definition-composition.md) designs composite Definitions, which release the outputs of
 several digest-pinned member Definitions through one Plan, Run and Release. Its
@@ -95,7 +107,10 @@ evidence and the production manifest; explicit policies select production/develo
 applicability without deployment claims. Member Release reuse and local composite qualification rehearsal remain
 deferred and refused. The [hosted composite publication record](adr/reconciliation/adr-26.md#hosted-gpu-site-publication)
 owns external execution evidence and its consumer-acceptance and qualification limits.
-The composite supplies all maintained NVKE production, development and floating-source nightly bundles.
+Production and floating-source nightly use a release composite that adds a publication-bound inventory
+to the same 83 member payloads. Development retains the 83-output composite; ADR-26 records this
+explicit exception to the shared-composite rule. Composite-owned derived outputs bind their member
+materials without acquiring a producer or member attribution.
 The explicit ADR-26 U10 maintainer cutover supersedes the former retirement prerequisites; it does not
 establish independent consumer acceptance or change member Build identities.
 
@@ -131,6 +146,9 @@ These assumptions are subject to the current ADRs and milestone acceptance crite
   Public NVKE inputs are fetched anonymously with vendored dependencies (ADR-18 §8).
 - Workflow ownership, branch protection, and protected publication environments are security controls in v1.
   The consumer trusts the named producer and qualification identities under an explicit issuer policy.
+  For GitHub platform-token publication, the operator configures Write-only package Actions access and
+  disables inheritance. NVKR authenticates package identity, repository linkage and default-private visibility
+  (with an explicit public opt-in), but does not verify roles or prevent deletion by a misconfigured Admin token.
 - Qualified reproduction assumes inputs can be normalized and the execution environment admitted against a
   signed profile. Operators provide the independent conformance evidence and trust policy (ADR-07/08/16).
 - Qualified offline operation requires the retained input/evidence closure and pinned trust material; it is a
@@ -357,9 +375,16 @@ A proposed multi-platform executable output (ADR-28) compiles like an OCI aggreg
 [index publication](adr/0028-multi-platform-executable-indexes.md#6-publication-a-standard-image-index-over-minimal-per-platform-images).
 This path is designed, not implemented.
 
-The compiler derives each output's graph from its exact selected components and concrete
+The compiler derives each ordinary output's graph from its exact selected components and concrete
 target. `nvkr.build` identifies the logical projection of that validated graph. Output names, packaging and execution settings remain bound by their owning records. Equal Build
 Digests do not merge producer jobs, restore results, observations or evidence across named outputs.
+
+ADR-19/20 admit a source-less release-derived inventory bundle. Its explicit package dependencies precede
+in-process inventory projection, wrapping and publication. The derivation authenticates each selected sibling
+package and combines its observed facts with the namespace fixed at compilation; it performs no registry or
+Release readback. Its tagged logical identity binds encoding, namespace and named sibling Build identities.
+The qualifier re-projects final signed membership and compares the inventory document and canonical tar envelope from the held verified archive. Catalog and
+installer derivations remain deferred, and no external hosted acceptance is implied by local contracts.
 
 Raw Debian outputs select one ordinary `host-package` producer. Existing sessions, result authentication,
 held files and lifecycle staging own execution and archive retention; OS consumers use the existing material
@@ -381,10 +406,15 @@ NVKE OS producer owns its embedded contents. IR/Plan lowering binds the exact so
 projects the root QCOW2 without binary-bundle packaging. A process-local held-QCOW2 observer has contract coverage
 for exact delivery bytes and producer/Plan bindings; it grants no execution authority or qualified reproduction
 verdict. Production VM execution and held-result population use the separately admitted native ARC route;
-direct producer selection does not introduce independently built OS layers. The narrower candidate uses exact
-live producer/material evidence and reports inspection as not performed, satisfying the NVKE disk-evidence floor.
-NVKE still requires the remaining delivery and consumer gates. The approved M3 MVP retains producer-only disk
-evidence and source-metadata consistency. ADR-13's strict mode requires a full inventory reconciling traced
+direct producer selection does not introduce independently built OS layers. ADR-13's
+package-only mode inventories the exact held final plain disk through the pinned
+offline appliance and signs Debian package names, versions, architectures and purls.
+Maintained Environments retain producer-only evidence until refreshed appliances
+preserve observed distro/vendor and their measured pins are recorded. Activation
+requires explicit producer-only FDE overrides. Producer/material integrity, every evidence slot and the remaining
+delivery/consumer gates still apply. Consumer minima order producer-only, packages,
+then strict; package inspection never claims file integrity or material correspondence.
+ADR-13's strict mode requires a full inventory reconciling traced
 materials with read-only inspection of each selected disk; this is deferred hardening. That composition claim does not
 establish NVKE-owned runtime correctness.
 It also does not establish disk reproduction. The exact QCOW2 digest names the delivered artifact; matching
@@ -469,7 +499,7 @@ hosted execution, registry services, signing or operational release acceptance (
 | Artifact | Producer/packager → consumer | Exact blob or OCI bytes, separate from logical build identity |
 | Release content and evidence | Release/transport owners → verifier | Noncircular exact content subject and typed proof closure |
 | External test outputs | External producer → descriptive consumer | `testresults` owns bounded descriptions/serialization only; no execution, authentication or qualification authority |
-| Diagnostic validation profile | User → `validation` → supported producer | Separate check-instance/suite/harness selection; `lifecycle` authenticates product and tool publications and exports exact executable members; diagnostic execution cannot issue qualification authority |
+| Diagnostic validation selection | User → `validation` → completed Run | Registered suites bound to exact Run outputs in one TestEnvironment (ADR-24); the legacy profile route keeps separate check-instance/suite/harness selection; `lifecycle` authenticates product and tool publications and exports exact executable members; diagnostic execution cannot issue qualification authority |
 | Authenticated receipts | Owning verifier → authorized operation | Bound to exact subjects, roles, and policy; cannot be recreated by parsing |
 
 All structured identities use ADR-01's canonical codec and named digest families. The codec uses its specified
@@ -494,7 +524,7 @@ in reconciliation; a facade alone does not discharge that debt.
 | Authored input admission | `definition` | Strictly decode and validate Definition/Environment, own their canonical identity and independent copies |
 | Public lifecycle | `lifecycle` | Freeze attempts from complete plans, persist outcomes, expose Run and Release views; delegate authority |
 | Compilation and execution | `factory` | Compile authored inputs into complete plans; render and execute the same operations with one producer instruction; observe typed payloads against exact planned producers |
-| Diagnostic checks | `validation`, `conformance`, `testresults` | Explicit profile dispatch, local suite/harness capture and descriptive outputs; no qualification authority (ADR-16 §6) |
+| Diagnostic checks | `validation`, `conformance`, `testresults` | Explicit selection and profile dispatch, local suite/harness capture and descriptive outputs; no qualification authority (ADR-16 §6) |
 | Plan inspection | `planview` | Validate through factory, retain immutable descriptive snapshots, render linked graphs and compare named Plan fields without granting execution or evidence authority |
 | Producer execution | `pipeline` | Shared producer launcher, source snapshots, runtime observations, artifact-byte verification and provider transport |
 | Trust and signing | `trust`, `sign` | Authenticate documents, tools and signer policies |
@@ -566,7 +596,7 @@ copies named QCOW2/EFI bytes and proofs while preserving complete OCI membership
 aggregate authentication precedes proof and final inventory publication/readback. [Reconciliation](adr/reconciliation/object-store-publication.md#selective-boot-asset-publication) tracks implementation.
 Environment v3 and Plan v7 describe the opt-in selection and two bounded phases. Core lifecycle APIs issue
 limited selected-artifact receipts after original authentication and cleanup; generated selective execution,
-production rendering and external provider/client acceptance remain separate work. The NVKE catalog owns a standalone script/template candidate checked against the CRD from pinned NVKE source. NVKR Go has no MachineImage renderer; no producer or workflow enables the candidate.
+production rendering and external provider/client acceptance remain separate work. The NVKE catalog owns a standalone Go module/template candidate checked against the CRD from pinned NVKE source. NVKR's root Go module has no MachineImage renderer; no producer or workflow enables the candidate.
 
 [Reconciliation](adr/reconciliation/README.md) owns the current support matrix. Local immutable attempts,
 Plan/graph inspection, GitHub generation, metadata-only release navigation and the scoped
@@ -602,7 +632,7 @@ schema, policy or output.
 |---|---|---|---|
 | Six public objects with generated internal relationships | Removes repeated authoring and caller-built receipt graphs while retaining typed trust boundaries | Requires compiler/verifier ownership | 17 |
 | Compile definitions into a graph rather than maintain hand-written CI | One reviewed model controls dependency and transport validation; regeneration makes changes inspectable | Compiler and provider adapters become security-sensitive infrastructure | 18/21 |
-| Separate build identity from environment and publication | A destination change does not change what is being built | Plan, bundle, artifact and evidence identities must remain distinct | 01/02/20 |
+| Separate payload identity from environment and publication | A destination change preserves ordinary payload identity; explicit release-derived outputs bind the destination | Plan, bundle, artifact and evidence identities must remain distinct | 01/02/20 |
 | Name the v1 evidence tier explicitly | Hosted production can ship without claiming reproduction | Trust shifts to workflow ownership and the hosted platform | 16 |
 | Run pinned source entrypoints for wrapped builds | Commit, tree and toolchain remain explicit inputs | External build behavior and declared privilege remain producer risks; fused execution needs its own implementation | 10 |
 | Keyless cosign for v1 | Consumer acceptance uses standard signature and attestation verification against a workflow identity | Online identity/transparency dependencies and permanent disclosure; no qualified clearance | 04 |
@@ -732,31 +762,52 @@ provider controls on the caller. Native preflight and checkout stay explicit in 
 Before checkout or input transfer, disk producers reject missing, symlink or non-character KVM devices.
 If the runner cannot open the fixed device read/write, one bounded noninteractive permission bootstrap
 sets mode 0666 and requires a successful open afterward. Failed mutation or access remains a capability
-rejection. Full helper-owned capacity and held KVM API admission remain required before work.
+rejection. Each shell read/write-open has a five-second timeout and five-second kill grace; failures
+name the ARC runner pod as a runner-capability fault. The early check proves access only.
+Full helper-owned capacity and held KVM API admission remain required before work. ARC admission
+failures identify the pod and phase; unavailable KVM retains its failed open path and OS error.
 [ADR-18 §8](adr/0018-pipeline-ir-and-ci-adapter-emission.md#8-pipeline-attested-generation-and-credential-admission)
 owns which jobs, including finalization and the final Run upload used by the closing summary, stay in the
 entry workflow under fallback partitioning; shared recovery precedes finalization. Static Plan/manifest references and source scheduling by target/consumer cohort
 reduce routine pin churn without changing executable Plan/IR identities. Workflow bytes remain stable only
 while topology, labels/interfaces, visible policy and required inline action pins stay unchanged; every input change still requires
 complete bundle regeneration and checking. Static validation expands templates with their invocation data and checks their exact generated
-bytes, preserving credential scope and per-job finalizer results. Edit locality separately preserves existing
-jobs when an independent output is added. On GitHub a job is one authority class on one runner for one
-Build target or publication route (ADR-18 §8). Source fetch without a credential, build, acquisition,
-terminal observation, SBOM and packaging share a producer job. SBOM attestation, publication, signing,
+bytes, preserving credential scope and per-job finalizer results. Edit locality preserves ordinary jobs when
+an independent output is added; shared source selection and image publication batches can change membership.
+On GitHub a job is one authority class on one runner, normally for one Build target or publication route
+(ADR-18 §8). Eligible non-owner source fetches without a credential, build, acquisition,
+terminal observation, SBOM and packaging may share a producer job. Shared source owners always run in
+source-only jobs before producer work. SBOM attestation, publication, signing,
 publication verification and release assembly share a release job with step-scoped credentials. An
 operation joins a job only when it has the same class, runner label and native platform and adds no
-prerequisite. The job preserves each operation, and failure of any operation marks the whole provider
+prerequisite, except the image batches and same-target source-fetch groups described below.
+The job preserves each operation, and failure of any operation marks the whole provider
 job unsuccessful for finalization. A shared pinned tool acquired by an independent root operation may be
 an additional prerequisite; the job waits for acquisition and restores the tool first, and a failed
 acquisition prevents that job. The root tool acquisition never gains members. A source fetch that holds
 a source credential and an object publication keep their own jobs; the explicit ARC
-disk group preserves its live owner. Membership does not follow global adjacency or fixed-size chunks.
+disk group preserves its live owner. Ordinary producer membership does not follow global adjacency.
+Single-platform OCI image publication operations may share a job across routes with equal runner,
+platform and publication credential reference, within the original operation and duration ceilings and
+at most two output routes per job.
+Same-target source-fetch groups may combine acyclic dependencies on different source owners; the job
+waits for all those owners and shares their failure coupling.
+The projection refuses cyclic dependencies; bounded cross-output waiting and failure coupling are explicit.
+Each output retains its own evidence, signing and verification operations. Source acquisition is shared
+within the Run by exact repository URL, commit and tree; prepared closures additionally require the same
+vendor specification and native platform. Consumers independently authenticate restored source and their native vendor
+runtime before writing. Shared source owners finish before producer work, and differing vendor
+specifications reconstruct pristine pinned source before their own vendoring. Consumers still depend on
+the selected owner's vendor success and transport its complete closure. These transport choices
+do not change Plan or Build identity or reuse producer results.
 Aggregate accounting and summaries change with the complete required set, and finalization still requires
 every job. The current Plan determines scheduling without previous-generated-state input.
 Identical complete host step sequences
 can share descriptive YAML anchors for native preflight, credential-free checkout, current-job preparation
 and one or two uncontrolled node calls. Expansion restores independent nodes before substituting each
 job's parameters; an earlier new anchor owner may change presentation while preserving expanded jobs.
+The carrier and credential rules below describe the implementation pending the
+[accepted destination-staging migration](adr/0018-pipeline-ir-and-ci-adapter-emission.md).
 Private carriers use Go-owned, digest-verified chunks in an unlinked private/internal GHCR package; Actions
 retain their JSON locators plus separately admitted metadata records. The factory validates exact schemas
 and inventories before exporting metadata; control layouts exclude output payload blobs. Same-Run provider
@@ -774,7 +825,9 @@ a bounded two-hour budget for setup, transport, authentication and final record 
 Carrier and GHCR publication admission use the automatic repository token for source metadata, separately
 from the credential that accesses package metadata and registry bytes. Producers receive neither through
 these admission paths.
-Admission bounds expanded YAML parsing events as well as file bytes. The default flat projection adds no cross-output barrier. Redundant dependency edges are removed only with the full
+Admission bounds expanded YAML parsing events as well as file bytes. The default flat projection adds no
+global cross-output barrier; the admitted source and image groups retain their explicit dependencies.
+Redundant dependency edges are removed only with the full
 prerequisite closure preserved; authored setup, runtime variables, images or services that mention the
 direct dependency context retain the original lists.
 Large finalizers receive exact original job results through fixed, bounded collectors. A collector must
@@ -785,7 +838,7 @@ within one complete Plan, finalizer, Run and Release.
 GitHub stores the complete Plan as a per-bundle index into shared frozen records and byte-exact
 command files. [ADR-21](adr/0021-generated-pipeline-maintenance-and-lifecycle.md#1-the-emitted-pipeline-is-a-generated-artifact-not-an-owned-scaffold)
 owns storage and admission. Loading reconstructs the same canonical Plan before execution;
-Plan and Build identity are unchanged. Runtime carriers and Tekton retain the packed canonical
+Plan and Build identity are unchanged. Stable Plan-record names bind exact bytes through each owning manifest; environment bindings are stored separately in each bundle's targets record. Shared-record updates require coordinated regeneration of all owners. Runtime carriers and Tekton retain the packed canonical
 form; helper consumers stage that form and let the generation owner reconstruct the GitHub bundle.
 [ADR-18 §8](adr/0018-pipeline-ir-and-ci-adapter-emission.md#8-pipeline-attested-generation-and-credential-admission)
 owns the grouping, the jobs that stay in the entry workflow, result forwarding and the proposed signer
@@ -872,7 +925,8 @@ anchors completion; authenticated production output publications and aggregate r
 attempts of the same producer run under ADR-20's ordering and exact-input checks. Original evidence is retained, and an
 earlier attempt's unrelated job failure does not invalidate its successfully authenticated outputs.
 
-Hosted artifact checking verifies every output's complete payload sequentially and releases non-executable
+Hosted artifact checking retains explicitly marked bounded derived-inventory layers for comparison. It
+verifies every output's complete payload sequentially and releases other non-executable
 scratch after each output. The lifecycle owner issues an opaque check receipt retaining verified control
 documents, evidence, exact executable bundle bytes and the frozen Plan. The narrower owner cannot export discarded
 payloads; ordinary full-publication verification retains its complete export capability.
@@ -918,7 +972,9 @@ signed through the three local roles and passed registry read-back. The demo han
 coverage; downstream cluster deployment is a separate scope. Reconciliation tracks independent consumer
 and negative-case evidence and the remaining hosted acceptance work.
 
-The MVP keeps disk evidence producer-only. Embedded declarations are optional; omission is not applicable,
+Maintained disk evidence stays producer-only pending the appliance refresh required by ADR-13's
+implemented package-only mode. Qualification reports retain the authenticated disk evidence scope;
+package inventory does not establish file integrity or material reconciliation. Embedded declarations are optional; omission is not applicable,
 while authored declarations must match their referenced pinned upstream metadata. This supplies no effective
 customized or installed composition claim and does not replace exact build-input/material evidence.
 External suites outside scope are explicitly not evaluated. Future required suites must supply authenticated
@@ -1028,7 +1084,7 @@ and remaining independent-consumer acceptance are scoped in reconciliation.
 | Change to the example | Identity effect |
 |---|---|
 | CLI source pin changes | Build Digest and enclosing plan change; new execution is needed to learn output identities |
-| Only registry destination changes | build identity is unchanged; Environment/plan/bundle can change; preserved package bytes retain their OCI digest |
+| Only registry destination changes | ordinary payload Build identity is unchanged; release-derived inventory identity and bytes change; Environment/plan/bundle can change |
 | Only signing policy changes | build identity is unchanged; Environment and production evidence change |
 | Same inputs run again | build identity stays fixed; production metadata can differ; v1 makes no reproduction guarantee |
 | SBOM structure becomes a new plan output | Plan bytes and identity change; existing attestations retain their original meaning |
@@ -1312,7 +1368,8 @@ pipeline-attested cross-Run reuse of complete named outputs: a Plan-derived key 
 toolchain profile, platform, evidence set, lane, origin and signer policy; untrusted discovery; owner-issued
 acceptance; and a `reused` Run origin that retains original provenance instead of claiming current execution.
 One frozen decision set serves every execution partition. It is not implemented. v1 production acceptance retains its AMD64 floor. Additional ARM64 candidate outputs remain mandatory
-when selected by the Definition. NVKE and the M3 MVP retain producer-only disk evidence; strict inspection and
+when selected by the Definition. Maintained NVKE inputs retain producer-only disk evidence until the
+package-mode appliance refresh and measured pin update; strict inspection and
 material reconciliation are deferred hardening (ADR-13 §6). Organizational ratification remains separate.
 
 ### Quality-attribute scenarios

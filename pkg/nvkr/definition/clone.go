@@ -30,6 +30,7 @@ func (input Definition) Clone() Definition {
 	input.Outputs = append([]DefinitionOutput(nil), input.Outputs...)
 	for i := range input.Outputs {
 		out := &input.Outputs[i]
+		out.Derived = out.Derived.Clone()
 		out.Components = append([]string(nil), out.Components...)
 		out.Platforms = slices.Clone(out.Platforms)
 		if out.Catalog != nil {
@@ -57,6 +58,17 @@ func (input Environment) Clone() Environment {
 		value.Smoke = value.Smoke.Clone()
 		input.Tekton = &value
 	}
+	if input.GitLab != nil {
+		value := *input.GitLab
+		value.AdditionalRefs = slices.Clone(value.AdditionalRefs)
+		value.PipelineSources = slices.Clone(value.PipelineSources)
+		value.Runners = maps.Clone(value.Runners)
+		for platform, runner := range value.Runners {
+			runner.Tags = slices.Clone(runner.Tags)
+			value.Runners[platform] = runner
+		}
+		input.GitLab = &value
+	}
 	input.GitHubRuntimeSources = slices.Clone(input.GitHubRuntimeSources)
 	if input.ToolchainAccess != nil {
 		value := *input.ToolchainAccess
@@ -77,6 +89,7 @@ func (input Environment) Clone() Environment {
 	input.GitHubDispatchBranches = append([]string(nil), input.GitHubDispatchBranches...)
 	input.ExecutionClasses = execution.CloneClasses(input.ExecutionClasses)
 	input.DiskInspectionProfiles = maps.Clone(input.DiskInspectionProfiles)
+	input.DiskEvidenceOverrides = maps.Clone(input.DiskEvidenceOverrides)
 	if input.SourceAccess != nil {
 		original := input.SourceAccess
 		input.SourceAccess = make(map[string]SourceAccess, len(original))

@@ -1,0 +1,123 @@
+{
+  "buildDigest": "sha256:6cabe7a8ba5adb5853f927d525935cb45e09eee7b5ed6b08e2883233c243aa94",
+  "catalogDigest": "sha256:84b9ecc3946d2ff92d75a413f45c9fffc7fb54f198589e5da8158ec6f397bbd2",
+  "components": [
+    "capnico-controller"
+  ],
+  "executionGraph": {
+    "nodes": [
+      {
+        "artifactPath": "bin/capnico-controller-amd64.oci.tar",
+        "builderType": "buildkit-rootless",
+        "command": [
+          "sh",
+          "-ec",
+          "buildctl-daemonless.sh build --frontend dockerfile.v0 --local context=/src/. --local dockerfile=/src --opt platform=linux/amd64 --opt \"build-arg:SOURCE_DATE_EPOCH=$SOURCE_DATE_EPOCH\" --output type=oci,dest=/src/bin/capnico-controller-amd64.oci.tar,oci-mediatypes=true,rewrite-timestamp=true"
+        ],
+        "component": "capnico-controller",
+        "env": [
+          {
+            "name": "CGO_ENABLED",
+            "value": "0"
+          },
+          {
+            "name": "GOAMD64",
+            "value": "v1"
+          },
+          {
+            "name": "GOARCH",
+            "value": "amd64"
+          },
+          {
+            "name": "GOFLAGS",
+            "value": "-trimpath -buildvcs=false"
+          },
+          {
+            "name": "GOOS",
+            "value": "linux"
+          },
+          {
+            "name": "GOTOOLCHAIN",
+            "value": "local"
+          },
+          {
+            "name": "LC_ALL",
+            "value": "C"
+          },
+          {
+            "name": "SOURCE_DATE_EPOCH",
+            "value": "1789170151"
+          },
+          {
+            "name": "TZ",
+            "value": "UTC"
+          }
+        ],
+        "id": "build-capnico-controller",
+        "kind": "build",
+        "needs": [
+          "fetch-source-dd9e8997ac5820a246ca1cb74549be46e3ee7669a17d947a754b45eff552246b"
+        ],
+        "network": "default",
+        "outputType": "oci-image",
+        "platform": "linux/amd64",
+        "sourceCommit": "30882520888ab7bb75d125cb7bb9aa89e48acd6a",
+        "sourceDest": "source-dd9e8997ac5820a246ca1cb74549be46e3ee7669a17d947a754b45eff552246b",
+        "sourceReadOnly": true,
+        "sourceTreeHash": "4bc81a40160d655bddaadc1b96f9413703351b0e",
+        "toolchain": "moby/buildkit@sha256:f8a833b2de9d68e27f0815e4a737abdfaf8a2e4c615650557df11025101557b4",
+        "vendorSpecDigest": "sha256:c5d8e2b1623e31ad8864aa9b8cf823cca004f3f45fa490a18f63aaf839216c62",
+        "version": "0.0.45",
+        "workdir": "/src",
+        "writeDir": "bin"
+      },
+      {
+        "commit": "30882520888ab7bb75d125cb7bb9aa89e48acd6a",
+        "dest": "source-dd9e8997ac5820a246ca1cb74549be46e3ee7669a17d947a754b45eff552246b",
+        "id": "fetch-source-dd9e8997ac5820a246ca1cb74549be46e3ee7669a17d947a754b45eff552246b",
+        "kind": "fetch",
+        "network": "default",
+        "repo": "https://github.com/dsx-ai-factory/cluster-api-provider-nico",
+        "treeHash": "4bc81a40160d655bddaadc1b96f9413703351b0e",
+        "vendorImage": "moby/buildkit@sha256:f8a833b2de9d68e27f0815e4a737abdfaf8a2e4c615650557df11025101557b4",
+        "vendorSpecDigest": "sha256:c5d8e2b1623e31ad8864aa9b8cf823cca004f3f45fa490a18f63aaf839216c62"
+      },
+      {
+        "id": "verify",
+        "kind": "verify",
+        "needs": [
+          "build-capnico-controller"
+        ]
+      }
+    ],
+    "platform": "linux/amd64",
+    "schemaVersion": "nvkr.dev/ir/v4"
+  },
+  "name": "capnico-controller/linux/amd64",
+  "platform": "linux/amd64",
+  "resolvedComponents": [
+    {
+      "Name": "capnico-controller",
+      "artifactPath": "bin/capnico-controller-{{.Arch}}.oci.tar",
+      "buildCommand": [
+        "sh",
+        "-ec",
+        "buildctl-daemonless.sh build --frontend dockerfile.v0 --local context=/src/. --local dockerfile=/src --opt platform=linux/{{.Arch}} --opt \"build-arg:SOURCE_DATE_EPOCH=$SOURCE_DATE_EPOCH\" --output type=oci,dest=/src/bin/capnico-controller-{{.Arch}}.oci.tar,oci-mediatypes=true,rewrite-timestamp=true"
+      ],
+      "builderType": "buildkit-rootless",
+      "commit": "30882520888ab7bb75d125cb7bb9aa89e48acd6a",
+      "fromSource": true,
+      "outputType": "oci-image",
+      "platforms": [
+        "linux/amd64",
+        "linux/arm64"
+      ],
+      "repo": "https://github.com/dsx-ai-factory/cluster-api-provider-nico",
+      "sourceDateEpoch": 1789170151,
+      "tag": "v0.0.45",
+      "toolchainImage": "moby/buildkit@sha256:f8a833b2de9d68e27f0815e4a737abdfaf8a2e4c615650557df11025101557b4",
+      "treeHash": "4bc81a40160d655bddaadc1b96f9413703351b0e",
+      "writeDir": "bin"
+    }
+  ]
+}

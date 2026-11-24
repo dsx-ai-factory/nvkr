@@ -168,6 +168,21 @@ not replace either native inventory. A missing child fails the whole named outpu
 output has equal bytes or an equal Build Digest. This is the pipeline artifact-publication membership
 contract, not qualified reproduction or external runtime acceptance.
 
+A release-derived inventory is an independently required bundle member with packaging file inventory,
+signature and production provenance in the `wrapped-build` lane. Provenance resolved dependencies name each
+selected sibling's observed package digest and repository; qualification joins them to the exact signed
+material binding and final sibling membership. It has no invented source producer or
+source-build evidence slot. The qualifier authenticates its ordinary membership and evidence, re-projects
+the selected siblings from final signed Release metadata, and compares the exact inventory document and
+canonical single-file tar envelope with the held verified payload. Gzip compression bytes may vary without
+changing this comparison; the signed OCI layer digest still authenticates the transported archive. Missing siblings, changed locations or different inventory bytes
+fail the complete Release. Its explicit non-tool smoke rule grants no installation claim.
+
+In `per-output-v1`, only the inventory and aggregate root predicates carry these derived materials;
+ordinary sibling predicates retain their producer classification. Legacy aggregate publication shares
+one aggregate predicate, including its derived materials and `wrapped-build` classification, across
+its members. It supports local dry-run diagnostics, not independent hosted qualification.
+
 Evidence strength is subject-scoped. A Release may expose independently reproduced or digest-verified component
 evidence beside a pipeline-attested aggregate artifact, but the stronger component evidence cannot upgrade that
 aggregate or the Release lane. A content-validated rebuild proves neither exact-byte reproduction nor upstream
@@ -220,7 +235,10 @@ admission returns a capability error before publication work; it cannot claim co
 
 The owning lifecycle module issues an opaque, subject-bound check receipt after authenticating its exact
 inputs and build evidence. Hosted checks independently verify every output's complete payload in sequence;
-non-executable payload scratch is released before the next output. The delivery owner retains the checked
+non-executable payload scratch is released before the next output. The bounded exception retains only an
+explicitly marked derived inventory layer (at most 9 MiB compressed), admitted from its checked descriptor
+before download, for exact inventory comparison under the shared close/join lifetime. This grants no general
+payload or layout export capability. The delivery owner retains the checked
 control documents, evidence and exact executable bundle bytes, and issues no complete-set capability until every
 output and the aggregate content identity pass. This bounds transient payload storage by the current output
 instead of the sum of all outputs; one output must still fit the available scratch capacity. Discarded bytes

@@ -145,6 +145,9 @@ func githubPartitionsEngaged(plan *Plan, flat []byte) bool {
 
 // The flat rendering is the semantic reference for exact partition projection.
 func renderGitHubFlat(ctx context.Context, plan *Plan, validate bool) (*GeneratedBundle, error) {
+	if plan != nil && plan.Environment.GitLab != nil {
+		return nil, e.New(e.CodeEngineCapability, "GitHub generation cannot ignore Environment.gitlab")
+	}
 	if ctx == nil {
 		return nil, e.New(e.CodeUsage, "GitHub factory rendering requires a context")
 	}
@@ -405,7 +408,7 @@ func renderGitHubFlat(ctx context.Context, plan *Plan, validate bool) (*Generate
 			}
 			fmt.Fprintf(&body, "        run: %s\n", githubRunnerCommand(plan, "run-disk", "output", stage.DiskOutput))
 			writeGitHubPackerDiagnosticStep(&body, plan, stage, actions)
-			if githubDiskInspectionRequired(plan) {
+			if githubDiskInspectionRequired(plan, stage.DiskOutput) {
 				// Diagnostics are short-lived descriptions, never planned evidence
 				// carriers. Preserve them even when the live inspection fails.
 				diagnostic := githubInspectionDiagnosticStep(plan, actions, stage.DiskOutput)

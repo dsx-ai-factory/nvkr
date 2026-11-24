@@ -1,5 +1,26 @@
 ## Support by owner
 
+Interactive catalog-family bumping prepares the explicit multi-catalog closure before writing working files.
+Local Git fixtures cover cross-catalog release consistency, excluded cohorts, unchanged dry-run files and
+second-catalog preparation failure. Injected writer tests cover rollback, cancellation and concurrent edits,
+including retained recovery backups when another writer changed a committed member. Additional fixtures
+inject edits immediately before/after withdrawal, change unchanged inputs during publication, and
+validate edited workflow/policy bytes captured after initial admission. Publication checks the actual
+displaced bytes and uses no-replace links; paths may briefly be absent. These contracts do not
+establish cross-file crash atomicity, hosted family maintenance or producer execution. Scheduled refresh
+retains its existing source selection and separate owner transactions.
+Family commitment holds the shared Plan-store guard, publishes manifests before retiring captured
+objects removed by ordinary staged generation, and writes the derived index last. Injected tests cover
+retirement rollback, cancellation and concurrent saves. Directory additions or retirements require
+ordinary authored regeneration and are refused before commitment.
+The family path generates static authored bundles without freezing runtime source heads, then repeats
+owner checks. Runtime-source fixtures retain capture refusal and exact-commit dispatch admission; family
+generation supplies neither a frozen snapshot nor a source commit. Explicit source-bound Ubuntu24 copies
+and their predecessor chains regenerate through the overlay owner while preserving producer contracts.
+The real default-family no-op dry run checked the existing closure and resolved every selected pin; the
+no-change path does not run staged generation or commitment. Changed-candidate preparation, second-pass
+generation and rollback are covered by local fixtures, not an externally exercised family version advance.
+
 Explicit producer-overlay maintenance now checks the existing generated baseline before pin mutation,
 copies complete producers from named catalogs, and derives ordered predecessor bindings before Run
 generation. The NVIDIA/upstream TCG copies and their two dependent local KVM bindings are enrolled;
@@ -24,6 +45,11 @@ measurements and successful publication. Native image push paths are checked aga
 the module-local inspector dependency graph for both Linux architectures. Manifest
 comparison and routing are diagnostic only; these offline tests do not exercise
 GitHub issue writes, hosted matrix outputs or a live refresh.
+The comparison, notification and review-proposal adapters now live in
+`pkg/nvkr/toolchainmaintenance`. Comparison uses the existing packed/tree Plan loader directly;
+proposal checks the complete candidate file set before creating remote blobs. Go contracts cover
+manifest equality and refusal, issue reuse, create-once routing, review-branch retries and closed
+proposals. These ports have no new hosted publication or notification evidence.
 
 The [publication attempt](https://github.com/dsx-ai-factory/nvkr/actions/runs/42939744937)
 admitted preparation `42904976235` attempt 1, published all four approved candidate subjects, and passed
@@ -83,17 +109,61 @@ Local contracts cover exact canonical round trips, malformed references, missing
 The loader does not render workflows or actions; complete closure checks remain with generation and runtime bootstrap.
 Packed inputs, CLI JSON and Tekton retain the canonical representation.
 The Plan schema and digest contracts are unchanged.
-The 2026-11-17 three-folder simplification preserves the exact reconstructed canonical bytes, three Plan Digests and 261 named Build Digests of the retained development, NVKE and nightly NVKE bundles at `b5109e62dbf95de245669fafd3e76968bd90ac9a`.
-The store contains 22 Plan records, 87 step records with inline component configurations and source pins,
-62 byte-identical scripts and one shared navigation index. Its only object folders are `plan`, `steps` and `scripts`.
-Across the store and three private bundle directories, the change reduces files from 441 to 236,
-nested directories from 218 to 187 and bytes from 3,460,553 to 2,977,305 (excluding workflows and local locks).
-The store itself grows from 2,166,150 to 2,668,669 bytes because configurations are inline;
-removing duplicated per-bundle indexes and reducing manifest membership saves 985,767 bytes elsewhere.
-Named object paths remain unchanged when neighboring bundles are added, removed or reordered;
-the shared index groups variants and records their full hashes and bundle users.
-One graph object contains the unchanged 941 nodes and 1,537 artifacts shared by all three bundles.
-Hosted execution of the simplified layout remains unrecorded.
+The v3 storage projection gives Plan and step records stable names, keeps script and catalog variants
+content-addressed, and omits the artifact graph. Loading admits the stored inputs, derives the graph through
+the existing compiler, checks the root's typed `graphDigest`, and validates the full Plan against its
+manifest identity. Runner placement, execution bindings and utility platform/container values are derived;
+the publication prefix and publication-bound inventory Build Digest live in each bundle's targets record.
+Static Environments share output records when only their bindings differ. Runtime-plan
+Environments scope every stable record by bundle to preserve independent dispatch refresh and carrier
+installation; maintained production and nightly therefore keep separate output and step records. The original canonical Plan and
+all identities are reconstructed before admission; the descriptive index retains full file hashes,
+while each loader authenticates every loaded object against its own manifest.
+`TestPlanTreeEnvironmentProjectionPreservesIdentity` covers exact canonical and identity round trips
+across prefix, runner and utility-container differences. `TestPlanTreePrefixUpdateTouchesOnlyEnvironmentRecords`
+covers stable paths and limits a prefix edit to the root, Environment and targets records.
+`TestPlanStoreStableTamperAndSweep` covers altered/swapped stable objects and unreferenced-object sweeping.
+Coordinated writer contracts cover omitted-owner refusal, concurrent access and interrupted publication;
+`TestPlanStoreCoordinatedInterruptedPublication` proves mixed-state rejection and same-batch recovery.
+The maintained inventory driver and catalog-maintenance closure compile all selected owners before calling the coordinated writer.
+Catalog-refresh contracts retain runtime-source freezing, unpinned-source and selected-projection refusals,
+qualifier/producer overlap checks, qualification ownership conflicts and coded failures.
+`TestPlanStoreEnvironmentGraphsDeriveIndependently` covers signed and unsigned Environments sharing
+the remaining records while reconstructing their distinct complete graphs independently.
+`TestPlanStoreConflictingSelectedRecords` proves that selected owners with incompatible shared producer
+contents are refused with `NVKR-E-ENGINE-CAPABILITY` before creating output, in either batch order.
+The production and development regeneration Make targets include all maintained owners, while their
+check targets retain their group scope. The shell driver calls the coordinated CLI for writes.
+Inventory `runtime` flags select runtime admission only for checks; writes establish the reviewed
+baseline without dispatch-time source freezing. Entry-point tests cover sorted unique bundle names,
+the required prefix, mixed-group selection and identical writes with either runtime flag value.
+A shared-record change must include all owners. `TestRuntimePlanRefreshBesideProduction` covers
+independent runtime dispatch refresh and both carrier installers with unchanged production bytes.
+The v1 and v2 tree readers remain available for migration. `TestPlanTreeMaintainedIdentity` checks blank-graph
+derivation against every maintained Plan and exact canonical/Build identity round trips.
+`TestPlanTreeStorageVersions` covers all three encodings; `TestPlanTreeGraphMigrationSweepsStoredGraphs`
+covers legacy loading, graph tamper refusal and retirement. `TestPlanTreeDerivedGraphAdmission` covers
+missing, invalid and altered digests, forbidden graph/node copies and unknown fields.
+`TestPlanTreeDerivedGraphRequiresManifestIdentity` rejects a consistent replacement tree whose file hashes
+and graph digest match but whose manifest Plan identity is stale. Hosted execution of v3 remains unrecorded.
+`TestPlanTreeLegacyExecutableGraph` preserves the admitted historical executable media type in v1/v2
+reads and requires v3 generation to refuse it before emission when exact compiler rederivation differs.
+
+Local regeneration on 2026-11-19 from main `3772ca1a29f9eae50507db807009a9f9b8b2ec6c`
+preserved the exact canonical bytes of the four maintained Plans (263 named builds and 253 outputs).
+The recursive store inventory, including its shared index and excluding sibling leases, changed from
+235 files / 136,084 lines / 5,557,492 bytes to 410 files / 97,703 lines / 3,551,814 bytes:
+2,005,678 fewer bytes (36.1%). Graph omission removes the largest repeated records, while stable
+selection-scoped steps and independent nightly records retain more files than main. Nightly gives up
+output/step sharing to preserve independent runtime refresh. The packed Plans retain their full graphs;
+the largest remains 7,161,864 bytes (85.4% of the 8 MiB bound), with 1,226,744 bytes of headroom.
+Packed catalog-snapshot deduplication is a separate follow-up, outside this storage change.
+Replaying only the production publication prefix from `candidate/gpu-site` to
+`nightly/gpu-site` changed five store lines (two index hashes, one Environment value and two targets
+values), plus two lines in the private Plan (Environment and graph digests) and one line each in the
+producer and qualification manifests: nine generated line replacements in six files.
+No workflow, shared output, step or script bytes changed in that replay. The authored prefix was restored
+and the maintained bundles regenerated; this is local storage evidence, not hosted execution evidence.
 
 Invocation data is regenerated from the Plan and is not a bundle member;
 `TestGitHubActionDataIsTransientAndRetired` covers omission, prior-owned retirement and refusal of
@@ -106,7 +176,30 @@ exact command operands remain in the step record. Plan loads do not consult this
 shared job and bundle-user lookup, and separate object/navigation drift without adding a Plan-loader dependency.
 Bundle independence contracts cover damaged neighboring private Plans and workflows; each bundle checks its own job mapping.
 The maintained all-bundle check covers the complete navigation index. Legacy workflow retirement retains its owning manifest without admitting retired workflows into navigation.
-Runtime pin-refresh contracts retain exact executable programs while regenerating descriptive record links.
+Runtime pin-refresh contracts retain exact executable programs while regenerating descriptive record links; shared-record changes require all owning bundles in the write.
 `TestPlanStoreNamedPathGrammar` and `TestPlanStoreFullDigestDisagreementDoesNotPublish` directly cover the
 named-path predicate and both conflicting-full-digest refusal branches. These are local contracts;
 hosted execution of the navigation layout remains unrecorded.
+
+## GitLab generated bundle
+
+GitLab generation implements the fixed `.gitlab/nvkr-run/` pipeline/Plan/manifest namespace through the
+shared generated-file owner. Its Plan retains packed canonical bytes; the shared Plan store above is
+GitHub-only. Root `.gitlab-ci.yml` remains operator-owned; runtime admission requires its
+single exact local include and the project's default root CI configuration.
+The exact generated transport includes the native Docker-helper switch suppressing Runner's default
+`umask 0000`, the native fresh-clone strategy and the token-free Git URL flag before all job checkouts.
+Current workflow rules mirror the exact ref/source policy, require protected refs for publication and
+end with refusal. These later policy changes do not inherit the earlier provider-run evidence below. Contract tests cover all-job
+inheritance and coherent missing/disabled/substituted policy refusal. Shared manifest `0644` mode checks
+remain unchanged. Fresh job-owned source checkout avoids the reproduced unchanged-file mode retention in
+reused Runner storage. The historical [real server/Runner runs](adr-18.md#gitlab-ordinary-unsigned-profile)
+exercised that policy across all eight jobs in their recorded source snapshots, with unchanged source
+and zero retries; they do not validate this upstream integration.
+
+Exact projection, conditional dependencies, custody/tampering, coexistence, ownership/retirement and symlink-refusal contracts are included
+in the [validation record](adr-18.md#gitlab-ordinary-unsigned-profile). Controlled contracts, the real ARM64
+recipe Run and full repository checks have separate scopes; none grants signing or qualification.
+GitLab named namespaces, arbitrary root
+customization, runtime/source refresh, qualification generation, catalog maintenance and projection-pilot
+selection remain outside the admitted profile.

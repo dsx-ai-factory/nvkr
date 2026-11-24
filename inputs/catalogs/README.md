@@ -1,9 +1,14 @@
 # Catalog ownership
 
-There are 12 maintained catalog entrypoints. Each owns one `registry.yaml` and `pins.lock.yaml` pair.
+There are 13 maintained catalog entrypoints. Each owns one `registry.yaml` and `pins.lock.yaml` pair.
 Architecture, Kubernetes version and site flavor are explicit producer selections within these catalogs;
 Definitions select the required producers and concrete platforms. Shared declaration owners remain in
 [`shared/`](shared/README.md), with digest-pinned imports and independent consuming locks.
+
+Catalog metadata names match slash-separated paths relative to this directory, for example `ovn/nvidia`.
+Legacy names remain readable in old catalog releases and captured Plans. A metadata rename changes catalog
+snapshot and dependent Plan identities, so overlays, name-keyed local toolchain bindings and generated
+consumers move together. Producer keys and pins keep their existing contracts.
 
 | Catalog | Pin cohort and ownership |
 |---|---|
@@ -12,6 +17,7 @@ Definitions select the required producers and concrete platforms. Shared declara
 | [`kubernetes-conformance`](kubernetes-conformance/registry.yaml) | Kubernetes test-version cohorts and Hydrophone; selected independently of the NVKE controller release |
 | [`local-path-provisioner`](local-path-provisioner/registry.yaml) | Rancher provisioner release, chart and helper-image pins |
 | [`nico`](nico/registry.yaml) | Infra-controller release with NICo/Core/Flow products; independent of NVKE |
+| [`nvidia-workload-identity`](nvidia-workload-identity/registry.yaml) | DSX IMDS NodeAttestor agent executable; independently pinned WLI source and builders, shared action declarations; independent build-only bundle outside NVKE composite membership |
 | [`node-images`](node-images/registry.yaml) | OS-image material and builder cohorts, with release and diagnostic variants and ordered overlays |
 | [`nvke`](nvke/registry.yaml) | NVKE release, module-tag and site producer variants, including controller profiles |
 | [`nvsentinel`](nvsentinel/registry.yaml) | NVSentinel release and development products; independent upstream cadence |

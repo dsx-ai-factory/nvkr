@@ -35,7 +35,7 @@ The task and reference indexes below retain the detailed command, schema, mainte
 | Watch a local Run or inspect its recorded outcome | [Lifecycle dashboard and read-only inspection](lifecycle.md#choose-local-run-presentation) |
 | Choose components, pin inputs, and scope replacements | [Catalogs and components](catalogs-and-components.md) |
 | Start a small executable Definition from catalog components | [Definition init](lifecycle.md#start-a-small-executable-definition) |
-| Visualize dependencies and generate GitHub Actions or Tekton | [Pipeline generation](generate-pipeline.md) |
+| Visualize dependencies and generate GitHub Actions, Tekton or the proposed native GitLab adapter | [Pipeline generation](generate-pipeline.md), [GitLab profile](generate-pipeline.md#native-gitlab-execution) |
 | Understand how heterogeneous materials become a disk | [Node images](node-images.md) |
 | Build AICR deployment bundles as OCI artifacts | [AICR inputs, supported hardware recipes and rendering limits](../inputs/definitions/aicr/README.md) |
 | Find published outputs, download a named output, and verify a consumer claim | [Release quickstart](release-quickstart.md) |
@@ -48,7 +48,7 @@ The task and reference indexes below retain the detailed command, schema, mainte
 | Build and recover the local NVKE CLI publication | [Local NVKE walkthrough](../demos/m1-local.md) |
 
 Example-specific inputs and commands live beside their Definitions: [three-output tutorial](examples/nvke-tutorial/README.md),
-[nine-output deploy example](examples/nvke-deploy/README.md), [83-output NVKE composite and committed workflow](../inputs/definitions/nvke/README.md),
+[nine-output deploy example](examples/nvke-deploy/README.md), [84-output NVKE release composite and committed workflow](../inputs/definitions/nvke/README.md),
 and [OS-image routes](../inputs/definitions/diagnostics/README.md). The separate
 [Ubuntu 24 inputs](../inputs/definitions/diagnostics/ubuntu24/README.md) select build-only native plain and
 public-bootstrap FDE disk diagnostics; the sibling Ubuntu 24.04 disks family selects them for publication. The
@@ -107,10 +107,10 @@ The [input instructions](../inputs/definitions/nvke/README.md#generate-and-check
 The composite owns all three maintained bundles under the ADR-26 U10 cutover; the former combined input
 remains only a comparison fixture.
 
-[ADR-24: imported validator catalog](adr/0024-imported-validator-catalog.md) defines discovery,
-adapter selection and artifact bindings across repositories, including its diagnostic and evidence limits.
-The provisional local-plan CLI slice implements catalog discovery and versioned-profile execution;
-broader adapter and profile support remains deferred.
+[ADR-24: imported validator catalog](adr/0024-imported-validator-catalog.md) defines registered container
+commands discovered by repository and suite group, their selection, binding to a completed Run, test
+environments and results, including their diagnostic and evidence limits. The provisional local-plan CLI
+slice implements catalog discovery and versioned-profile execution until it migrates to that model.
 
 [ADR-26: Definition composition](adr/0026-definition-composition.md) designs composite Definitions
 that release several digest-pinned Definitions as one Release, with a worked NVKE four-family example and

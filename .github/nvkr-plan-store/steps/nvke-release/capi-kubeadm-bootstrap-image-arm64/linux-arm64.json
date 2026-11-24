@@ -1,0 +1,60 @@
+{
+  "buildDigest": "sha256:bb4d3a40a6ebbeef77de21eee05798f42716bad717b0faff0947b9ad49f764cc",
+  "catalogDigest": "sha256:84b9ecc3946d2ff92d75a413f45c9fffc7fb54f198589e5da8158ec6f397bbd2",
+  "components": [
+    "capi-kubeadm-bootstrap-image"
+  ],
+  "executionGraph": {
+    "nodes": [
+      {
+        "artifact": "registry.k8s.io/cluster-api/kubeadm-bootstrap-controller:v1.13.6",
+        "component": "capi-kubeadm-bootstrap-image",
+        "digest": "sha256:bde7f270a2d5aeb07fe9775017f0bd523fa2b3443c139fe4a71b622545e4570e",
+        "id": "pull-capi-kubeadm-bootstrap-image",
+        "imageParentDigest": "sha256:fc508bc9d2d0b2860dfc397c7c864230d135cd3b5505f40187d93570e4593884",
+        "kind": "pull",
+        "network": "default",
+        "outputType": "oci-image",
+        "platform": "linux/arm64",
+        "version": "1.13.6"
+      },
+      {
+        "id": "verify",
+        "kind": "verify",
+        "needs": [
+          "pull-capi-kubeadm-bootstrap-image"
+        ]
+      }
+    ],
+    "platform": "linux/arm64",
+    "schemaVersion": "nvkr.dev/ir/v4"
+  },
+  "name": "capi-kubeadm-bootstrap-image-arm64",
+  "platform": "linux/arm64",
+  "resolvedComponents": [
+    {
+      "Name": "capi-kubeadm-bootstrap-image",
+      "commit": "bd8162edfe045c1bb490d431b3acddd568bdb887",
+      "fromSource": false,
+      "outputType": "oci-image",
+      "platforms": [
+        "linux/amd64",
+        "linux/arm64"
+      ],
+      "prebuilt": {
+        "digests": {
+          "amd64": "sha256:90d6d0a0eca123164a7be5c35d4ea51541b0c7f2851a914224b7c733c622e4ed",
+          "arm64": "sha256:bde7f270a2d5aeb07fe9775017f0bd523fa2b3443c139fe4a71b622545e4570e"
+        },
+        "evidence": {
+          "none": true
+        },
+        "image": "registry.k8s.io/cluster-api/kubeadm-bootstrap-controller:v1.13.6",
+        "imageParentDigest": "sha256:fc508bc9d2d0b2860dfc397c7c864230d135cd3b5505f40187d93570e4593884"
+      },
+      "repo": "https://github.com/kubernetes-sigs/cluster-api",
+      "sourceDateEpoch": 1788866431,
+      "tag": "v1.13.6"
+    }
+  ]
+}

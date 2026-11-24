@@ -1,5 +1,11 @@
 ## Output-local publication and metadata assembly
 
+This entry records the implemented private-carrier publication path. The accepted 2026-11-20
+[ADR-18](adr-18.md) / [ADR-20](adr-20.md) destination-staging revision supersedes its transport and default
+credential requirements, but is not implemented. The checks and Runs below do not establish destination
+staging, package admission with platform tokens or release-root equivalence. Private CI storage and the unlinked-package
+checks remain active until the separately gated migration replaces them.
+
 The GitHub `per-output-v1` mode retains full payload/producer/evidence checks for each exact named output.
 Each output publishes and verifies its artifact and signed metadata root. Aggregate assembly authenticates
 those roots, production predicates and SBOM bundles against the complete Plan, same workflow run and frozen
@@ -38,7 +44,7 @@ and dry-run signing reject this mode.
 
 Maintained production/nightly generation selects fixed independent
 registry reader/writer credentials, including native toolchain preparation, qualification/smoke and nightly
-runtime consumers. Hosted publication now rejects repository-linked packages even while their repository is
+runtime consumers. The current hosted implementation rejects repository-linked packages even while their repository is
 private. Production qualification generation rejects workflow-token publication and target credentials
 before emitting a bundle, matching its fixed independent writer. Regression cases cover legacy publication,
 legacy targets and their combination; local execution of these cases remains deferred to CI.

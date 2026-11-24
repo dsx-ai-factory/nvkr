@@ -13,17 +13,20 @@ sets the variable.
 Ordinary local source admission uses Git's bounded `ls-files --format` query to reject indexed gitlinks;
 an unsupported query fails with a coded diagnostic naming this Git version floor.
 The required [authoring lab regression](docs/examples/authoring-lab/README.md) uses these tools and fails
-if a prerequisite is missing. `make check` additionally requires Python 3.12 or later (`python3` on `PATH`)
-for `make test-ci-tools`, which runs the CI report parser and all local adapter contract suites using
-only the Python standard library. Go-test adapter wrappers report an explicit skip when Python is
-absent; that is not full-gate coverage. The tooling gate fails if Python is missing or too old and
-runs every suite independently, so a Go-only test pass cannot stand in for the completion gate.
+if a prerequisite is missing. `make test-ci-tools` runs the Go CI sharding and local adapter contract suites,
+including the shell/jq generation, dispatch, diagnostics and summary contracts.
+That target also vets and tests the separate MachineImage catalog Go module, which requires Git 2.45 or newer
+with `--no-lazy-fetch` support for offline CRD reads. Its first build needs module-proxy access unless its
+hash-locked dependencies are already cached.
+Python is optional for the Packer observer's script-specific tests, which skip when `python3` is absent.
+The Packer toolchain image retains Python for that observer and NVKE's image-input composer. NVKE's
+native deployment scripts also require Python on the execution host; see the native demo prerequisites.
 The restated-status check in `make check` diffs against `origin/main`; set `STATUS_BASE` when your base
 branch has another name, and fetch full history in a shallow clone.
-On macOS with Homebrew, install the additional JSON, timeout, and Python tools with:
+On macOS with Homebrew, install the additional JSON and timeout tools with:
 
 ```sh
-brew install jq yq coreutils python
+brew install jq yq coreutils
 ```
 
 The checksum contract tests execute `sha256sum`, supplied by macOS (including `/sbin/sha256sum` on macOS 26)
@@ -41,7 +44,7 @@ GitHub.
 
 `make zizmor-report` runs optional report-only workflow security diagnostics, separate from
 `make ci-check`. It downloads zizmor 1.32.0 and verifies the pinned archive SHA-256 before
-execution (Linux AMD64 or Darwin ARM64; Python 3.12+ and curl required). The scan uses strict
+execution (Linux AMD64 or Darwin ARM64; curl, tar and the required shell/JSON tools). The scan uses strict
 collection and offline mode on Git-listed workflows and action definitions under `.github/`,
 including committed generated bundles and new non-ignored files. No generated scratch bundles
 are scanned. Online audits (including remote action/repository metadata checks) are omitted;
@@ -112,18 +115,18 @@ resume capabilities. The [demo index](demos/README.md) provides bounded generati
 journeys with their prerequisites.
 
 The bundle records its selected Definition and Environment in `.github/nvkr-run-nvke/plan.json`.
-The maintained release selection is the 83-output [NVKE composite](inputs/definitions/nvke/README.md), including
+The maintained release selection is the 84-output [NVKE release composite](inputs/definitions/nvke/README.md), including
 plain and public-bootstrap FDE disks for both native architectures. The separate
 [FDE diagnostic workflow](inputs/definitions/diagnostics/fde.md) selects one build-only disk for branch iteration.
 Regenerate with the intended selection after changing its inputs or generator code:
 
 ```sh
 go run ./cmd/nvkr run generate \
-  --definition inputs/definitions/nvke/gpu-site.composite.yaml \
-  --environment inputs/environments/github-nvke-gpu-site.yaml --engine github --root .
+  --definition inputs/definitions/nvke/nvke-release.composite.yaml \
+  --environment inputs/environments/github-nvke.yaml --engine github --root .
 go run ./cmd/nvkr run generate \
-  --definition inputs/definitions/nvke/gpu-site.composite.yaml \
-  --environment inputs/environments/github-nvke-gpu-site.yaml --engine github --root . --check
+  --definition inputs/definitions/nvke/nvke-release.composite.yaml \
+  --environment inputs/environments/github-nvke.yaml --engine github --root . --check
 ```
 
 Use the same generator version and input selection for generation and checking. Generated files are owned by
@@ -135,8 +138,8 @@ Definition/Environment paths recorded in the committed Plan. A `make build` CLI 
 Use [scratch generation](docs/generate-pipeline.md) for v1, deploy, or other examples; generating them with
 `--root .` would add an unenrolled default bundle, which maintained-closure checks refuse.
 
-The [NVKE family selections](inputs/definitions/nvke/README.md) are pinned members of the one
-maintained composite. `make nvke-generate` and `make nvke-check` select the production bundle;
+The [NVKE family selections](inputs/definitions/nvke/README.md) are pinned members of both maintained
+composites. Production/nightly add the release inventory; development retains the payload-only selection. `make nvke-generate` and `make nvke-check` select the production bundle;
 `workflows-generate` and `workflows-check` include production, development and floating-source nightly.
 Catalog maintenance enrolls those three exact selections. Standalone family and combined-candidate
 bundles are retired under ADR-26 U10; their retained authored fixtures are not supported release paths.
@@ -209,8 +212,8 @@ make pipeline-dev-run PIPELINE_DEV_REPO=dsx-ai-factory/nvkr
 
 The dispatch helper requires a clean named branch matching the selected repository's remote commit and
 an active registered workflow. It never commits, pushes or changes provider settings. For a preflight without
-dispatch, use `python3 scripts/pipeline-dev.py --repo dsx-ai-factory/nvkr --check` after
-`make pipeline-dev-check`. `make pipeline-dev-generate` regenerates just the development bundle.
+dispatch, use `bash scripts/pipeline-dev.sh --repo dsx-ai-factory/nvkr --check` after
+`make pipeline-dev-check`. `make pipeline-dev-generate` regenerates all maintained bundles together.
 
 Release metadata assembly and deliverable verification use four concurrent output workers. For a diagnostic
 factory invocation, `NVKR_VERIFY_WORKERS` selects a canonical integer from 1 through 16; invalid values fail
@@ -365,8 +368,8 @@ exceptions and completed Runs are scoped in [reconciliation](docs/adr/reconcilia
 ## Test timing and cache use
 
 Use `make test GO_TEST_FLAGS="-json -count=1"` to capture uncached ordinary test events. CI runs the same
-ordinary suite in fifteen shards: eight divide factory tests, two divide lifecycle tests, and five divide
-the remaining packages. Heavy-package selections come from Go's compiled test inventory, including
+ordinary suite in nineteen shards: eight divide factory tests; two each divide lifecycle, qualification,
+and CLI tests; and five divide the remaining packages. Heavy-package selections come from Go's compiled test inventory, including
 examples and fuzz seeds; all other packages run whole. New packages and tests are assigned automatically.
 Each test runs in one shard, and the gate requires every shard plus the independent static, lint and
 vulnerability checks to succeed. `make test` and `make check` retain the complete local suite.
@@ -524,3 +527,63 @@ caller-authored descriptions into authority.
 
 [CONTRIBUTING.md](CONTRIBUTING.md) owns contribution and commit rules. [Documentation guidance](docs/README.md)
 identifies active references; historical drafts and dated evidence do not override current contracts.
+
+## Test the GitLab adapter against a real server
+
+Run the opt-in integration test locally. The manual **GitLab Docker acceptance** workflow remains
+available, but its standard `ubuntu-24.04` runner does not guarantee the disk requirement below.
+See the [GitLab acceptance ledger](docs/adr/reconciliation/adr-18.md#gitlab-ordinary-unsigned-profile)
+for recorded execution scope. The workflow's [`nvkectl` job](.github/workflows/gitlab-docker.yml)
+has a fixed `runs-on: ubuntu-24.04`; dispatch offers no runner selector. Before dispatch, change that
+job's `runs-on` to an adequately sized GitHub-hosted runner configured for the repository, or use
+the local path below.
+The standard public runner has four CPUs and 16 GB RAM but only 14 GB guaranteed storage; the private
+repository allocation is two CPUs, 8 GB RAM and 14 GB storage. See the
+[GitHub runner specifications](https://docs.github.com/en/actions/reference/runners/github-hosted-runners).
+The supported alternative is a disposable local Docker daemon with the required capacity. Install
+the Go version in `.go-version`, Git and Docker, then use a local Unix Docker context
+with native Linux AMD64 or ARM64 execution, at least four CPUs, 12 GiB Docker memory and 35 GiB free disk.
+The selected daemon must expose `/var/run/docker.sock` on its own host or VM. The test bind-mounts
+that exact daemon-side socket and verifies that its daemon ID matches the selected context before
+checking disk space. The client-side Unix socket path may differ. A rootless daemon exposing only
+its per-user socket does not meet this prerequisite; select a compatible disposable daemon.
+The test checks Docker CPU and memory first, then pulls only the pinned Docker CLI prerequisite and
+measures available bytes on an owned daemon volume before pulling the large server images. The
+35 GiB observation is a precondition, not a reservation; concurrent use can still consume capacity.
+The test neither adds storage nor deletes unrelated resources. It builds the real pinned NVKE CLI;
+allow up to two hours.
+No existing GitLab service, registration token, SSH key or organization credential is needed.
+
+```sh
+export GOTOOLCHAIN=local
+export NVKR_GITLAB_EVIDENCE="$(mktemp -d)/evidence"
+make test-gitlab-docker
+```
+
+The test starts the official GitLab CE server and GitLab Runner in Docker, uses a fresh private project,
+and selects only `nvkectl` from the maintained native NVKE tutorial Definition. NVKR builds its own CLI,
+generates and checks the committed GitLab include, and retains ownership of every product build step.
+The official `glab` executable creates the project and masked read-only API variable, asks the real server
+to lint the complete include, submits the pipeline through its API, and polls terminal pipeline and job
+statuses. The test requires the exact generated job inventory, success with no retried jobs, a complete
+unsigned Run bound to the generated Plan, and an independently inspected downloadable `nvkectl` binary bundle.
+
+Server, Runner and its native helper, external `glab`, Go bootstrap image and Docker CLI images are
+pinned in `toolchains/gitlab-docker/pins.json`. The pinned official Go image is the bootstrap image.
+A read-only owned volume supplies only the Docker client copied from its pinned official image,
+with an explicit Runner tool path. No bootstrap registry, image build, package-manager update or product build
+script is added. External `glab` keeps its dependencies outside NVKR's linked Apache-clean binary.
+
+HTTPS uses a freshly generated test CA and server certificate with verified hostnames. Each job receives
+only the public CA and its scoped GitLab credentials. The administrator token, server private key and Runner
+authentication configuration stay outside the product checkout and job mounts. The fixture's Docker socket
+grants its registered jobs control of the selected daemon, so run on a disposable development/CI daemon.
+Named build storage is mounted at its reported daemon path so NVKR's own Docker workspace mounts refer
+to the same bytes on Linux and Docker-backed macOS. Native image checks refuse emulation or an architecture mismatch.
+
+Cleanup stops scheduling and joins the owned containers before removing this test's network and volumes.
+It never prunes Docker or removes unrelated resources. Pulled upstream images remain ordinary shared caches.
+Only bounded status, Run and executable-bundle metadata enter `NVKR_GITLAB_EVIDENCE`; credentials, raw server
+logs, Runner configuration and job traces are excluded. An unavailable dependency, failed lint, failed/skipped
+job, missing artifact or cleanup failure fails the integration test. Its result covers this one unsigned
+executable output; it does not establish publication, signing, disks, private-source access or full NVKE qualification.

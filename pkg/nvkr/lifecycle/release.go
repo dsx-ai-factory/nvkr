@@ -17,6 +17,7 @@ import (
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/delivery"
 	e "github.com/dsx-ai-factory/nvkr/pkg/nvkr/errors"
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/factory"
+	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/sbom"
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/sign"
 	"github.com/google/go-containerregistry/pkg/authn"
 )
@@ -145,6 +146,7 @@ func PrepareExactInputs(definition Definition, environment Environment, plan *fa
 	frozenOutputs := make([]factory.LifecycleOutputPlan, len(plan.LifecycleOutputs))
 	for index, output := range plan.LifecycleOutputs {
 		frozenOutputs[index] = output
+		frozenOutputs[index].Derived = output.Derived.Clone()
 		frozenOutputs[index].Components = append([]string(nil), output.Components...)
 		frozenOutputs[index].ImageIndex = output.ImageIndex.Clone()
 	}
@@ -404,6 +406,10 @@ func requireDiskEvidence(policy VerificationPolicy, artifacts []delivery.Output)
 		}
 		switch artifact.Disk.EvidenceMode {
 		case "": // Strict inspected evidence is stronger than either policy floor.
+		case sbom.DiskInstalledPackages:
+			if minimum == DiskEvidenceStrict {
+				return e.New(e.CodeGateUnmet, "disk artifact %q has package-only evidence, below consumer minimum %q", artifact.Name, minimum)
+			}
 		case string(DiskEvidenceBuildProvenance):
 			if minimum != DiskEvidenceBuildProvenance {
 				return e.New(e.CodeGateUnmet, "disk artifact %q has producer-only evidence, below consumer minimum %q", artifact.Name, minimum)

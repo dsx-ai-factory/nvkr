@@ -1,0 +1,127 @@
+{
+  "buildDigest": "sha256:efb63314fda04589283c4d42a3b3246069521ce80a15e53d04c3336dae1fa71b",
+  "catalogDigest": "sha256:84b9ecc3946d2ff92d75a413f45c9fffc7fb54f198589e5da8158ec6f397bbd2",
+  "components": [
+    "nvke-nico-reference-profiles"
+  ],
+  "executionGraph": {
+    "nodes": [
+      {
+        "artifactPath": "bin/nico-reference-profiles-fixture-amd64.oci.tar",
+        "builderType": "buildkit-rootless",
+        "command": [
+          "sh",
+          "-euc",
+          {
+            "file": ".github/nvkr-plan-store/scripts/nvke-nico-reference-profiles/build@3c0b9bdbe680.sh"
+          }
+        ],
+        "component": "nvke-nico-reference-profiles",
+        "env": [
+          {
+            "name": "CGO_ENABLED",
+            "value": "0"
+          },
+          {
+            "name": "GOAMD64",
+            "value": "v1"
+          },
+          {
+            "name": "GOARCH",
+            "value": "amd64"
+          },
+          {
+            "name": "GOFLAGS",
+            "value": "-trimpath -buildvcs=false"
+          },
+          {
+            "name": "GOOS",
+            "value": "linux"
+          },
+          {
+            "name": "GOTOOLCHAIN",
+            "value": "local"
+          },
+          {
+            "name": "LC_ALL",
+            "value": "C"
+          },
+          {
+            "name": "SOURCE_DATE_EPOCH",
+            "value": "1793236039"
+          },
+          {
+            "name": "TZ",
+            "value": "UTC"
+          }
+        ],
+        "id": "build-nvke-nico-reference-profiles",
+        "kind": "build",
+        "needs": [
+          "fetch-source-32433f31b61d1f5850d517f0b889f0b74e63c885e2e5b1f91f3aee2ecbd25bbd"
+        ],
+        "network": "default",
+        "outputType": "oci-image",
+        "platform": "linux/amd64",
+        "sourceCommit": "2cfd00081b468d85a4894ec17e9deac13c9d8169",
+        "sourceDest": "source-32433f31b61d1f5850d517f0b889f0b74e63c885e2e5b1f91f3aee2ecbd25bbd",
+        "sourceReadOnly": true,
+        "sourceTreeHash": "a377abf5f0d584db9c86cc9981b2fdaa8bb4ac53",
+        "toolchain": "moby/buildkit@sha256:f8a833b2de9d68e27f0815e4a737abdfaf8a2e4c615650557df11025101557b4",
+        "vendorSpecDigest": "sha256:c5d8e2b1623e31ad8864aa9b8cf823cca004f3f45fa490a18f63aaf839216c62",
+        "version": "0.23.0",
+        "workdir": "/src",
+        "writeDir": "bin"
+      },
+      {
+        "commit": "2cfd00081b468d85a4894ec17e9deac13c9d8169",
+        "dest": "source-32433f31b61d1f5850d517f0b889f0b74e63c885e2e5b1f91f3aee2ecbd25bbd",
+        "id": "fetch-source-32433f31b61d1f5850d517f0b889f0b74e63c885e2e5b1f91f3aee2ecbd25bbd",
+        "kind": "fetch",
+        "network": "default",
+        "repo": "https://github.com/dsx-ai-factory/nvke",
+        "treeHash": "a377abf5f0d584db9c86cc9981b2fdaa8bb4ac53",
+        "vendorImage": "moby/buildkit@sha256:f8a833b2de9d68e27f0815e4a737abdfaf8a2e4c615650557df11025101557b4",
+        "vendorSpecDigest": "sha256:c5d8e2b1623e31ad8864aa9b8cf823cca004f3f45fa490a18f63aaf839216c62"
+      },
+      {
+        "id": "verify",
+        "kind": "verify",
+        "needs": [
+          "build-nvke-nico-reference-profiles"
+        ]
+      }
+    ],
+    "platform": "linux/amd64",
+    "schemaVersion": "nvkr.dev/ir/v4"
+  },
+  "name": "controller-profiles/linux/amd64",
+  "platform": "linux/amd64",
+  "resolvedComponents": [
+    {
+      "Name": "nvke-nico-reference-profiles",
+      "artifactPath": "bin/nico-reference-profiles-fixture-{{.Arch}}.oci.tar",
+      "buildCommand": [
+        "sh",
+        "-euc",
+        {
+          "file": ".github/nvkr-plan-store/scripts/nvke-nico-reference-profiles/build@1db1b1ef9b14.sh"
+        }
+      ],
+      "builderType": "buildkit-rootless",
+      "commit": "2cfd00081b468d85a4894ec17e9deac13c9d8169",
+      "fromSource": true,
+      "outputType": "oci-image",
+      "platforms": [
+        "linux/amd64",
+        "linux/arm64"
+      ],
+      "repo": "https://github.com/dsx-ai-factory/nvke",
+      "sourceDateEpoch": 1793236039,
+      "tag": "v0.23.0",
+      "toolchainImage": "moby/buildkit@sha256:f8a833b2de9d68e27f0815e4a737abdfaf8a2e4c615650557df11025101557b4",
+      "treeHash": "a377abf5f0d584db9c86cc9981b2fdaa8bb4ac53",
+      "writeDir": "bin"
+    }
+  ]
+}

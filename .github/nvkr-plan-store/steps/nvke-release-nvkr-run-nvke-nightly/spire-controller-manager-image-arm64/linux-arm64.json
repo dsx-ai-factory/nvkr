@@ -1,0 +1,60 @@
+{
+  "buildDigest": "sha256:a07fe8def269f61b2e1364f9826d982a19291277ca06810e6012c39e00153b8d",
+  "catalogDigest": "sha256:846dcc17957d283482e241ed117d4d61060b1a37930c85f2a799e3de717ba092",
+  "components": [
+    "spire-controller-manager-image"
+  ],
+  "executionGraph": {
+    "nodes": [
+      {
+        "artifact": "ghcr.io/spiffe/spire-controller-manager:0.7.0",
+        "component": "spire-controller-manager-image",
+        "digest": "sha256:99dae65b7e207a7d34f9bef2aff901d6cbba40bd5ed31093ebf51e6a063783bc",
+        "id": "pull-spire-controller-manager-image",
+        "imageParentDigest": "sha256:d7b9e710f5428ea25daa35a07083fe517ed70c23df902d21c54a0f444455a84b",
+        "kind": "pull",
+        "network": "default",
+        "outputType": "oci-image",
+        "platform": "linux/arm64",
+        "version": "0.23.0"
+      },
+      {
+        "id": "verify",
+        "kind": "verify",
+        "needs": [
+          "pull-spire-controller-manager-image"
+        ]
+      }
+    ],
+    "platform": "linux/arm64",
+    "schemaVersion": "nvkr.dev/ir/v4"
+  },
+  "name": "spire-controller-manager-image-arm64",
+  "platform": "linux/arm64",
+  "resolvedComponents": [
+    {
+      "Name": "spire-controller-manager-image",
+      "commit": "2cfd00081b468d85a4894ec17e9deac13c9d8169",
+      "fromSource": false,
+      "outputType": "oci-image",
+      "platforms": [
+        "linux/amd64",
+        "linux/arm64"
+      ],
+      "prebuilt": {
+        "digests": {
+          "amd64": "sha256:fb3bfc8f98f24c769004543d6b760142380c8f2d3a0354391ee2bfdd48039e59",
+          "arm64": "sha256:99dae65b7e207a7d34f9bef2aff901d6cbba40bd5ed31093ebf51e6a063783bc"
+        },
+        "evidence": {
+          "none": true
+        },
+        "image": "ghcr.io/spiffe/spire-controller-manager:0.7.0",
+        "imageParentDigest": "sha256:d7b9e710f5428ea25daa35a07083fe517ed70c23df902d21c54a0f444455a84b"
+      },
+      "repo": "https://github.com/dsx-ai-factory/nvke",
+      "sourceDateEpoch": 1793236039,
+      "tag": "v0.23.0"
+    }
+  ]
+}

@@ -82,30 +82,18 @@ func (b *backend) source(ctx context.Context, repository string, opts Options) (
 }
 
 // Transfer packages must have no reported repository association even while the
-// source repository is private. Publication enforces the same linkage boundary.
+// source repository is private. Independent publication enforces the same boundary.
 // Neither check proves independent grants; operators retain that ACL obligation.
 func (b *backend) checkPrivacy(ctx context.Context, request Request, source repositoryRecord, opts Options) (bool, error) {
 	return b.checkPackagePrivacy(ctx, strings.ToLower(strings.Split(request.Repository, "/")[1])+"/ci-artifacts", source, opts, true)
 }
 
 func (b *backend) checkPackagePrivacy(ctx context.Context, packageName string, source repositoryRecord, opts Options, requireUnlinked bool) (bool, error) {
-	kind := "users"
-	if source.Owner.Type == "Organization" {
-		kind = "orgs"
-	}
-	packagePath := "/" + kind + "/" + url.PathEscape(source.Owner.Login) + "/packages/container/" + url.PathEscape(packageName)
-	var record packageRecord
-	status, err := b.get(ctx, packagePath, opts.Token, &record)
-	if err != nil {
+	record, exists, err := b.lookupPackage(ctx, packageName, source, opts)
+	if err != nil || !exists {
 		return false, err
 	}
-	if status == http.StatusNotFound {
-		return false, nil
-	}
-	if status != http.StatusOK {
-		return false, e.New(e.CodeFetchFailed, "CI storage package request returned HTTP %d", status)
-	}
-	if record.Name != packageName || record.PackageType != "container" || !strings.EqualFold(record.Owner.Login, source.Owner.Login) || !privateVisibility(record.Visibility) {
+	if !privateVisibility(record.Visibility) {
 		return false, e.New(e.CodeTrustPolicyMissing, "CI storage requires the exact private or internal GHCR package")
 	}
 	// GitHub's package schema makes repository optional and nullable; its GET
@@ -122,6 +110,31 @@ func (b *backend) checkPackagePrivacy(ctx context.Context, packageName string, s
 		}
 	}
 	return true, nil
+}
+
+// lookupPackage authenticates the exact package identity. Callers own visibility,
+// linkage and missing-package policy; a successful lookup does not admit use.
+func (b *backend) lookupPackage(ctx context.Context, packageName string, source repositoryRecord, opts Options) (packageRecord, bool, error) {
+	kind := "users"
+	if source.Owner.Type == "Organization" {
+		kind = "orgs"
+	}
+	packagePath := "/" + kind + "/" + url.PathEscape(source.Owner.Login) + "/packages/container/" + url.PathEscape(packageName)
+	var record packageRecord
+	status, err := b.get(ctx, packagePath, opts.Token, &record)
+	if err != nil {
+		return packageRecord{}, false, err
+	}
+	if status == http.StatusNotFound {
+		return packageRecord{}, false, nil
+	}
+	if status != http.StatusOK {
+		return packageRecord{}, false, e.New(e.CodeFetchFailed, "GHCR package request returned HTTP %d", status)
+	}
+	if record.Name != packageName || record.PackageType != "container" || !strings.EqualFold(record.Owner.Login, source.Owner.Login) {
+		return packageRecord{}, false, e.New(e.CodeTrustPolicyMissing, "GHCR package identity was not authenticated by GitHub")
+	}
+	return record, true, nil
 }
 
 func (b *backend) ensurePrivatePackage(ctx context.Context, repository name.Repository, source repositoryRecord, opts Options, requireUnlinked bool) error {
@@ -141,14 +154,32 @@ func (b *backend) ensurePrivatePackage(ctx context.Context, repository name.Repo
 	if err := remote.Write(repository.Tag("privacy-probe-v1"), seed, b.registryOptions(ctx, opts)...); err != nil {
 		return safeIOError(ctx, e.CodeFetchFailed, "seeding metadata-only private package")
 	}
-	exists, err = b.checkPackagePrivacy(ctx, packageName, source, opts, requireUnlinked)
-	if err != nil {
-		return err
+	return b.confirmSeedPrivacy(ctx, packageName, source, opts, requireUnlinked)
+}
+
+// A successful registry write can precede visibility in the Packages API.
+// Retry only absence after the metadata seed; an explicit policy rejection is
+// terminal. No payload is admitted until the exact package passes every check.
+func (b *backend) confirmSeedPrivacy(ctx context.Context, packageName string, source repositoryRecord, opts Options, requireUnlinked bool) error {
+	wait := b.wait
+	if wait == nil {
+		wait = waitChunkRetry
 	}
-	if !exists {
-		return e.New(e.CodeTrustPolicyMissing, "metadata seed did not establish an API-confirmed private package")
+	const attempts = 6
+	for attempt := range attempts {
+		exists, err := b.checkPackagePrivacy(ctx, packageName, source, opts, requireUnlinked)
+		if err != nil || exists {
+			return err
+		}
+		if attempt+1 < attempts {
+			// Five absence waits total 62 seconds. Each get retains its own
+			// bounded rate-limit retries under the caller's operation deadline.
+			if err := wait(ctx, (2*time.Second)<<attempt); err != nil {
+				return safeIOError(ctx, e.CodeTimeout, "private package confirmation wait canceled")
+			}
+		}
 	}
-	return nil
+	return e.New(e.CodeTrustPolicyMissing, "metadata seed did not establish an API-confirmed private package")
 }
 
 func privateVisibility(visibility string) bool {

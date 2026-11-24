@@ -41,7 +41,7 @@ func githubStagePrivateImages(plan *Plan, stage githubStage) []string {
 			images = append(images, node.Container)
 		}
 	}
-	if stage.DiskOutput != "" && githubDiskInspectionRequired(plan) {
+	if stage.DiskOutput != "" && githubDiskInspectionRequired(plan, stage.DiskOutput) {
 		image := plan.Environment.DiskInspectionProfiles[stage.Nodes[0].Platform].Image
 		if githubPrivateToolchain(plan, image) {
 			images = append(images, image)
@@ -110,7 +110,7 @@ func PrepareGitHubImages(ctx context.Context, plan *Plan, stageID string, option
 			if instruction.BuilderType == ir.BuilderVMImage {
 				admission, err := AdmitLocalVMBuild(ctx, plan, node.ID, workspace)
 				if err != nil {
-					return err
+					return githubRunnerCapabilityError(err, "prepare-images VM admission")
 				}
 				defer func() {
 					returnErr = joinFactoryCleanupError(returnErr, admission.Close(), "close image preparation admission")
