@@ -35,7 +35,9 @@ func TestOSWorkflowToolchainLockGate(t *testing.T) {
 	if !invocationFound {
 		t.Fatal("workflow lock gate must invoke jq -n -e with the actual candidate and reviewed files")
 	}
-	gateTail, _, gateFound := strings.Cut(gateAndRemainder, "pin=\"$(bin/nvkr catalog source-pin")
+	// Stop before candidate catalog resolution: this fixture supplies lock files,
+	// not a candidate checkout. Catalog layouts have separate shell-execution tests.
+	gateTail, _, gateFound := strings.Cut(gateAndRemainder, "catalog_dir=\"$(bash scripts/nvke-os-catalog-dir.sh")
 	if !gateFound {
 		t.Fatal("workflow lock gate boundary is missing")
 	}
