@@ -7,8 +7,11 @@ package validation
 
 import (
 	"context"
+	"errors"
 	"fmt"
+	"io"
 	"os"
+	"sort"
 	"strings"
 
 	"golang.org/x/sys/unix"
@@ -62,4 +65,46 @@ func (r *catalogRoot) read(ctx context.Context, path string, limit int) ([]byte,
 	}
 	defer func() { _ = current.Close() }()
 	return readRegular(ctx, current, limit)
+}
+
+// names lists one held directory beneath the root ("" is the root itself),
+// refusing symlinked or non-directory components and more than limit entries.
+func (r *catalogRoot) names(ctx context.Context, path string, limit int) ([]string, error) {
+	if ctx == nil {
+		return nil, usage("directory listing requires context")
+	}
+	parts := []string{"."}
+	if path != "" {
+		if !safeEntryPath(path) {
+			return nil, usage("unsafe catalog path")
+		}
+		parts = strings.Split(path, "/")
+	}
+	current := r.file
+	for _, part := range parts {
+		if err := ctx.Err(); err != nil {
+			if current != r.file {
+				_ = current.Close()
+			}
+			return nil, err
+		}
+		fd, err := unix.Openat(int(current.Fd()), part, unix.O_RDONLY|unix.O_DIRECTORY|unix.O_CLOEXEC|unix.O_NOFOLLOW, 0)
+		if current != r.file {
+			_ = current.Close()
+		}
+		if err != nil {
+			return nil, fmt.Errorf("%q must be a directory, not a symlink: %w", path, err)
+		}
+		current = os.NewFile(uintptr(fd), part)
+	}
+	defer func() { _ = current.Close() }()
+	names, err := current.Readdirnames(limit + 1)
+	if err != nil && !errors.Is(err, io.EOF) {
+		return nil, err
+	}
+	if len(names) > limit {
+		return nil, usage("catalog directory exceeds its entry limit")
+	}
+	sort.Strings(names)
+	return names, nil
 }

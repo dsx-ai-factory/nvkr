@@ -6,22 +6,75 @@ not authenticate artifact membership in a Run or grant release qualification.
 
 ## Run locally
 
-`nvkr validators` is a hidden command group (omitted from normal help) in development, and its schemas remain provisional. It provides
-discovery, explicit catalog-based selection, and a versioned local-plan profile.
+`nvkr validators` is a hidden command group (omitted from normal help) in development, and its schemas remain provisional.
+Discovery reads validator registrations from a catalog directory; execution still uses the
+versioned local-plan profile below.
 
-Discovery reads only the catalog index and its entry files; it neither imports source
-nor probes Docker or prepares an environment. `available` describes installed adapter
-support; runtime readiness stays `unverified`. Adapter-owned limitations remain visible
-independently of authored display text. The `cli` suite mixes source tests with
-supplied-executable process contracts: only the contracts exercise the binary, and
-bootstrap E2E is separate.
+### Validator catalog
+
+`validators list` and `validators describe` read the catalog directory selected with
+`--validator-catalog <dir>`. The default is the shipped catalog,
+`inputs/testing/validator-catalog`, resolved against the working directory. A selected
+directory replaces the shipped catalog completely; no entries are inherited. Each registration lives at `{repository}/{suite-group}/{suite}.yaml`, and
+its `id` must equal that path without the extension. A suite group need not name an artifact.
+
+Discovery opens the directory once and reads every registration through it. Any other entry
+(including hidden files, other extensions and empty directories), a symlink, an invalid
+document or a registration whose `id` differs from its path fails the whole catalog. Documents use
+the same strict YAML/JSON rules as profiles. Discovery neither imports source, probes Docker nor
+checks that any requirement can be met; `requires` is a declaration.
+
+```yaml
+apiVersion: nvkr.dev/validator-registration/v1
+kind: ValidatorRegistration
+id: nvke/nvkectl/contract
+description: Run upstream process contracts against a built nvkectl executable
+inputs:
+  executable:            # input role
+    output: nvkectl      # exact Run output
+    component: nvkectl   # producer component
+    format: executable
+testOrigin:
+  fromInput: executable  # test source is the role's recorded producer source
+image:
+  fromInput: executable  # execution image is the role's producer toolchain
+workingDirectory: cli    # optional, relative to the test origin
+acquisition:             # optional dependency preparation
+  command: [go, mod, download]
+command: [make, --no-print-directory, test-artifact, ...]
+environment:             # literals or ${inputs.<role>.path|version}
+  NVKECTL: ${inputs.executable.path}
+  NVKECTL_EXPECTED_VERSION: ${inputs.executable.version}
+requires:
+  platforms: [linux/amd64, linux/arm64]
+  capabilities: [docker]
+timeout: 30m
+```
+
+Arguments of `command` and `acquisition.command`, like `environment` values, may contain
+`${inputs.<declared role>.path|version}` anywhere in the text, any number of times. `path` stands
+for the staged input's path inside the test container and `version` for its expected version from
+the Run's build metadata. Each reference is replaced as plain text before the container starts;
+`command` is an argument vector with no shell evaluation, so a substituted value stays inside its
+argument. Any other `${` text, including a literal `${`, fails loading. The catalog directory
+may be given in any spelling (`./dir`, `dir/`); a symlinked catalog root is refused.
+
+Registrations are not yet executed. The `pkg/nvkr/validation` package resolves selections
+(exact suite IDs or parent paths such as `nvke/nvkectl`, in argument order without duplicates),
+admits them against the built-in `local` test environment, and binds each input role to exactly
+one named output of a completed local Run. All inputs of one suite must be built for the same
+platform. The binding records the Run's content subject and each output's digest and build
+subject. Admission does not yet check `acquisition` or its network access;
+the executor that runs `acquisition` and `command` will enforce them, and is follow-up work. No
+command exposes this yet. `validators run --profile` below still uses the earlier indexed
+catalog under `inputs/testing/validators/` until it is migrated.
 
 ```sh
 GOTOOLCHAIN=local go build -o bin/nvkr ./cmd/nvkr
 
-# Discover available validators
-bin/nvkr validators list --catalog inputs/testing/validators/catalog.yaml
-bin/nvkr validators describe --catalog inputs/testing/validators/catalog.yaml nvke/nvkectl/contract
+# Discover validators in the shipped catalog, or in a replacement directory
+bin/nvkr validators list
+bin/nvkr validators describe --validator-catalog ./company-validators nvke/nvkectl/contract
 
 # Execute a validation profile
 bin/nvkr validators run --profile /path/to/validation.yaml --keep
@@ -68,9 +121,9 @@ bin/nvkr validators run --profile /path/to/validation.yaml --keep
 absolute or relative to the profile file; use an absolute path to decouple the profile
 from its location.
 
-The SDK exposes `ListValidators`, `DescribeValidator`, and `PrepareValidatorProfile`;
-execute the returned invocation with `Run(ctx)`. No implicit catalog or suite fallback
-is installed.
+The SDK exposes `ListValidators` and `DescribeValidator` for the catalog directory, and
+`PrepareValidatorProfile` for profiles; execute the returned invocation with `Run(ctx)`.
+Profiles have no implicit catalog or suite fallback.
 
 Every selected instance must explicitly bind `executable` to one named output and one
 artifact path; no inference, glob or run-all behavior exists. Multiple instances
@@ -119,9 +172,9 @@ this slice.
 - There is no per-run timeout override. The test-container bound comes only from the
   catalog entry's `timeout`, so a shorter bound needs a separate catalog entry.
 - Admission errors use the profile loader's codes (for example unknown validator exits
-  13 and an excluded platform exits 29); a missing `--profile` or `--catalog` is a
-  coded usage error (exit 2). Suite-failure status, timeout classification and cleanup follow
-  the execution owners.
+  13 and an excluded platform exits 29); a missing `--profile`, an empty
+  `--validator-catalog` or a missing catalog directory is a coded usage error (exit 2).
+  Suite-failure status, timeout classification and cleanup follow the execution owners.
 - Workspaces use `--workspace-root` and `--keep`; with `--keep` each also retains
   `selection.json`.
 - Relative `plan`, `artifact` and `catalog` paths resolve against the profile file's
