@@ -15,7 +15,7 @@
 #       --substitutions FILE --matrix FILE [--node-user USER] \
 #       [--node-image-check FILE ...] --leg DIR [--leg DIR ...]
 #       Build OUT (created fresh) from the plan, the substitution record, the matrix the run
-#       was dispatched with, one hardware-e2e-check-node-image.py record per node image and one
+#       was dispatched with, one `hwe2e check-node-image` record per node image and one
 #       directory per leg. SOURCE is the artifact source the run used and must be the one the
 #       substitution record names:
 #         nvkr-outputs   the plan names NVKR-built artifacts. Each node image record must name
@@ -31,7 +31,7 @@
 #                        recorded unmodified, there is no producer, and node image records are
 #                        refused: the node images are the ones the plan names, which NVKR did not
 #                        check.
-#       A leg directory holds leg.json, coverage.json (hardware-e2e-check-junit.py) and staged.json
+#       A leg directory holds leg.json, coverage.json (`hwe2e check-junit`) and staged.json
 #       (hardware-e2e-stage-inputs.sh or hardware-e2e-build-subject.sh). Every dispatched stream must be
 #       one the plan names, on the architecture the plan gives it, so a stream the plan lacks can never
 #       stand in for one it has; a run that dispatched fewer streams than the plan names is incomplete.

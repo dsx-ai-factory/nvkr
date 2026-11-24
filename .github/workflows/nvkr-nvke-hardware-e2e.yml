@@ -256,12 +256,30 @@ jobs:
           name: nvkr-hardware-e2e-plan-${{ github.run_id }}
           path: plan-out
 
+      # The checks are NVKR's own Go, built from this checkout with its pinned toolchain, so no
+      # interpreter and no other project's toolchain stands between this job and the bytes it checks.
+      - name: Set up Go for the NVKR checks
+        uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version-file: nvkr/.go-version
+          cache: false
+
+      - name: Build the NVKR checks
+        working-directory: nvkr
+        env:
+          GOTOOLCHAIN: local
+          CGO_ENABLED: '0'
+        run: |
+          set -euo pipefail
+          mkdir -p "$GITHUB_WORKSPACE/hwe2e-bin"
+          go build -trimpath -o "$GITHUB_WORKSPACE/hwe2e-bin/hwe2e" ./internal/hwe2e
+
       - name: Check each node image
         run: |
           set -euo pipefail
           mkdir checks
           for slot in os-image-amd64 os-image-arm64; do
-            python3 nvkr/scripts/hardware-e2e-check-node-image.py --slot "$slot" --substitutions plan-out/substitutions.json --out "checks/$slot.json"
+            "$GITHUB_WORKSPACE/hwe2e-bin/hwe2e" check-node-image --slot "$slot" --substitutions plan-out/substitutions.json --out "checks/$slot.json"
           done
 
       - name: Upload the node image checks
@@ -391,6 +409,24 @@ jobs:
           set -euo pipefail
           mkdir leg
           nvkr/scripts/hardware-e2e-summary.sh leg leg "$STREAM" "$COMBINATION" "$MATRIX_ARCH"
+
+      # Built before the NVKE harness's Go takes the path, with NVKR's own pinned toolchain: the JUnit
+      # checks below are NVKR's and run the same binary on every leg.
+      - name: Set up Go for the NVKR checks
+        uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version-file: nvkr/.go-version
+          cache: false
+
+      - name: Build the NVKR checks
+        working-directory: nvkr
+        env:
+          GOTOOLCHAIN: local
+          CGO_ENABLED: '0'
+        run: |
+          set -euo pipefail
+          mkdir -p "$GITHUB_WORKSPACE/hwe2e-bin"
+          go build -trimpath -o "$GITHUB_WORKSPACE/hwe2e-bin/hwe2e" ./internal/hwe2e
 
       # Empty is valid: the OSS os-image releases bake no account. Anything but a plain account name is
       # refused, so the value can neither carry a second output line nor name something else.
@@ -597,7 +633,7 @@ jobs:
       - name: Check the selected specs fit the stage
         run: |
           set -euo pipefail
-          python3 nvkr/scripts/hardware-e2e-check-junit.py \
+          "$GITHUB_WORKSPACE/hwe2e-bin/hwe2e" check-junit \
             --dry leg/dry-run.junit.xml \
             --stage "$SITE_STAGE" \
             --label-filter "site-controller && !${SITE_TENANT_EXCLUDE}" \
@@ -623,7 +659,7 @@ jobs:
         if: always() && env.DRY_RUN != 'true'
         run: |
           set -euo pipefail
-          python3 nvkr/scripts/hardware-e2e-check-junit.py \
+          "$GITHUB_WORKSPACE/hwe2e-bin/hwe2e" check-junit \
             --dry leg/dry-run.junit.xml \
             --real nvke/controller/test/e2e/qualify-e2e.junit.xml \
             --stage "$SITE_STAGE" \

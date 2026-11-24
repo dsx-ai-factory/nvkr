@@ -219,7 +219,7 @@ func TestNodeImageWorkflowDryRunJobNeverHoldsTheStoreOrItsRole(t *testing.T) {
 		t.Fatalf("the dry run reads %v, want %v", pull.Env, wantEnv)
 	}
 	for _, want := range []string{
-		"python3 scripts/hardware-e2e-publish-node-image.py --dry-run",
+		`"$RUNNER_TEMP/bin/hwe2e" publish-node-image --dry-run`,
 		`--slot "$SLOT"`, `--reference "$RELEASE"`, `--output "$OUTPUT"`, `--version "$NVKE_VERSION"`,
 		`--s3-uri "$S3_URI"`, `--prefix "$PREFIX"`, `--cdn-domain "$CDN_DOMAIN"`, `--region "$REGION"`,
 		`--nvkr "$RUNNER_TEMP/bin/nvkr"`, `--work-dir "$RUNNER_TEMP/pull"`, `--out "$RUNNER_TEMP/record"`,
@@ -411,6 +411,10 @@ func TestNodeImageWorkflowBuildsNvkrOnlyToPullTheRelease(t *testing.T) {
 		if !strings.Contains(build.Run, `-o "$RUNNER_TEMP/bin/nvkr" ./cmd/nvkr`) {
 			t.Fatalf("%s: the build must write the binary the next step names, got %q", name, build.Run)
 		}
+		// The publisher is built beside it, from the same checkout and toolchain, before any credential exists.
+		if !strings.Contains(build.Run, `go build -trimpath -o "$RUNNER_TEMP/bin/hwe2e" ./internal/hwe2e`) {
+			t.Fatalf("%s: the build must also write the publisher the later steps run, got %q", name, build.Run)
+		}
 	}
 }
 
@@ -432,7 +436,7 @@ func TestNodeImageWorkflowPublishesOnlyThroughTheScript(t *testing.T) {
 		t.Fatalf("the publish step reads %v, want %v", publish.Env, wantEnv)
 	}
 	for _, want := range []string{
-		"python3 scripts/hardware-e2e-publish-node-image.py",
+		`"$RUNNER_TEMP/bin/hwe2e" publish-node-image`,
 		`--slot "$SLOT"`, `--reference "$RELEASE"`, `--output "$OUTPUT"`, `--version "$NVKE_VERSION"`,
 		`--s3-uri "$S3_URI"`, `--prefix "$PREFIX"`, `--cdn-domain "$CDN_DOMAIN"`, `--region "$REGION"`,
 		`--run-url "$RUN_URL"`, `--nvkr "$RUNNER_TEMP/bin/nvkr"`,
@@ -445,8 +449,11 @@ func TestNodeImageWorkflowPublishesOnlyThroughTheScript(t *testing.T) {
 	if strings.Contains(publish.Run, "--dry-run") {
 		t.Fatal("the publish step is never a dry run; the dry run is its own job")
 	}
-	if _, err := os.Stat(filepath.Join(hardwareE2ERoot(t), "scripts", "hardware-e2e-publish-node-image.py")); err != nil {
-		t.Fatalf("the publish step names a script that does not exist: %v", err)
+	if _, err := os.Stat(filepath.Join(hardwareE2ERoot(t), "internal", "hwe2e", "publish.go")); err != nil {
+		t.Fatalf("the publish step names a package that does not exist: %v", err)
+	}
+	if strings.Contains(raw, "python") {
+		t.Fatal("the workflow runs no interpreter: the publisher is a subcommand of one Go binary")
 	}
 	// Every object store call and every pull belongs to the script. The workflow never fetches the
 	// HTTPS front end: it can sit behind an address allowlist that runners are not on, so a request

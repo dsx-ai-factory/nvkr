@@ -85,7 +85,9 @@ jobs:
           go-version-file: .go-version
           cache: false
 
-      # Only release pull is used, so nothing here builds, signs or verifies anything.
+      # Only release pull is used, so nothing here builds, signs or verifies anything. The publisher is
+      # built beside it from the same checkout with the same pinned toolchain, and owns every pull and
+      # every object store call.
       - name: Build nvkr
         env:
           GOTOOLCHAIN: local
@@ -94,6 +96,7 @@ jobs:
           set -euo pipefail
           mkdir -p "$RUNNER_TEMP/bin"
           go build -trimpath -ldflags '-X main.version=dev -X main.commit=unknown' -o "$RUNNER_TEMP/bin/nvkr" ./cmd/nvkr
+          go build -trimpath -o "$RUNNER_TEMP/bin/hwe2e" ./internal/hwe2e
 
       - name: Log in to GHCR
         uses: docker/login-action@dbcb813823bdd20940b903addbd779551569679f # v4.6.0
@@ -117,7 +120,7 @@ jobs:
         run: |
           set -euo pipefail
           df -h "$RUNNER_TEMP"
-          python3 scripts/hardware-e2e-publish-node-image.py --dry-run \
+          "$RUNNER_TEMP/bin/hwe2e" publish-node-image --dry-run \
             --slot "$SLOT" --reference "$RELEASE" --output "$OUTPUT" --version "$NVKE_VERSION" \
             --s3-uri "$S3_URI" --prefix "$PREFIX" --cdn-domain "$CDN_DOMAIN" --region "$REGION" \
             --nvkr "$RUNNER_TEMP/bin/nvkr" \
@@ -184,7 +187,9 @@ jobs:
           go-version-file: .go-version
           cache: false
 
-      # Only release pull is used, so nothing here builds, signs or verifies anything.
+      # Only release pull is used, so nothing here builds, signs or verifies anything. The publisher is
+      # built beside it from the same checkout with the same pinned toolchain, and owns every pull and
+      # every object store call.
       - name: Build nvkr
         env:
           GOTOOLCHAIN: local
@@ -193,6 +198,7 @@ jobs:
           set -euo pipefail
           mkdir -p "$RUNNER_TEMP/bin"
           go build -trimpath -ldflags '-X main.version=dev -X main.commit=unknown' -o "$RUNNER_TEMP/bin/nvkr" ./cmd/nvkr
+          go build -trimpath -o "$RUNNER_TEMP/bin/hwe2e" ./internal/hwe2e
 
       - name: Log in to GHCR
         uses: docker/login-action@dbcb813823bdd20940b903addbd779551569679f # v4.6.0
@@ -221,7 +227,7 @@ jobs:
         run: |
           set -euo pipefail
           df -h "$RUNNER_TEMP"
-          python3 scripts/hardware-e2e-publish-node-image.py \
+          "$RUNNER_TEMP/bin/hwe2e" publish-node-image \
             --slot "$SLOT" --reference "$RELEASE" --output "$OUTPUT" --version "$NVKE_VERSION" \
             --s3-uri "$S3_URI" --prefix "$PREFIX" --cdn-domain "$CDN_DOMAIN" --region "$REGION" \
             --run-url "$RUN_URL" --nvkr "$RUNNER_TEMP/bin/nvkr" \

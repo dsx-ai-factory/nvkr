@@ -557,14 +557,16 @@ func TestHardwareE2EWorkflowAdmitsOnlyARealRunFromMainAndItsFirstAttempt(t *test
 func TestHardwareE2EWorkflowReferencesScriptsThatExist(t *testing.T) {
 	_, raw := hardwareE2ELoadWorkflow(t)
 	root := hardwareE2ERoot(t)
-	reference := regexp.MustCompile(`scripts/(hardware-e2e-[a-z-]+\.(sh|py))`)
+	// The two checks are not scripts: they are subcommands of one Go binary, pinned by
+	// TestHardwareE2EWorkflowBuildsItsChecksWithNVKRsOwnToolchain.
+	reference := regexp.MustCompile(`scripts/(hardware-e2e-[a-z-]+\.sh)`)
 	seen := map[string]bool{}
 	for _, match := range reference.FindAllStringSubmatch(raw, -1) {
 		seen[match[1]] = true
 	}
 	for _, want := range []string{
-		"hardware-e2e-substitute-plan.sh", "hardware-e2e-matrix.sh", "hardware-e2e-check-node-image.py", "hardware-e2e-stage-inputs.sh",
-		"hardware-e2e-build-subject.sh", "hardware-e2e-check-junit.py", "hardware-e2e-summary.sh",
+		"hardware-e2e-substitute-plan.sh", "hardware-e2e-matrix.sh", "hardware-e2e-stage-inputs.sh",
+		"hardware-e2e-build-subject.sh", "hardware-e2e-summary.sh",
 	} {
 		if !seen[want] {
 			t.Fatalf("the workflow does not use %s", want)
@@ -578,6 +580,59 @@ func TestHardwareE2EWorkflowReferencesScriptsThatExist(t *testing.T) {
 		if strings.HasSuffix(script, ".sh") && info.Mode()&0o111 == 0 {
 			t.Fatalf("scripts/%s is run directly and must be executable", script)
 		}
+	}
+}
+
+// The node image check and the JUnit check are NVKR's own Go, one binary built from the checkout with its
+// pinned toolchain. A leg builds it before the NVKE harness's Go takes the path, so neither an interpreter
+// nor another project's toolchain stands between a job and what it checks.
+func TestHardwareE2EWorkflowBuildsItsChecksWithNVKRsOwnToolchain(t *testing.T) {
+	doc, raw := hardwareE2ELoadWorkflow(t)
+	if strings.Contains(raw, "python") {
+		t.Fatal("the workflow runs no interpreter: its checks are one Go binary")
+	}
+	if _, err := os.Stat(filepath.Join(hardwareE2ERoot(t), "internal", "hwe2e", "main.go")); err != nil {
+		t.Fatalf("the workflow builds a package that does not exist: %v", err)
+	}
+	const binary = `"$GITHUB_WORKSPACE/hwe2e-bin/hwe2e"`
+	for _, tc := range []struct{ job, use string }{
+		{"verify-node-images", binary + " check-node-image"},
+		{"hardware-e2e", binary + " check-junit"},
+	} {
+		job := doc.Jobs[tc.job]
+		setupAt, setup := hardwareE2EWorkflowStepNamed(t, job, "Set up Go for the NVKR checks")
+		if !strings.HasPrefix(setup.Uses, "actions/setup-go@") || setup.With["go-version-file"] != "nvkr/.go-version" || setup.With["cache"] != false {
+			t.Fatalf("%s: Go for the checks must come from NVKR's pin, uncached, got %q %v", tc.job, setup.Uses, setup.With)
+		}
+		buildAt, build := hardwareE2EWorkflowStepNamed(t, job, "Build the NVKR checks")
+		if build.WorkingDirectory != "nvkr" || build.Env["GOTOOLCHAIN"] != "local" || build.Env["CGO_ENABLED"] != "0" {
+			t.Fatalf("%s: the checks must build in the NVKR checkout with the pinned local toolchain and no cgo, got %q %v", tc.job, build.WorkingDirectory, build.Env)
+		}
+		if !strings.Contains(build.Run, `go build -trimpath -o "$GITHUB_WORKSPACE/hwe2e-bin/hwe2e" ./internal/hwe2e`) {
+			t.Fatalf("%s: the build must write the binary the checks name, got %q", tc.job, build.Run)
+		}
+		if setupAt >= buildAt {
+			t.Fatalf("%s: Go is set up at step %d, after the build at step %d", tc.job, setupAt, buildAt)
+		}
+		used := false
+		for index, step := range job.Steps {
+			if !strings.Contains(step.Run, tc.use) {
+				continue
+			}
+			used = true
+			if index <= buildAt {
+				t.Fatalf("%s: step %q runs the checks at step %d, before they are built at step %d", tc.job, step.Name, index, buildAt)
+			}
+		}
+		if !used {
+			t.Fatalf("%s never runs %s", tc.job, tc.use)
+		}
+	}
+	// A leg's checks are built before NVKE's Go replaces the toolchain they were built with.
+	leg := doc.Jobs["hardware-e2e"]
+	buildAt, _ := hardwareE2EWorkflowStepNamed(t, leg, "Build the NVKR checks")
+	if nvkeGoAt, _ := hardwareE2EWorkflowStepNamed(t, leg, "Set up Go"); buildAt >= nvkeGoAt {
+		t.Fatalf("a leg builds its checks at step %d, after the NVKE harness's Go at step %d", buildAt, nvkeGoAt)
 	}
 }
 
@@ -689,7 +744,7 @@ func TestHardwareE2EWorkflowSelectsItsArtifactSourceBeforeAnyMachine(t *testing.
 	_, dry := hardwareE2EWorkflowStepNamed(t, leg, "Check the selected specs fit the stage")
 	_, covered := hardwareE2EWorkflowStepNamed(t, leg, "Check the run covered what it selected")
 	for name, step := range map[string]hardwareE2EWorkflowStep{"dry validation": dry, "coverage check": covered} {
-		for _, flag := range []string{"hardware-e2e-check-junit.py", "--dry leg/dry-run.junit.xml", `--stage "$SITE_STAGE"`, "--label-filter " + filter} {
+		for _, flag := range []string{`"$GITHUB_WORKSPACE/hwe2e-bin/hwe2e" check-junit`, "--dry leg/dry-run.junit.xml", `--stage "$SITE_STAGE"`, "--label-filter " + filter} {
 			if !strings.Contains(step.Run, flag) {
 				t.Fatalf("the %s lacks %q", name, flag)
 			}
@@ -761,7 +816,7 @@ func TestHardwareE2EWorkflowChecksEachNodeImageByTheMethodItsOutputNamed(t *test
 	for _, want := range []string{
 		"set -euo pipefail",
 		"for slot in os-image-amd64 os-image-arm64; do",
-		`python3 nvkr/scripts/hardware-e2e-check-node-image.py --slot "$slot" --substitutions plan-out/substitutions.json --out "checks/$slot.json"`,
+		`"$GITHUB_WORKSPACE/hwe2e-bin/hwe2e" check-node-image --slot "$slot" --substitutions plan-out/substitutions.json --out "checks/$slot.json"`,
 	} {
 		if !strings.Contains(check.Run, want) {
 			t.Fatalf("the node image check lacks %q", want)

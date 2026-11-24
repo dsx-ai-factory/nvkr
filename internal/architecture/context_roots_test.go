@@ -50,6 +50,7 @@ var contextRootExceptions = map[contextRoot]contextRootException{
 	{"cmd/nvkr-disk-inspect/main.go", "main", "Background"}:                                                           {1, processRoot},
 	{"cmd/nvkr-results-publish/main.go", "main", "Background"}:                                                        {1, processRoot},
 	{"cmd/nvkr/main.go", "main", "Background"}:                                                                        {1, processRoot},
+	{"internal/hwe2e/main.go", "main", "Background"}:                                                                  {1, processRoot},
 	{"internal/quicke2e/main.go", "main", "Background"}:                                                               {1, processRoot},
 	{"internal/quicke2e/runner.go", "(*runner).cleanupContainer", "Background"}:                                       {1, boundedCleanup},
 	{"pkg/nvkr/conformance/run.go", "(*Producer).produce", "Background"}:                                              {3, boundedRecovery},

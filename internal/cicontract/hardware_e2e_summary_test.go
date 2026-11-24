@@ -248,7 +248,7 @@ const hardwareE2ECoverageGroupsRule = "every leg coverage must count its groups,
 // source of its node image.
 const hardwareE2ENodeBuiltRule = "a node image whose source is not an NVKR release must be named as not NVKR-built"
 
-// hardwareE2ENodeImageCheck is what hardware-e2e-check-node-image.py writes for a node image, built
+// hardwareE2ENodeImageCheck is what the check-node-image subcommand of internal/hwe2e writes for a node image, built
 // from the same synthetic outputs manifest the substitution script was given.
 func hardwareE2ENodeImageCheck(manifest map[string]any, slot string) map[string]any {
 	image := hardwareE2ESlots(manifest)[slot].(map[string]any)
