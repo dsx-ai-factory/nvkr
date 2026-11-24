@@ -226,6 +226,9 @@ func cmdFactoryGitHub() *cli.Command {
 		githubFactoryCommand("run-disk", "output", func(c *cli.Context, plan *factory.Plan, options factory.GitHubStepOptions) error {
 			return factory.RunGitHubDisk(c.Context, plan, c.String("output"), options)
 		}),
+		githubFactoryCommand("stage-disk", "output", func(c *cli.Context, plan *factory.Plan, options factory.GitHubStepOptions) error {
+			return factory.StageGitHubDisk(c.Context, plan, c.String("output"), options)
+		}),
 		githubFactoryCommand("run-node", "node", func(c *cli.Context, plan *factory.Plan, options factory.GitHubStepOptions) error {
 			if factory.IsObjectPublicationNode(plan, c.String("node")) {
 				return executeGitHubObjectPublication(c.Context, plan, c.String("node"), factoryGeneratorVersion(), options)

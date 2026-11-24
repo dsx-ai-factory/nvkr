@@ -184,6 +184,7 @@ func (observer *registryObserver) explain(ctx context.Context, err error) error 
 	if err == nil {
 		return nil
 	}
+	readOnly := observer.readOnly && !registryWriteAttempted(ctx)
 	report := observer.snapshot()
 	if report.LastOperation == "unknown" {
 		return err // Admission/local errors occurred before registry I/O.
@@ -200,7 +201,7 @@ func (observer *registryObserver) explain(ctx context.Context, err error) error 
 		return err // Local failures do not inherit the last registry response.
 	}
 	if coded == nil {
-		err = registryOperationError(ctx, err, "registry operation failed", !observer.readOnly)
+		err = registryOperationError(ctx, err, "registry operation failed", !readOnly)
 		_ = errors.As(err, &coded)
 	}
 	if errors.As(err, &response) && response.Request != nil {
@@ -235,7 +236,7 @@ func (observer *registryObserver) explain(ctx context.Context, err error) error 
 				action = "The operation was canceled or timed out; reconcile partial uploads before retrying the same identified publication."
 			}
 		}
-		if observer.readOnly && (coded.Code == e.CodeTimeout || coded.Code == e.CodeUnavailable) {
+		if readOnly && (coded.Code == e.CodeTimeout || coded.Code == e.CodeUnavailable) {
 			action = "Check the endpoint, TLS trust, DNS and connectivity, then retry the bounded read-only operation; no upload was attempted."
 		}
 	}

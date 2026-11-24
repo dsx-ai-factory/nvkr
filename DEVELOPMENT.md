@@ -249,7 +249,7 @@ Configure these **separate development environments**, retaining the existing pr
 | Environment | Configuration |
 |---|---|
 | `nvkr-dev-release` | Admit reviewed feature branches. Store `NVKR_DEV_REGISTRY_WRITE` and `NVKR_DEV_REGISTRY_READ` secrets, plus `NVKR_DEV_REGISTRY_WRITE_USER` and `NVKR_DEV_REGISTRY_READ_USER` variables. |
-| `nvkr-dev-arc` | Admit the reviewed development workflow and selected branch refs to the existing ephemeral `arc-amd64-kvm` and `arc-arm64-kvm` pools. Preserve the existing capacity, Docker/KVM and isolation requirements. |
+| `nvkr-dev-arc` | Admit the reviewed development workflow and selected branch refs to the existing ephemeral `arc-amd64-kvm` and `arc-arm64-kvm` pools. Store the separate `NVKR_DEV_REGISTRY_STAGE_WRITE` secret and `NVKR_DEV_REGISTRY_STAGE_WRITE_USER` variable for the fixed disk push step. Preserve the existing capacity, Docker/KVM and isolation requirements. |
 | `nvkr-dev-cleanup` | Admit **only the default branch**. Store `NVKR_DEV_REGISTRY_CLEANUP`; allow its hourly scheduled job to run without a per-run approval if automatic cleanup is desired. |
 
 Use a dedicated development publishing account with no production-package write/admin access. Its write
@@ -265,6 +265,25 @@ no package-write permission to their repository `GITHUB_TOKEN`; verification, as
 receive only the dedicated read credential. Only artifact signing and SBOM attestation receive OIDC.
 GHCR publication jobs use the automatic repository token separately for source-repository metadata checks;
 the development publishing token does not need repository scope for that lookup.
+
+Development disks stage their unsigned prepared layout directly at their final destination, without a tag.
+Only the fixed push step receives the stage writer; the producer job has no OIDC or release-environment
+credential. This is a step scope, not a machine isolation boundary: candidate code runs on that ARC host.
+The stage writer must be a separate token from the release writer, scoped to the disposable
+development packages. Use the same dedicated development package principal for stage, release,
+read and cleanup tokens: the stage token creates run/attempt-derived packages that cannot be
+granted to separate accounts before dispatch. The release writer needs read/write access to these
+packages, the release reader needs read access, and cleanup needs delete/admin access. Verify the
+actual token scopes and package ACLs; see [staging acceptance](docs/adr/reconciliation/adr-20.md#support-by-owner).
+A missing or under-scoped stage writer fails in the fixed push step after the disk build has completed;
+the build does not preflight these credentials.
+The staged digest and bounded controls travel through Actions metadata. The release job reads the
+complete preparation back by digest without retaining its payload. SBOM attestation uses only controls
+and no registry credential; the publisher binds its bundles to the readback before publishing evidence
+and root metadata. Signing and independent full-payload verification follow. Other outputs and production lanes retain private CI
+payload transport, and all `NVKR_CI_STORAGE_*` settings remain required for those and shared inputs.
+This maintained lane retains its explicit scoped accounts; the adopter platform-token default is a
+separate migration step.
 
 Configure repository secret `NVKR_REGISTRY_READ` and variable `NVKR_REGISTRY_READ_USER` for the
 shared private toolchain and smoke images as well. These are additional prerequisites to the development
@@ -307,8 +326,9 @@ Different branches and attempts cannot advance one another's Helm aliases or sha
 The Plan records the namespace policy; the execution owner binds actual destinations to the current
 repository, workflow, run and attempt without changing logical Build identity or rewriting the committed Plan.
 
-Signed development Runs are non-canceling. To retry, dispatch a complete new Run (or rerun **all** jobs).
-Failed-job-only reruns cannot reuse publications from an earlier attempt's disposable namespace. A cancelled
+Signed development Runs are non-canceling. A complete new Run (or rerun of **all** jobs) rebuilds every output.
+A failed release job may reuse a staged disk from an earlier attempt of the same Run; its destination and
+controls must retain that preparation's exact attempt. Foreign-run and future-attempt references are refused. A cancelled
 Run can leave partial publications and may have no final record; cleanup discovers packages independently
 of successful finalization. Actions locators for CI helpers/carriers and final Run records retain seven
 days; disk diagnostic locators retain one day. GHCR carrier blobs require separate retention management.
@@ -316,10 +336,12 @@ After locator transfers expire, start a complete new Run.
 
 ### Qualify an existing development Run
 
-Development qualification is unavailable. The development bundle now belongs to the GPU site composite, and
-qualification rejects a composite Run until composite qualification has a supported owner (ADR-26 U8).
-`make pipeline-dev-generate` therefore generates no development qualifier or native smoke worker, and their
-committed pair is retired.
+The maintained GPU-site development qualifier and native smoke worker are
+`.github/workflows/nvkr-dev-qualify.yml` and `.github/workflows/nvkr-dev-smoke.yml`.
+`make pipeline-dev-generate` regenerates these with the other maintained owners.
+Use the separate development qualification policy for a development Run; see
+[ADR-26 reconciliation](docs/adr/reconciliation/adr-26.md#support-by-owner) for hosted acceptance and the
+separate local composite rehearsal boundary. Generating workflows does not establish hosted qualification.
 
 ### Disposable registry cleanup
 
@@ -332,9 +354,9 @@ the rest. Preview from the default branch before enabling deletion:
 gh workflow run nvkr-dev-cleanup.yml --repo dsx-ai-factory/nvkr --ref main -f apply=false
 ```
 
-Cleanup requires internal packages in the exact reserved namespace, matching GitHub account and workflow attempt, a completed
+Cleanup requires private or internal packages in the exact reserved namespace, matching GitHub account and workflow attempt, a completed
 attempt at least 24 hours old, and package/version timestamps at least 24 hours old. It rechecks candidates
-before deletion. Active, young or ambiguous state is retained; API/admission failures fail the job rather
+before deletion, including unchanged visibility. Active, young or ambiguous state is retained; API/admission failures fail the job rather
 than claim cleanup succeeded. Whole-package deletion includes that package's versions, signatures and
 referrers, avoiding guesses based on tags. The next hourly sweep removes eligible packages; this is not an
 exact 24-hour expiry or proof of physical storage reclamation. Existing production and older unscoped

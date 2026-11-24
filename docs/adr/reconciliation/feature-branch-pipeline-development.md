@@ -181,16 +181,16 @@ Provider pool/credential/ACL configuration is an external prerequisite, not esta
 
 The factory owner derives registry targets beneath the current run and attempt without mutating committed
 Plan bytes or Build identity. Development now uses production's same-run retry contract: retained
-subjects, controls and predicates keep their original attempt bindings; new publication work uses the
-current attempt. Other runs, future attempts and changed Plans remain rejected. Development qualification
+subjects, controls and predicates keep their original attempt bindings. New preparations use the current
+attempt; completion of a retained staged disk keeps its original namespace. Other runs, future attempts and changed Plans remain rejected. Development qualification
 selects bounded provider-authenticated metadata candidates and rechecks the full original closure.
 The retry regression suite and complete repository gate passed in [Merge Gate 39327338735](https://github.com/dsx-ai-factory/nvkr/actions/runs/39327338735) at `92ce9fc65182a965f94ffa8a527828a971e9fc45`. Local test execution was skipped at the user's request. Live partial retry and independent qualification remain pending. Signed-development helpers/carriers and all final Run records retain
 seven days; disk diagnostics retain one day. Full signed development is non-canceling.
 
-The development cleanup module inventories only internal packages in that reserved attempt namespace.
+The development cleanup module inventories only private/internal packages in that reserved attempt namespace.
 It authenticates account, package and exact completed workflow-attempt metadata; package, version and
 original and latest attempt timestamps must all be at least 24 hours old. After complete namespace inventory and package-metadata checks, each invocation admits at most 25 eligible
-packages in name order, including preview. Later invocations drain the remainder. It rechecks before whole-package deletion, fails
+packages in name order, including preview. Later invocations drain the remainder. It rechecks unchanged visibility before whole-package deletion, fails
 closed on unknown/ambiguous/API state, and records confirmed partial progress without retrying ambiguous
 mutation. Preview is the default. The separate hourly cleanup workflow executes only default-branch code
 with a cleanup-only credential; it never loads branch executables or downloaded artifacts. Production and
@@ -198,8 +198,8 @@ older unscoped packages remain outside this protocol.
 
 Definition/factory contracts cover admission, identity, complete NVKE graph retention, exact rendering,
 credential/environment scope, retention, runtime namespace projection and same-run retry admission.
-Cleanup API fixtures cover internal visibility, rejection of private/public/missing/empty/unknown visibility at inventory
-and deletion recheck, eligibility, authentication errors, pagination, races and mutation failures;
+Cleanup API fixtures cover private/internal visibility, rejection of public/missing/empty/unknown visibility at inventory
+and deletion recheck, refusal of visibility changes between private and internal, eligibility, authentication errors, pagination, races and mutation failures;
 workflow contracts enforce default-branch scheduling and secret scope. The dispatch helper retains its
 clean/current pushed-commit preflight. These tests do not establish live GitHub execution, actual credential
 scope, ephemeral runner isolation, successful keyless services, GHCR deletion or physical storage reclaim.
