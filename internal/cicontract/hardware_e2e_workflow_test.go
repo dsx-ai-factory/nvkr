@@ -314,13 +314,17 @@ func TestHardwareE2EWorkflowKeepsExpressionsOutOfScripts(t *testing.T) {
 func TestHardwareE2EWorkflowHoldsCredentialsOnlyWhereTheyAreUsed(t *testing.T) {
 	doc, raw := hardwareE2ELoadWorkflow(t)
 	secretRef := regexp.MustCompile(`secrets\.([A-Z0-9_]+)`)
-	// Integration boundary: the FORGE_* names are the pinned NVKE harness's own input names.
+	// Integration boundary: the FORGE_* environment names are the pinned NVKE harness's own input
+	// names; the repository secrets and variables they are read from are NVKR's HARDWARE_E2E_* names.
 	allowed := map[string]bool{
-		"GITHUB_TOKEN":           true,
-		"FORGE_API_KEY":          true,
-		"FORGE_JUMP_HOST":        true,
-		"FORGE_SITE_2_JUMP_HOST": true,
-		"NGC_API_KEY":            true,
+		"GITHUB_TOKEN":                  true,
+		"HARDWARE_E2E_API_KEY":          true,
+		"HARDWARE_E2E_JUMP_HOST":        true,
+		"HARDWARE_E2E_SITE_2_JUMP_HOST": true,
+		"NGC_API_KEY":                   true,
+	}
+	if strings.Contains(raw, "vars.FORGE_") || strings.Contains(raw, "secrets.FORGE_") {
+		t.Fatal("repository variables and secrets are NVKR's and use HARDWARE_E2E_* names, not the harness's FORGE_* spelling")
 	}
 	for _, match := range secretRef.FindAllStringSubmatch(raw, -1) {
 		if !allowed[match[1]] {
@@ -335,7 +339,7 @@ func TestHardwareE2EWorkflowHoldsCredentialsOnlyWhereTheyAreUsed(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		if strings.Contains(string(serialized), "secrets.") || strings.Contains(string(serialized), "vars.FORGE_") {
+		if strings.Contains(string(serialized), "secrets.") || strings.Contains(string(serialized), "vars.HARDWARE_E2E_") {
 			t.Fatalf("job %s must not hold hardware site credentials or secrets; they belong to the protected-environment job", name)
 		}
 	}
@@ -350,8 +354,11 @@ func TestHardwareE2EWorkflowHoldsCredentialsOnlyWhereTheyAreUsed(t *testing.T) {
 			t.Fatalf("FORGE_API_KEY must reach only the suite's run step, found at %q", step.Name)
 		}
 	}
-	for _, name := range []string{"FORGE_JUMP_HOST", "FORGE_SITE_2_JUMP_HOST"} {
-		if leg.Env[name] != "${{ secrets."+name+" }}" {
+	for name, secret := range map[string]string{
+		"FORGE_JUMP_HOST":        "HARDWARE_E2E_JUMP_HOST",
+		"FORGE_SITE_2_JUMP_HOST": "HARDWARE_E2E_SITE_2_JUMP_HOST",
+	} {
+		if leg.Env[name] != "${{ secrets."+secret+" }}" {
 			t.Fatalf("%s must be a job-level secret so the log masks it, got %q", name, leg.Env[name])
 		}
 	}

@@ -334,32 +334,33 @@ jobs:
       SITE_INPUTS: ${{ github.workspace }}/.site-inputs
       # Integration boundary. The pinned NVKE harness reads the FORGE_* names below, and its provider
       # is "forge", so they stay as NVKE spells them. They appear only in this block, in the steps
-      # that pass them on, and in the matrix script's provider filter; every other name here is NVKR's.
-      FORGE_TELEPORT_PROXY: ${{ vars.FORGE_TELEPORT_PROXY }}
+      # that pass them on, and in the matrix script's provider filter; every other name here is NVKR's,
+      # including the HARDWARE_E2E_* repository variables and secrets they are read from.
+      FORGE_TELEPORT_PROXY: ${{ vars.HARDWARE_E2E_TELEPORT_PROXY }}
       # Names a Teleport provision token whose GitHub allow rule covers this repository. NVKE's token
       # admits only dsx-ai-factory/nvke.
-      FORGE_TELEPORT_JOIN_TOKEN: ${{ vars.FORGE_TELEPORT_JOIN_TOKEN }}
+      FORGE_TELEPORT_JOIN_TOKEN: ${{ vars.HARDWARE_E2E_TELEPORT_JOIN_TOKEN }}
       # Secrets rather than variables so the job-level env header masks them.
-      FORGE_JUMP_HOST: ${{ secrets.FORGE_JUMP_HOST }}
-      FORGE_SITE_2_JUMP_HOST: ${{ secrets.FORGE_SITE_2_JUMP_HOST }}
+      FORGE_JUMP_HOST: ${{ secrets.HARDWARE_E2E_JUMP_HOST }}
+      FORGE_SITE_2_JUMP_HOST: ${{ secrets.HARDWARE_E2E_SITE_2_JUMP_HOST }}
       # The only login the bot's role grants on the jump hosts.
       FORGE_TELEPORT_LOGIN: root
       FORGE_SITE_2_TELEPORT_LOGIN: root
       # Read by controller/test/e2e/environments/forge.yaml.
-      FORGE_ORG_ID: ${{ vars.FORGE_ORG_ID }}
-      FORGE_SITE_ID: ${{ vars.FORGE_SITE_ID }}
-      FORGE_VPC_ID: ${{ vars.FORGE_VPC_ID }}
-      FORGE_SUBNET_ID: ${{ vars.FORGE_SUBNET_ID }}
-      FORGE_SSH_KEY_GROUP_ID: ${{ vars.FORGE_SSH_KEY_GROUP_ID }}
-      FORGE_INSTANCE_TYPE_CPU_ID: ${{ vars.FORGE_INSTANCE_TYPE_CPU_ID }}
-      FORGE_INSTANCE_TYPE_GPU_ID: ${{ vars.FORGE_INSTANCE_TYPE_GPU_ID }}
-      FORGE_SITE_2_SITE_ID: ${{ vars.FORGE_SITE_2_SITE_ID }}
-      FORGE_SITE_2_VPC_ID: ${{ vars.FORGE_SITE_2_VPC_ID }}
-      FORGE_SITE_2_VPC_PREFIX_ID: ${{ vars.FORGE_SITE_2_VPC_PREFIX_ID }}
-      FORGE_SITE_2_SSH_KEY_GROUP_ID: ${{ vars.FORGE_SITE_2_SSH_KEY_GROUP_ID }}
-      FORGE_SITE_2_INSTANCE_TYPE_CPU_AMD64_ID: ${{ vars.FORGE_SITE_2_INSTANCE_TYPE_CPU_AMD64_ID }}
-      FORGE_SITE_2_INSTANCE_TYPE_CPU_ARM64_ID: ${{ vars.FORGE_SITE_2_INSTANCE_TYPE_CPU_ARM64_ID }}
-      FORGE_SITE_2_INSTANCE_TYPE_GPU_GB200_ID: ${{ vars.FORGE_SITE_2_INSTANCE_TYPE_GPU_GB200_ID }}
+      FORGE_ORG_ID: ${{ vars.HARDWARE_E2E_ORG_ID }}
+      FORGE_SITE_ID: ${{ vars.HARDWARE_E2E_SITE_ID }}
+      FORGE_VPC_ID: ${{ vars.HARDWARE_E2E_VPC_ID }}
+      FORGE_SUBNET_ID: ${{ vars.HARDWARE_E2E_SUBNET_ID }}
+      FORGE_SSH_KEY_GROUP_ID: ${{ vars.HARDWARE_E2E_SSH_KEY_GROUP_ID }}
+      FORGE_INSTANCE_TYPE_CPU_ID: ${{ vars.HARDWARE_E2E_INSTANCE_TYPE_CPU_ID }}
+      FORGE_INSTANCE_TYPE_GPU_ID: ${{ vars.HARDWARE_E2E_INSTANCE_TYPE_GPU_ID }}
+      FORGE_SITE_2_SITE_ID: ${{ vars.HARDWARE_E2E_SITE_2_SITE_ID }}
+      FORGE_SITE_2_VPC_ID: ${{ vars.HARDWARE_E2E_SITE_2_VPC_ID }}
+      FORGE_SITE_2_VPC_PREFIX_ID: ${{ vars.HARDWARE_E2E_SITE_2_VPC_PREFIX_ID }}
+      FORGE_SITE_2_SSH_KEY_GROUP_ID: ${{ vars.HARDWARE_E2E_SITE_2_SSH_KEY_GROUP_ID }}
+      FORGE_SITE_2_INSTANCE_TYPE_CPU_AMD64_ID: ${{ vars.HARDWARE_E2E_SITE_2_INSTANCE_TYPE_CPU_AMD64_ID }}
+      FORGE_SITE_2_INSTANCE_TYPE_CPU_ARM64_ID: ${{ vars.HARDWARE_E2E_SITE_2_INSTANCE_TYPE_CPU_ARM64_ID }}
+      FORGE_SITE_2_INSTANCE_TYPE_GPU_GB200_ID: ${{ vars.HARDWARE_E2E_SITE_2_INSTANCE_TYPE_GPU_GB200_ID }}
     steps:
       # NVKE measured that a GitHub-hosted runner reaches both the hardware site's API and the Teleport proxy
       # (forge-connectivity-probe.yml). The leg is stamped as soon as NVKR's scripts are checked out, so
@@ -606,7 +607,7 @@ jobs:
       # release/hack/qualify-e2e.sh. A dry run lists what it would run and takes no machine.
       - name: Run the e2e suite${{ inputs.dry-run && ' (dry run)' || '' }}
         env:
-          FORGE_API_KEY: ${{ secrets.FORGE_API_KEY }}
+          FORGE_API_KEY: ${{ secrets.HARDWARE_E2E_API_KEY }}
         run: nvke/release/hack/qualify-e2e.sh run
 
       # The suite names the jump host in its own errors. GitHub masks a secret in the job log but not in
