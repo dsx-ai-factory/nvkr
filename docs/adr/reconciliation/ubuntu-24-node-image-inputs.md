@@ -4,15 +4,20 @@ The shared Calico vendor recipe now sets `CNI_DOCKERHUB_MIRROR=mirror.gcr.io`
 inside its declared command. The node-image catalog imports the shared fragment
 for release and diagnostic producers; the NVSentinel experiment keeps its own
 mirrored command. `TestNVKECalicoVendorMirror` covers the compiled vendor argv for
-both architectures and its changed vendor identity. On 2026-11-05, anonymous read-only
+both architectures and its changed vendor identity. On 2026-11-05, NVKR's anonymous read-only
 `crane digest` and `crane manifest` checks matched all 11 Docker Hub Calico image
 digests in each architecture's v3.30.1 lock (22 exact references) at NVKE
 `2cfd00081b468d85a4894ec17e9deac13c9d8169`; the experiment's older Calico source
-has identical image locks. These checks establish manifest availability at that
-time, not blob completeness or a successful bundle, disk bake or hosted Run.
-This is best-effort: NVKE falls back to Docker Hub on a mirror miss, retries the
-canonical set on mirrored-transfer failure, and leaves Quay untouched. The public
-mirror has no retention guarantee. Registry credentials remain outside source
+has identical image locks. These probes establish manifest availability at that
+time; they did not exercise fallback, blob completeness, bundling, a disk bake or a hosted Run.
+
+The fallback rules come from the pinned NVKE consumer: it
+[retains Docker Hub on a mirror miss](https://github.com/dsx-ai-factory/nvke/blob/2cfd00081b468d85a4894ec17e9deac13c9d8169/os-image/packages/cni-common/bundle-lib.sh#L273-L291),
+[retries the canonical set on mirrored-transfer failure](https://github.com/dsx-ai-factory/nvke/blob/2cfd00081b468d85a4894ec17e9deac13c9d8169/os-image/packages/cni-common/bundle-lib.sh#L311-L328),
+and [leaves Quay untouched](https://github.com/dsx-ai-factory/nvke/blob/2cfd00081b468d85a4894ec17e9deac13c9d8169/os-image/packages/cni-common/bundle-lib.sh#L126-L135).
+The experiment's older pin has the same
+[digest selection and canonical fallback](https://github.com/dsx-ai-factory/nvke/blob/ff21ba8c07cafff74b68e238a8876af11e5beded/os-image/packages/cni-common/bundle-lib.sh#L183-L238).
+This is best-effort; the public mirror has no retention guarantee. Registry credentials remain outside source
 vendoring; [issue 412](https://github.com/dsx-ai-factory/nvkr/issues/412) tracks the
 durable authenticated acquisition and offline bundle mode. This mitigation
 references [issue 403](https://github.com/dsx-ai-factory/nvkr/issues/403) without
