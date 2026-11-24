@@ -85,11 +85,11 @@ integration results remain outside product lifecycle and v1 qualification
 acceptance (ADR-16/18).
 
 [ADR-24](adr/0024-imported-validator-catalog.md) separates imported-validator discovery from upstream
-test ownership and binds named artifact roles through explicit diagnostic profiles. The provisional CLI
-slice implements strict loading/discovery and frozen local-plan dispatch through the existing execution
-owners; native upstream catalog execution remains unexercised. Shared schema stabilization, published
-adapters and controller/chart integration are deferred. Existing CLI and legacy validation diagnostics
-retain their separate admission and result contracts; catalog registration grants no qualification authority.
+test ownership: registered container commands select named outputs of a completed Run and execute in one
+admitted TestEnvironment through a single executor with fixed isolation. Implementation status,
+including the provisional slice it replaces, is recorded in [reconciliation](adr/reconciliation/adr-24.md).
+Existing CLI and legacy validation diagnostics retain their separate admission and result contracts;
+catalog registration grants no qualification authority.
 
 [ADR-26](adr/0026-definition-composition.md) designs composite Definitions, which release the outputs of
 several digest-pinned member Definitions through one Plan, Run and Release. Its
@@ -495,7 +495,7 @@ hosted execution, registry services, signing or operational release acceptance (
 | Artifact | Producer/packager → consumer | Exact blob or OCI bytes, separate from logical build identity |
 | Release content and evidence | Release/transport owners → verifier | Noncircular exact content subject and typed proof closure |
 | External test outputs | External producer → descriptive consumer | `testresults` owns bounded descriptions/serialization only; no execution, authentication or qualification authority |
-| Diagnostic validation profile | User → `validation` → supported producer | Separate check-instance/suite/harness selection; `lifecycle` authenticates product and tool publications and exports exact executable members; diagnostic execution cannot issue qualification authority |
+| Diagnostic validation selection | User → `validation` → completed Run | Registered suites bound to exact Run outputs in one TestEnvironment (ADR-24); the legacy profile route keeps separate check-instance/suite/harness selection; `lifecycle` authenticates product and tool publications and exports exact executable members; diagnostic execution cannot issue qualification authority |
 | Authenticated receipts | Owning verifier → authorized operation | Bound to exact subjects, roles, and policy; cannot be recreated by parsing |
 
 All structured identities use ADR-01's canonical codec and named digest families. The codec uses its specified
@@ -520,7 +520,7 @@ in reconciliation; a facade alone does not discharge that debt.
 | Authored input admission | `definition` | Strictly decode and validate Definition/Environment, own their canonical identity and independent copies |
 | Public lifecycle | `lifecycle` | Freeze attempts from complete plans, persist outcomes, expose Run and Release views; delegate authority |
 | Compilation and execution | `factory` | Compile authored inputs into complete plans; render and execute the same operations with one producer instruction; observe typed payloads against exact planned producers |
-| Diagnostic checks | `validation`, `conformance`, `testresults` | Explicit profile dispatch, local suite/harness capture and descriptive outputs; no qualification authority (ADR-16 §6) |
+| Diagnostic checks | `validation`, `conformance`, `testresults` | Explicit selection and profile dispatch, local suite/harness capture and descriptive outputs; no qualification authority (ADR-16 §6) |
 | Plan inspection | `planview` | Validate through factory, retain immutable descriptive snapshots, render linked graphs and compare named Plan fields without granting execution or evidence authority |
 | Producer execution | `pipeline` | Shared producer launcher, source snapshots, runtime observations, artifact-byte verification and provider transport |
 | Trust and signing | `trust`, `sign` | Authenticate documents, tools and signer policies |
