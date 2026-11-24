@@ -23,7 +23,8 @@ case ${#catalogs[@]} in
     ;;
   1) printf '%s\n' "${catalogs[0]}" ;;
   *)
-    echo '[NVKR-E-INVALID-CATALOG] ambiguous NVKE OS catalog layout in candidate checkout' >&2
+    printf '[NVKR-E-INVALID-CATALOG] ambiguous NVKE OS catalog layout: %s and %s\n' \
+      "${catalogs[0]}/registry.yaml" "${catalogs[1]}/registry.yaml" >&2
     exit 1
     ;;
 esac
