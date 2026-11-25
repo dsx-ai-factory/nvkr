@@ -80,9 +80,14 @@ fresh local products on a disposable GitHub-hosted AMD64 runner and invokes the
 existing native Go site/tenant workload and DNS tests. Natural tenant deletion and
 VM/backend/network cleanup must join before success. Product bytes and raw
 deployment captures stay private on that runner; no products are published or
-uploaded. The ARM64 dispatch-and-consume nightly is retired. These trusted-code
-integration results remain outside product lifecycle and v1 qualification
-acceptance (ADR-16/18).
+uploaded. The ARM64 dispatch-and-consume nightly is retired. A second,
+dispatch-only workflow, the NVKE hardware E2E, runs NVKE's hardware site-controller suite on real
+hardware, for a dispatched NVKE commit and version, against a plan NVKE's planner generates each run
+(refused unless it names that commit), with either NVKR-built outputs or the amd64 stream's artifacts built from
+the subject commit and labelled NVKE-built; its credentials live in a protected
+environment and its run summary asserts `qualificationAuthority: "none"`. These
+trusted-code integration results remain outside product lifecycle and v1
+qualification acceptance (ADR-16/18).
 
 [ADR-24](adr/0024-imported-validator-catalog.md) separates imported-validator discovery from upstream
 test ownership: registered container commands select named outputs of a completed Run and execute in one

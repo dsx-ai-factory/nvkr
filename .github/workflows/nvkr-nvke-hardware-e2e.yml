@@ -3,15 +3,53 @@
 ---
 name: NVKR NVKE hardware E2E
 
-# Placeholder that registers this dispatch-only workflow on the default branch so a branch that
-# carries the real workflow can be dispatched. The default-branch copy takes no machine, holds no
-# credentials and always fails; the real workflow replaces it.
+# Runs NVKE's hardware site-controller suite on real hardware, from an NVKE checkout at a
+# pinned harness commit, against the plan NVKE's own `qualify plan` generates in the first job
+# for the dispatched subject (ADR-18). Nothing here qualifies, gates or releases anything: the run
+# records a summary whose qualificationAuthority is "none", and the final job refuses to pass unless
+# that summary meets its contract.
+#
+# The subject is named by two required inputs, with no default: the NVKE commit and the version tag
+# at it. `qualify plan` derives the commit from the version, and a commit can carry several tags, so
+# the plan is generated for the version and the run is refused unless the plan names the commit.
+#
+# What the node runs is chosen by the required artifact-source input, with no default:
+#
+#   nvkr-outputs   the controller, capi-provisioned and nvkectl images NVKR built, pulled by the
+#                  digest the outputs manifest names, and the node image the manifest names at an
+#                  https URL, checked by the method its entry names before any machine is taken.
+#                  A node image from an NVKR release is NVKR-built. One another CI run published,
+#                  such as an NVKE release image, is not, and the summary says so.
+#   build-subject  the controller, capi-provisioned and nvkectl built inside the job from the
+#                  subject commit, and the node image the plan itself names. Nothing is NVKR-built,
+#                  and the summary says so. It runs the amd64 stream only, because NVKE's arm64 image
+#                  build needs emulation the hosted AMD64 runner lacks, so its summary names fewer legs
+#                  than the plan has streams and is never complete.
+#
+# Either way the deploy path, the imager EFI and the site profiles are NVKE's. Each stream holds two
+# CPU machines and one GPU machine for about an hour on the hardware site NVKE's own lanes use. Never
+# cancel a run in flight: teardown is the suite's, and a killed runner leaks the instances.
+#
+# A dry run joins no Teleport and takes no machine, but it is not credential-free. A job's permissions
+# and environment cannot depend on an input, so a dry run's leg still enters the protected environment
+# (and waits for its approval), holds the permission to request an OIDC token that it never requests,
+# and reads the environment's variables. It runs no spec and reaches no hardware site: it shows that the
+# plan, the staged inputs, the config and the specs selected for the stage agree. The node image
+# publisher's dry run is its own job, without the environment or the token permission.
 
 'on':
   workflow_dispatch:
     inputs:
+      subject-commit:
+        description: The NVKE commit under test, a full lower-case 40-hex commit. The plan is generated for subject-version and the run is refused unless the plan names this commit.
+        type: string
+        required: true
+      subject-version:
+        description: The NVKE version tag at that commit, such as v0.24.0-beta.12. Several tags can point at one commit, so the commit alone cannot pick the plan.
+        type: string
+        required: true
       artifact-source:
-        description: nvkr-outputs runs NVKR-built artifacts. build-subject builds them from the subject commit in the job and says nothing is NVKR-built.
+        description: nvkr-outputs runs NVKR-built artifacts. build-subject builds them from the subject commit in the job, runs the amd64 stream only, and says nothing is NVKR-built.
         type: choice
         required: true
         options: [nvkr-outputs, build-subject]
@@ -25,7 +63,7 @@ name: NVKR NVKE hardware E2E
         type: string
         default: ''
       harness-commit:
-        description: The NVKE commit whose suite and harness run. Empty means the plan fixture's commit. For build-subject it must be that commit.
+        description: The NVKE commit whose suite and harness run. Empty means subject-commit. For build-subject it must be subject-commit.
         type: string
         default: ''
       node-user:
@@ -51,13 +89,778 @@ name: NVKR NVKE hardware E2E
 
 permissions: {}
 
+# A dry run takes no machine, so it does not wait behind a real run.
+concurrency:
+  group: nvkr-nvke-hardware-e2e-${{ github.ref }}-${{ inputs.dry-run && 'dry-run' || 'run' }}
+  cancel-in-progress: false
+
 jobs:
-  placeholder:
-    name: Refuse the placeholder
+  plan:
+    name: Plan the run
+    if: github.repository == 'dsx-ai-factory/nvkr'
     runs-on: ubuntu-24.04
-    timeout-minutes: 5
+    timeout-minutes: 30
+    permissions:
+      contents: read
+    outputs:
+      matrix: ${{ steps.matrix.outputs.matrix }}
+      harness-commit: ${{ steps.commits.outputs.harness }}
+      subject-commit: ${{ steps.commits.outputs.subject }}
+      qualify-sha256: ${{ steps.qualify.outputs.sha256 }}
+    env:
+      SOURCE: ${{ inputs.artifact-source }}
+      MANIFEST: ${{ inputs.outputs-manifest }}
+      SUBJECT_COMMIT_INPUT: ${{ inputs.subject-commit }}
+      SUBJECT_VERSION: ${{ inputs.subject-version }}
+      HARNESS_INPUT: ${{ inputs.harness-commit }}
+      SKEW: ${{ inputs.allow-node-image-version-skew && 'true' || 'false' }}
+      DRY_RUN: ${{ inputs.dry-run && 'true' || 'false' }}
+      # How much of NVKE's matrix the plan covers. The substitution script requires the plan to say it.
+      SCOPE: golden-path
     steps:
-      - name: Refuse
+      # Everything that can be refused before a checkout or a machine is refused here.
+      - name: Admit the dispatch
+        env:
+          REF: ${{ github.ref }}
+          RUN_ATTEMPT: ${{ github.run_attempt }}
         run: |
-          echo "::error::this is the default-branch placeholder; dispatch the branch that carries the real workflow"
-          exit 1
+          set -euo pipefail
+          die() { echo "::error::$*"; exit 1; }
+          case "$SOURCE" in
+            nvkr-outputs | build-subject) ;;
+            *) die "artifact-source is '$SOURCE'; it must be nvkr-outputs or build-subject" ;;
+          esac
+          [[ "$SUBJECT_COMMIT_INPUT" =~ ^[0-9a-f]{40}$ ]] ||
+            die "subject-commit must be a full lower-case 40-hex NVKE commit"
+          [[ "$SUBJECT_VERSION" =~ ^v[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.]+)?$ ]] ||
+            die "subject-version must be an NVKE version tag such as v0.24.0-beta.12"
+          if [ "$DRY_RUN" != true ]; then
+            # The Teleport join token admits refs/heads/main only, and a re-run of failed legs would
+            # mix evidence from two attempts into one summary.
+            # TEMPORARY: remove the feature-branch allowance before merge.
+            [ "$REF" = refs/heads/main ] || [ "$REF" = refs/heads/pull-request/560 ] ||
+              die "a real run starts from refs/heads/main, not $REF"
+            [ "$RUN_ATTEMPT" = 1 ] || die "re-running jobs would mix two attempts; dispatch a new run"
+          fi
+          if [ "$SOURCE" = nvkr-outputs ]; then
+            [[ "$MANIFEST" =~ ^inputs/qualification/[A-Za-z0-9._-]+\.json$ ]] ||
+              die "nvkr-outputs needs outputs-manifest to be a .json file directly under inputs/qualification/"
+          else
+            [ -z "$MANIFEST" ] || die "outputs-manifest is only for nvkr-outputs: a build from the subject commit uses none"
+            [ "$SKEW" != true ] || die "allow-node-image-version-skew is only for nvkr-outputs: a build from the subject commit uses the plan's own node image"
+          fi
+
+      - name: Check out NVKR
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          path: nvkr
+          persist-credentials: false
+
+      # The dispatch names the subject commit. The harness commit is the same commit unless a caller asks
+      # for another, and a build from the subject commit cannot ask: it builds from the checkout the
+      # harness runs in.
+      - name: Resolve the subject and harness commits
+        id: commits
+        run: |
+          set -euo pipefail
+          die() { echo "::error::$*"; exit 1; }
+          subject="$SUBJECT_COMMIT_INPUT"
+          harness="${HARNESS_INPUT:-$subject}"
+          [[ "$harness" =~ ^[0-9a-f]{40}$ ]] || die "harness-commit must be empty or a full lower-case 40-hex commit"
+          if [ "$SOURCE" = build-subject ] && [ "$harness" != "$subject" ]; then
+            die "a build from the subject commit builds from the harness checkout, so harness-commit must be the subject commit $subject"
+          fi
+          printf 'subject=%s\nharness=%s\n' "$subject" "$harness" >> "$GITHUB_OUTPUT"
+          printf 'Subject %s at %s, harness %s, artifact source %s\n' "$SUBJECT_VERSION" "$subject" "$harness" "$SOURCE" >> "$GITHUB_STEP_SUMMARY"
+
+      # Every tag and the history behind it: the plan describes each component against its own tags,
+      # and the deploy path is exported from the subject commit's tree.
+      - name: Check out the NVKE harness
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          repository: dsx-ai-factory/nvke
+          ref: ${{ steps.commits.outputs.harness }}
+          path: nvke
+          fetch-depth: 0
+          fetch-tags: true
+          persist-credentials: false
+
+      - name: Check the harness checkout holds the subject commit
+        env:
+          HARNESS: ${{ steps.commits.outputs.harness }}
+          SUBJECT: ${{ steps.commits.outputs.subject }}
+        run: |
+          set -euo pipefail
+          [ "$(git -C nvke rev-parse HEAD)" = "$HARNESS" ] || { echo "::error::the checkout is not at $HARNESS"; exit 1; }
+          git -C nvke cat-file -e "${SUBJECT}^{commit}" ||
+            { echo "::error::the harness checkout at $HARNESS does not contain the subject commit $SUBJECT; the deploy path is exported from it"; exit 1; }
+
+      - name: Set up Go
+        uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version-file: nvke/go.work
+          cache: false
+
+      # Built once from the harness checkout, so the plan job and every leg run the same tool.
+      - name: Build qualify
+        id: qualify
+        working-directory: nvke
+        run: |
+          set -euo pipefail
+          mkdir -p "$GITHUB_WORKSPACE/qualify-bin"
+          go build -trimpath -o "$GITHUB_WORKSPACE/qualify-bin/qualify" ./release/cmd/qualify
+          printf 'sha256=%s\n' "$(sha256sum "$GITHUB_WORKSPACE/qualify-bin/qualify" | cut -d' ' -f1)" >> "$GITHUB_OUTPUT"
+
+      # NVKE's own planner, run for the version the dispatch named. It reads git and the harness
+      # checkout's qualification spec, release registry and release policy, and needs no credentials.
+      # commitDescribe is NVKE's default, set here so a changed default cannot change the plan. The
+      # registry names nvcr.io references through QUALIFY_E2E_NGC_ORG, which this job is not given: the
+      # placeholder keeps the organization out of every artifact, and a run of NVKR outputs whose plan
+      # still names nvcr.io after substitution is refused.
+      - name: Generate the plan
+        working-directory: nvke
+        env:
+          QUALIFY_E2E_NGC_ORG: '<ngc-org>'
+        run: |
+          set -euo pipefail
+          mkdir -p "$GITHUB_WORKSPACE/generated-plan"
+          "$GITHUB_WORKSPACE/qualify-bin/qualify" plan \
+            --subject nvke --scope "$SCOPE" --version "$SUBJECT_VERSION" --resolution commitDescribe \
+            --output "$GITHUB_WORKSPACE/generated-plan/plan.json"
+
+      # The plan must name the commit the dispatch named. nvkr-outputs swaps NVKR's references into it;
+      # build-subject keeps it byte for byte.
+      - name: Prepare the plan
+        env:
+          SUBJECT: ${{ steps.commits.outputs.subject }}
+        run: |
+          set -euo pipefail
+          subject=(--subject-commit "$SUBJECT" --subject-version "$SUBJECT_VERSION" --scope "$SCOPE")
+          if [ "$SOURCE" = build-subject ]; then
+            nvkr/scripts/hardware-e2e-substitute-plan.sh --build-subject "${subject[@]}" generated-plan/plan.json plan-out
+          else
+            flags=()
+            if [ "$SKEW" = true ]; then flags+=(--allow-node-image-version-skew); fi
+            nvkr/scripts/hardware-e2e-substitute-plan.sh ${flags[@]+"${flags[@]}"} "${subject[@]}" \
+              generated-plan/plan.json "nvkr/$MANIFEST" plan-out
+          fi
+
+      # NVKE's site-input build makes the arm64 images with Docker on this AMD64 runner, which has no
+      # arm64 emulation, so a build from the subject commit dispatches the amd64 stream only. The run
+      # summary then names fewer legs than the plan has streams and says the run is not complete.
+      # NVKR outputs are pulled, not built, and run both streams.
+      - name: Build the matrix
+        id: matrix
+        run: |
+          set -euo pipefail
+          flags=()
+          if [ "$SOURCE" = build-subject ]; then
+            flags+=(--amd64-only)
+            echo 'A build from the subject commit dispatches the amd64 stream only, so this run is not complete.' >> "$GITHUB_STEP_SUMMARY"
+          fi
+          matrix="$(nvkr/scripts/hardware-e2e-matrix.sh ${flags[@]+"${flags[@]}"} "$GITHUB_WORKSPACE/nvke/release/hack/qualify-e2e.sh" "$GITHUB_WORKSPACE/plan-out/plan.json")"
+          printf 'matrix=%s\n' "$matrix" >> "$GITHUB_OUTPUT"
+          jq . <<<"$matrix"
+
+      - name: Upload the plan
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: nvkr-hardware-e2e-plan-${{ github.run_id }}
+          path: plan-out
+          if-no-files-found: error
+          retention-days: 30
+
+      # The plan as NVKE generated it, before any substitution. It is not committed anywhere, so this is
+      # the bytes the summary's generatedSha256 names.
+      - name: Upload the plan as generated
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: nvkr-hardware-e2e-generated-plan-${{ github.run_id }}
+          path: generated-plan/plan.json
+          if-no-files-found: error
+          retention-days: 30
+
+      - name: Upload qualify
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: nvkr-hardware-e2e-qualify-${{ github.run_id }}
+          path: qualify-bin/qualify
+          if-no-files-found: error
+          retention-days: 7
+
+  # Checks each node image the plan names before any machine is taken, by the method the outputs
+  # manifest names for it. http-get fetches the URL exactly as the hardware site's imager will. s3-readback
+  # fetches nothing and records what the publication run reported, because the HTTPS front end can
+  # refuse a hosted runner's address; the summary says this run did not observe it. Neither shows that
+  # the hardware site can fetch the image: the provision stage does. A build from the subject commit uses the
+  # plan's own node images, which NVKR did not check.
+  verify-node-images:
+    name: Check the node images
+    needs: plan
+    if: inputs.artifact-source == 'nvkr-outputs'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 90
+    permissions:
+      contents: read
+    steps:
+      - name: Check out NVKR
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          path: nvkr
+          persist-credentials: false
+
+      - name: Download the plan
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: nvkr-hardware-e2e-plan-${{ github.run_id }}
+          path: plan-out
+
+      # The checks are NVKR's own Go, built from this checkout with its pinned toolchain, so no
+      # interpreter and no other project's toolchain stands between this job and the bytes it checks.
+      - name: Set up Go for the NVKR checks
+        uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version-file: nvkr/.go-version
+          cache: false
+
+      - name: Build the NVKR checks
+        working-directory: nvkr
+        env:
+          GOTOOLCHAIN: local
+          CGO_ENABLED: '0'
+        run: |
+          set -euo pipefail
+          mkdir -p "$GITHUB_WORKSPACE/hwe2e-bin"
+          go build -trimpath -o "$GITHUB_WORKSPACE/hwe2e-bin/hwe2e" ./internal/hwe2e
+
+      - name: Check each node image
+        run: |
+          set -euo pipefail
+          mkdir checks
+          for slot in os-image-amd64 os-image-arm64; do
+            "$GITHUB_WORKSPACE/hwe2e-bin/hwe2e" check-node-image --slot "$slot" --substitutions plan-out/substitutions.json --out "checks/$slot.json"
+          done
+
+      - name: Upload the node image checks
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: nvkr-hardware-e2e-node-image-checks-${{ github.run_id }}
+          path: checks
+          if-no-files-found: error
+          retention-days: 30
+
+  hardware-e2e:
+    name: ${{ matrix.stream }}${{ inputs.dry-run && ' (dry run)' || '' }}
+    needs: [plan, verify-node-images]
+    # verify-node-images is skipped for a build from the subject commit, which would skip this job too.
+    # NVKR outputs need it to have succeeded: a skipped fetch check is not a passed one.
+    if: ${{ !cancelled() && needs.plan.result == 'success' && (inputs.artifact-source == 'build-subject' || needs.verify-node-images.result == 'success') }}
+    strategy:
+      # A cancelled sibling dies before its teardown and leaks its instances.
+      fail-fast: false
+      # NVKE's lanes share this hardware site, which fits three runs at once, and GitHub concurrency
+      # cannot count across repositories. The matrix lists amd64 before arm64.
+      max-parallel: 1
+      matrix: ${{ fromJSON(needs.plan.outputs.matrix) }}
+    runs-on: ubuntu-24.04
+    # Required reviewers. Every credential below is scoped to it.
+    environment: nvke-hardware-e2e
+    # The suite's own timeout plus cleanup and setup, from the harness matrix. The go test timeout is
+    # shorter so Ginkgo can tear the node down before this kills the runner.
+    timeout-minutes: ${{ matrix.job_timeout_minutes }}
+    # The account every leg baked into its machines, read where the environment's variables are visible.
+    # The summary job has no environment, so it cannot read them itself.
+    outputs:
+      node-user: ${{ steps.node-user.outputs.value }}
+    permissions:
+      contents: read
+      # The GHCR pull of NVKR-built images.
+      packages: read
+      # The Teleport join.
+      id-token: write
+    env:
+      SOURCE: ${{ inputs.artifact-source }}
+      DRY_RUN: ${{ inputs.dry-run && 'true' || 'false' }}
+      SITE_STAGE: ${{ inputs.stage }}
+      KEEP_SITE: ${{ inputs.keep-site && 'true' || 'false' }}
+      HARNESS_COMMIT: ${{ needs.plan.outputs.harness-commit }}
+      SUBJECT_COMMIT: ${{ needs.plan.outputs.subject-commit }}
+      QUALIFY_SHA256: ${{ needs.plan.outputs.qualify-sha256 }}
+      COMBINATION: ${{ matrix.combination }}
+      STREAM: ${{ matrix.stream }}
+      MATRIX_ARCH: ${{ matrix.arch }}
+      # What the harness reads and the lane does not use. Empty is a choice the harness accepts and
+      # unset is not.
+      QUALIFY_E2E_SITE_CONTROLLER_VERSION: ''
+      SITE_DEPLOY_PATH_REF: ''
+      NVKE_CONTROLLER_NAMESPACE: ''
+      NVKE_CONTROLLER_SERVICE: ''
+      TENANT_GPU_RUNTIME: 'false'
+      KEEP_TENANT: 'false'
+      NODE_KEY_DIR: ''
+      NGC_API_KEY: ''
+      # ghcr, so the harness checks nothing against a registry this lane does not use. The staging
+      # scripts replace SITE_IMAGES with a localhost/ name no registry answers to.
+      SITE_IMAGE_REGISTRY: ghcr
+      # NVKE's release/registry.yaml names the registry as oci://nvcr.io/${QUALIFY_E2E_NGC_ORG} and
+      # `qualify` fails to load it without the variable.
+      QUALIFY_E2E_NGC_ORG: ${{ vars.QUALIFY_E2E_NGC_ORG }}
+      # Empty is what the OSS os-image releases bake.
+      NODE_USER: ${{ inputs.node-user || vars.QUALIFY_E2E_NODE_USER }}
+      # Under the workspace, so nothing from an earlier job can be staged.
+      SITE_INPUTS: ${{ github.workspace }}/.site-inputs
+      # Integration boundary. The pinned NVKE harness reads the FORGE_* names below, and its provider
+      # is "forge", so they stay as NVKE spells them. They appear only in this block, in the steps
+      # that pass them on, and in the matrix script's provider filter; every other name here is NVKR's,
+      # including the HARDWARE_E2E_* repository variables and secrets they are read from.
+      FORGE_TELEPORT_PROXY: ${{ vars.HARDWARE_E2E_TELEPORT_PROXY }}
+      # Names a Teleport provision token whose GitHub allow rule covers this repository. NVKE's token
+      # admits only dsx-ai-factory/nvke.
+      FORGE_TELEPORT_JOIN_TOKEN: ${{ vars.HARDWARE_E2E_TELEPORT_JOIN_TOKEN }}
+      # Secrets rather than variables so the job-level env header masks them.
+      FORGE_JUMP_HOST: ${{ secrets.HARDWARE_E2E_JUMP_HOST }}
+      FORGE_SITE_2_JUMP_HOST: ${{ secrets.HARDWARE_E2E_SITE_2_JUMP_HOST }}
+      # The only login the bot's role grants on the jump hosts.
+      FORGE_TELEPORT_LOGIN: root
+      FORGE_SITE_2_TELEPORT_LOGIN: root
+      # Read by controller/test/e2e/environments/forge.yaml.
+      FORGE_ORG_ID: ${{ vars.HARDWARE_E2E_ORG_ID }}
+      FORGE_SITE_ID: ${{ vars.HARDWARE_E2E_SITE_ID }}
+      FORGE_VPC_ID: ${{ vars.HARDWARE_E2E_VPC_ID }}
+      FORGE_SUBNET_ID: ${{ vars.HARDWARE_E2E_SUBNET_ID }}
+      FORGE_SSH_KEY_GROUP_ID: ${{ vars.HARDWARE_E2E_SSH_KEY_GROUP_ID }}
+      FORGE_INSTANCE_TYPE_CPU_ID: ${{ vars.HARDWARE_E2E_INSTANCE_TYPE_CPU_ID }}
+      FORGE_INSTANCE_TYPE_GPU_ID: ${{ vars.HARDWARE_E2E_INSTANCE_TYPE_GPU_ID }}
+      FORGE_SITE_2_SITE_ID: ${{ vars.HARDWARE_E2E_SITE_2_SITE_ID }}
+      FORGE_SITE_2_VPC_ID: ${{ vars.HARDWARE_E2E_SITE_2_VPC_ID }}
+      FORGE_SITE_2_VPC_PREFIX_ID: ${{ vars.HARDWARE_E2E_SITE_2_VPC_PREFIX_ID }}
+      FORGE_SITE_2_SSH_KEY_GROUP_ID: ${{ vars.HARDWARE_E2E_SITE_2_SSH_KEY_GROUP_ID }}
+      FORGE_SITE_2_INSTANCE_TYPE_CPU_AMD64_ID: ${{ vars.HARDWARE_E2E_SITE_2_INSTANCE_TYPE_CPU_AMD64_ID }}
+      FORGE_SITE_2_INSTANCE_TYPE_CPU_ARM64_ID: ${{ vars.HARDWARE_E2E_SITE_2_INSTANCE_TYPE_CPU_ARM64_ID }}
+      FORGE_SITE_2_INSTANCE_TYPE_GPU_GB200_ID: ${{ vars.HARDWARE_E2E_SITE_2_INSTANCE_TYPE_GPU_GB200_ID }}
+    steps:
+      # NVKE measured that a GitHub-hosted runner reaches both the hardware site's API and the Teleport proxy
+      # (forge-connectivity-probe.yml). The leg is stamped as soon as NVKR's scripts are checked out, so
+      # the recorded start is the leg's own and not the plan job's.
+      #
+      # The plan job refuses a later attempt, but GitHub's "re-run failed jobs" does not run it again,
+      # so each leg refuses one itself: a re-run leg would sit beside the first attempt's legs in one
+      # summary.
+      - name: Admit a GitHub-hosted AMD64 runner and the first attempt
+        run: |
+          set -euo pipefail
+          test "$RUNNER_ENVIRONMENT" = github-hosted
+          test "$(uname -s)/$(uname -m)" = Linux/x86_64
+          if [ "$DRY_RUN" != true ] && [ "$GITHUB_RUN_ATTEMPT" != 1 ]; then
+            echo "::error::a real run is its first attempt only; dispatch a new run instead of re-running a leg"
+            exit 1
+          fi
+          df -Pm "$GITHUB_WORKSPACE"
+
+      - name: Check out NVKR
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          path: nvkr
+          persist-credentials: false
+
+      - name: Stamp the leg
+        run: |
+          set -euo pipefail
+          mkdir leg
+          nvkr/scripts/hardware-e2e-summary.sh leg leg "$STREAM" "$COMBINATION" "$MATRIX_ARCH"
+
+      # Built before the NVKE harness's Go takes the path, with NVKR's own pinned toolchain: the JUnit
+      # checks below are NVKR's and run the same binary on every leg.
+      - name: Set up Go for the NVKR checks
+        uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version-file: nvkr/.go-version
+          cache: false
+
+      - name: Build the NVKR checks
+        working-directory: nvkr
+        env:
+          GOTOOLCHAIN: local
+          CGO_ENABLED: '0'
+        run: |
+          set -euo pipefail
+          mkdir -p "$GITHUB_WORKSPACE/hwe2e-bin"
+          go build -trimpath -o "$GITHUB_WORKSPACE/hwe2e-bin/hwe2e" ./internal/hwe2e
+
+      # Empty is valid: the OSS os-image releases bake no account. Anything but a plain account name is
+      # refused, so the value can neither carry a second output line nor name something else.
+      - name: Publish the node account
+        id: node-user
+        run: |
+          set -euo pipefail
+          if [[ ! $NODE_USER =~ ^[A-Za-z0-9._-]*$ ]]; then
+            echo "::error::the node account must be letters, digits, dot, underscore or hyphen"
+            exit 1
+          fi
+          printf 'value=%s\n' "$NODE_USER" >> "$GITHUB_OUTPUT"
+
+      # At the harness commit, with every tag: the deploy path is exported from the subject commit's
+      # tree, or from the controller/<version> tag, in this clone.
+      - name: Check out the NVKE harness
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          repository: dsx-ai-factory/nvke
+          ref: ${{ needs.plan.outputs.harness-commit }}
+          path: nvke
+          fetch-depth: 0
+          fetch-tags: true
+          persist-credentials: false
+
+      - name: Set up Go
+        uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version-file: nvke/go.work
+          cache: false
+
+      - name: Download the plan
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: nvkr-hardware-e2e-plan-${{ github.run_id }}
+          path: plan-out
+
+      - name: Download qualify
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: nvkr-hardware-e2e-qualify-${{ github.run_id }}
+          path: qualify-bin
+
+      # Each check costs a second and saves an hour: everything here would otherwise fail after a
+      # machine exists.
+      - name: Check the leg is what the plan job prepared
+        run: |
+          set -euo pipefail
+          [ "$(git -C nvke rev-parse HEAD)" = "$HARNESS_COMMIT" ] || { echo "::error::the harness checkout is not at $HARNESS_COMMIT"; exit 1; }
+          git -C nvke cat-file -e "${SUBJECT_COMMIT}^{commit}" || { echo "::error::the harness checkout lacks the subject commit"; exit 1; }
+          have="$(sha256sum qualify-bin/qualify | cut -d' ' -f1)"
+          [ "$have" = "$QUALIFY_SHA256" ] || { echo "::error::qualify is $have, not the $QUALIFY_SHA256 the plan job built"; exit 1; }
+          chmod 0755 qualify-bin/qualify
+
+      # This stream's versions, architecture, GPU and provider, from its entry in the plan.
+      - name: Read the stream from the plan
+        run: nvke/release/hack/qualify-e2e.sh stream-env "$GITHUB_WORKSPACE/plan-out/plan.json" "$COMBINATION" "$STREAM"
+
+      # Confirms every artifact the plan names is published, before a machine is taken. Off unless
+      # asked for: it needs NVKE's NGC credentials, and what it does with a plan that names NVKR's
+      # references has not been exercised.
+      - name: Check every artifact the plan names
+        if: inputs.verify-plan
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          NGC_API_KEY: ${{ secrets.NGC_API_KEY }}
+        working-directory: nvke
+        run: |
+          "$GITHUB_WORKSPACE/qualify-bin/qualify" verify --plan "$GITHUB_WORKSPACE/plan-out/plan.json" --wait 0
+
+      - name: Resolve the stream
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: nvke/release/hack/qualify-e2e.sh resolve
+
+      - name: Log in to GHCR
+        if: inputs.artifact-source == 'nvkr-outputs'
+        uses: docker/login-action@dbcb813823bdd20940b903addbd779551569679f # v4.6.0
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Read the pinned ORAS version
+        id: oras
+        if: inputs.artifact-source == 'nvkr-outputs'
+        run: echo "version=$(make -C nvke --no-print-directory print-ORAS_VERSION)" >> "$GITHUB_OUTPUT"
+
+      - name: Set up ORAS
+        if: inputs.artifact-source == 'nvkr-outputs'
+        uses: oras-project/setup-oras@005458ad77f1c8facd38a094e4af2e69e5607ff4 # v2.0.2
+        with:
+          version: ${{ steps.oras.outputs.version }}
+
+      # The images NVKR built, pulled by digest and saved as the archives the suite loads onto the node.
+      - name: Stage the NVKR-built inputs
+        if: inputs.artifact-source == 'nvkr-outputs'
+        run: |
+          set -euo pipefail
+          nvkr/scripts/hardware-e2e-stage-inputs.sh \
+            --arch "$ARCH" --harness "$GITHUB_WORKSPACE/nvke" \
+            --substitutions plan-out/substitutions.json \
+            --controller-version "$SITE_NVKE_CONTROLLER_VERSION" \
+            --capi-version "$CAPI_PROVISIONED_VERSION" --cli-version "$CLI_VERSION" \
+            --inputs "$SITE_INPUTS" --staged leg/staged.json --step-env "$GITHUB_ENV"
+
+      # The controller, capi-provisioned and nvkectl built from the subject commit by NVKE's own build.
+      - name: Build the inputs from the subject commit
+        if: inputs.artifact-source == 'build-subject'
+        run: |
+          set -euo pipefail
+          nvkr/scripts/hardware-e2e-build-subject.sh \
+            --arch "$ARCH" --harness "$GITHUB_WORKSPACE/nvke" --plan plan-out/plan.json \
+            --controller-version "$SITE_NVKE_CONTROLLER_VERSION" --capi-version "$CAPI_PROVISIONED_VERSION" \
+            --inputs "$SITE_INPUTS" --staged leg/staged.json --step-env "$GITHUB_ENV"
+
+      # Matched to the Teleport cluster's server version, with a committed digest, both from NVKE's
+      # make/tool-versions.mk.
+      - name: Install tsh and tbot
+        if: env.DRY_RUN != 'true'
+        run: |
+          set -euo pipefail
+          version="$(make -C nvke --no-print-directory print-TELEPORT_VERSION)"
+          expected="$(make -C nvke --no-print-directory print-TELEPORT_SHA256_AMD64)"
+          [ -n "$expected" ] || { echo "::error::no Teleport checksum pinned"; exit 1; }
+          tar="teleport-v${version}-linux-amd64-bin.tar.gz"
+          tmp="$(mktemp -d)"
+          curl -fsSL --connect-timeout 20 --max-time 300 --retry 8 --retry-all-errors --retry-max-time 240 \
+            -o "$tmp/$tar" "https://cdn.teleport.dev/$tar"
+          printf '%s  %s\n' "$expected" "$tmp/$tar" | sha256sum --check --strict -
+          tar -C "$tmp" -xzf "$tmp/$tar" teleport/tsh teleport/tbot
+          mkdir -p "$HOME/.local/bin"
+          install -m 0755 "$tmp/teleport/tsh" "$tmp/teleport/tbot" "$HOME/.local/bin/"
+          echo "$HOME/.local/bin" >> "$GITHUB_PATH"
+
+      # A daemon rather than one certificate: the cluster caps a certificate at two hours, which a full
+      # run outlives. tbot rewrites the identity every 20 minutes and the relay starts a fresh tsh per dial.
+      - name: Start the Teleport identity daemon
+        if: env.DRY_RUN != 'true'
+        env:
+          TBOT_DIR: ${{ runner.temp }}/tbot
+        run: |
+          set -euo pipefail
+          mkdir -p "$TBOT_DIR"
+          cat > "$RUNNER_TEMP/tbot.yaml" <<EOF
+          version: v2
+          proxy_server: ${FORGE_TELEPORT_PROXY}
+          onboarding:
+            join_method: github
+            token: ${FORGE_TELEPORT_JOIN_TOKEN}
+          storage:
+            type: memory
+          credential_lifetime:
+            ttl: 1h
+            renewal_interval: 20m
+          services:
+            - type: identity
+              destination:
+                type: directory
+                path: ${TBOT_DIR}
+          EOF
+          tbot start -c "$RUNNER_TEMP/tbot.yaml" >"$RUNNER_TEMP/tbot.log" 2>&1 &
+          echo $! > "$RUNNER_TEMP/tbot.pid"
+          for _ in $(seq 1 30); do
+            [ -s "$TBOT_DIR/identity" ] && break
+            sleep 2
+          done
+          if [ ! -s "$TBOT_DIR/identity" ]; then
+            echo "::error::tbot wrote no identity in 60s; the run cannot reach the jump host"
+            sed 's/^/  /' "$RUNNER_TEMP/tbot.log"
+            exit 1
+          fi
+          {
+            echo "TELEPORT_PROXY=$FORGE_TELEPORT_PROXY"
+            echo "TELEPORT_IDENTITY_FILE=$TBOT_DIR/identity"
+          } >> "$GITHUB_ENV"
+          tsh --proxy "$FORGE_TELEPORT_PROXY" --identity "$TBOT_DIR/identity" status
+
+      # The repositories have to be the ones the staging step named: the node's containerd knows each
+      # image only by the name inside its archive.
+      - name: Write the e2e config
+        run: nvke/release/hack/qualify-e2e.sh config
+
+      # The specs this leg selects, listed with the same label filter and flags as the real run and no
+      # machine. The real run's JUnit is checked against this list afterwards.
+      - name: List the specs the run selects
+        working-directory: nvke/controller/test/e2e
+        run: |
+          set -euo pipefail
+          go test -v -timeout 30m . -args \
+            -ginkgo.dry-run \
+            -ginkgo.label-filter="site-controller && !${SITE_TENANT_EXCLUDE}" \
+            -ginkgo.junit-report="$GITHUB_WORKSPACE/leg/dry-run.junit.xml" \
+            -ginkgo.no-color \
+            -e2e.config=e2e-config.yaml \
+            -e2e.environment="${SITE_ENVIRONMENT}" \
+            -e2e.site-stage="${SITE_STAGE}" \
+            -e2e.versions="controller=${SITE_NVKE_CONTROLLER_VERSION},cli=${CLI_VERSION},capi-provisioned=${CAPI_PROVISIONED_VERSION},${OS_IMAGE_VERSIONS}" \
+            -e2e.capabilities="${CAPABILITIES}"
+
+      # Before any machine: the specs the stage selects must be the ones it can pass, under the label
+      # filter this lane expects. Looking only after the run would leave a stage the suite cannot satisfy
+      # to burn an hour of hardware before the coverage check refused it.
+      - name: Check the selected specs fit the stage
+        run: |
+          set -euo pipefail
+          "$GITHUB_WORKSPACE/hwe2e-bin/hwe2e" check-junit \
+            --dry leg/dry-run.junit.xml \
+            --stage "$SITE_STAGE" \
+            --label-filter "site-controller && !${SITE_TENANT_EXCLUDE}" \
+            --dry-only
+
+      # The harness's own run step: the three nested timeouts, the flags and why each is there are in
+      # release/hack/qualify-e2e.sh. A dry run lists what it would run and takes no machine.
+      - name: Run the e2e suite${{ inputs.dry-run && ' (dry run)' || '' }}
+        env:
+          FORGE_API_KEY: ${{ secrets.HARDWARE_E2E_API_KEY }}
+        run: nvke/release/hack/qualify-e2e.sh run
+
+      # The suite names the jump host in its own errors. GitHub masks a secret in the job log but not in
+      # an uploaded artifact.
+      - name: Withhold credentials from the run files
+        id: withhold
+        if: always()
+        run: nvke/release/hack/qualify-e2e.sh withhold
+
+      # The run's JUnit must list every spec the dry run selected as passed, run nothing it did not
+      # select, and use the same label filter.
+      - name: Check the run covered what it selected
+        if: always() && env.DRY_RUN != 'true'
+        run: |
+          set -euo pipefail
+          "$GITHUB_WORKSPACE/hwe2e-bin/hwe2e" check-junit \
+            --dry leg/dry-run.junit.xml \
+            --real nvke/controller/test/e2e/qualify-e2e.junit.xml \
+            --stage "$SITE_STAGE" \
+            --label-filter "site-controller && !${SITE_TENANT_EXCLUDE}" \
+            --out leg/coverage.json
+
+      # Recorded on every real run, including a failed one, and published nowhere: NVKE's TestGrid
+      # identity trusts only NVKE's own refs.
+      - name: Record the qualification result
+        if: always() && env.DRY_RUN != 'true'
+        working-directory: nvke
+        run: |
+          set -euo pipefail
+          "$GITHUB_WORKSPACE/qualify-bin/qualify" result \
+            --plan "$GITHUB_WORKSPACE/plan-out/plan.json" \
+            --report "$GITHUB_WORKSPACE/nvke/controller/test/e2e/qualify-e2e.report.json" \
+            --combination "$COMBINATION" \
+            --stream "$STREAM" \
+            --started-at "$(jq -er .startedAt "$GITHUB_WORKSPACE/leg/leg.json")" \
+            --output "$GITHUB_WORKSPACE/leg/qualify-result.json"
+
+      # What the run summary reads: the stamp, the staged record, the coverage record, the spec list
+      # and the result record.
+      - name: Upload the leg evidence
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: nvkr-hardware-e2e-leg-${{ matrix.stream }}-${{ github.run_id }}
+          path: leg
+          if-no-files-found: warn
+          retention-days: 30
+
+      # The site bundle is redacted by the suite before it is written. The Ginkgo JSON report is not
+      # uploaded: it carries remote command output. Nothing is uploaded unless the redaction succeeded:
+      # a failed redaction would otherwise publish exactly what it was there to withhold.
+      - name: Upload the run files
+        if: always() && steps.withhold.outcome == 'success'
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: nvkr-hardware-e2e-run-${{ inputs.stage }}-${{ matrix.stream }}-${{ github.run_id }}
+          path: |
+            nvke/controller/test/e2e/qualify-e2e.log
+            nvke/controller/test/e2e/qualify-e2e.junit.xml
+            nvke/controller/test/e2e/nvkectl-diagnostics.tar.gz
+            nvke/controller/test/e2e/tenant-diagnostics.json
+            nvke/controller/test/e2e/site-cluster-state.txt
+            nvke/controller/test/e2e/site-bundle*
+            ${{ runner.temp }}/tbot.log
+          if-no-files-found: warn
+          retention-days: 7
+
+      # Before removing the identity, because a live daemon would write it straight back.
+      - name: Stop the Teleport identity daemon
+        if: always()
+        run: |
+          [ -f "$RUNNER_TEMP/tbot.pid" ] || exit 0
+          kill "$(cat "$RUNNER_TEMP/tbot.pid")" 2>/dev/null || true
+
+      - name: Remove the Teleport identity
+        if: always()
+        run: rm -rf -- "$RUNNER_TEMP/tbot"
+
+  # The run's one record. It passes only when every leg's evidence assembles into a summary that
+  # meets the contract, qualificationAuthority "none" included. A dry run has no evidence to record.
+  summarize:
+    name: Record and check the run summary
+    needs: [plan, verify-node-images, hardware-e2e]
+    if: ${{ !cancelled() && !inputs.dry-run && needs.plan.result == 'success' && needs.hardware-e2e.result == 'success' && (inputs.artifact-source == 'build-subject' || needs.verify-node-images.result == 'success') }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    permissions:
+      contents: read
+    env:
+      SOURCE: ${{ inputs.artifact-source }}
+      SITE_STAGE: ${{ inputs.stage }}
+      # What the legs used. This job has no environment, so its own reading of the variable could differ.
+      NODE_USER: ${{ needs.hardware-e2e.outputs.node-user }}
+      HARNESS_COMMIT: ${{ needs.plan.outputs.harness-commit }}
+      MATRIX: ${{ needs.plan.outputs.matrix }}
+    steps:
+      - name: Check out NVKR
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Download the plan
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: nvkr-hardware-e2e-plan-${{ github.run_id }}
+          path: plan-out
+
+      - name: Download the node image checks
+        if: inputs.artifact-source == 'nvkr-outputs'
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: nvkr-hardware-e2e-node-image-checks-${{ github.run_id }}
+          path: checks
+
+      # One directory per leg, each named for its artifact.
+      - name: Download the leg evidence
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          pattern: nvkr-hardware-e2e-leg-*-${{ github.run_id }}
+          path: legs
+
+      - name: Write the run summary
+        env:
+          ORCHESTRATOR_COMMIT: ${{ github.sha }}
+          ORCHESTRATOR_RUN: ${{ github.run_id }}
+        run: |
+          set -euo pipefail
+          printf '%s\n' "$MATRIX" > matrix.json
+          args=(write run-summary.json
+            --artifact-source "$SOURCE" --stage "$SITE_STAGE"
+            --harness-commit "$HARNESS_COMMIT"
+            --orchestrator-commit "$ORCHESTRATOR_COMMIT" --orchestrator-run "$ORCHESTRATOR_RUN"
+            --plan plan-out/plan.json --substitutions plan-out/substitutions.json --matrix matrix.json)
+          if [ -n "$NODE_USER" ]; then args+=(--node-user "$NODE_USER"); fi
+          if [ "$SOURCE" = nvkr-outputs ]; then
+            for check in checks/*.json; do args+=(--node-image-check "$check"); done
+          fi
+          for leg in legs/*/; do args+=(--leg "${leg%/}"); done
+          scripts/hardware-e2e-summary.sh "${args[@]}"
+
+      # Checked again from the bytes on disk, which is what a reader of the artifact will have.
+      - name: Check the run summary
+        run: scripts/hardware-e2e-summary.sh assert run-summary.json
+
+      - name: Show the run summary
+        run: |
+          {
+            echo '### Hardware E2E run summary'
+            echo
+            echo '```json'
+            jq . run-summary.json
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload the run summary
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: nvkr-hardware-e2e-run-summary-${{ github.run_id }}
+          path: run-summary.json
+          if-no-files-found: error
+          retention-days: 90

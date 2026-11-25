@@ -856,6 +856,80 @@ reconciliation.
 Trusted source code has sudo and Docker access on the disposable hosted VM.
 Results remain unsigned local diagnostics, outside qualified release acceptance.
 
+#### Repository NVKE hardware E2E adapter outside generated execution
+
+A second authored workflow, dispatch-only, runs NVKE's hardware site-controller suite on real machines. The
+workflow is not generated, uses only generic hosted `ubuntu-24.04` runners, and has no schedule, push or
+producer-release trigger, so nothing takes a
+machine except a person's dispatch. It signs, publishes and tags nothing, uploads nothing to TestGrid, and
+cannot gate an NVKR Release. Its run summary states `qualificationAuthority: "none"`, and the final job fails
+the run unless the summary meets that contract.
+
+The suite runs from an NVKE checkout at the harness commit, against the plan NVKE's own `qualify plan` generates
+in the run's first job. The dispatch names the subject with two required inputs, a full commit and the version tag
+at it, because the planner derives the commit from a version and one commit can carry several tags. The plan is
+generated from the full-history harness checkout under the default resolution, with no registry credential and a
+placeholder organization, and the run is refused before any matrix is built unless the plan names that commit,
+that version and the lane's authored scope. Nothing is committed: the plan as generated is kept as a run artifact and
+its digest is recorded in the summary. A required `artifact-source` input, with no default, selects one of two
+admitted sources. `nvkr-outputs` runs the controller, capi-provisioned and nvkectl images
+NVKR built, pulled by digest, with the node image served at an HTTPS URL. The outputs manifest names,
+for each node image, how its bytes are checked before any machine is taken: fetched and hashed from the runner
+(`http-get`), or the read-back a publication run recorded (`s3-readback`), which the lane records without
+fetching and labels as not observed by its own run. A node image with no named method is refused. The manifest
+also names each node image's source. An image whose source is an NVKR release is NVKR-built. An image whose source
+is another CI run, such as the NVKE run that published a release image, is recorded and summarized as not
+NVKR-built, and the run summary is refused if it claims otherwise in either direction.
+`build-subject` runs the same three built from the plan's subject commit by NVKE's own
+build, keeps the plan unmodified and labels every artifact NVKE-built. It dispatches the amd64 stream only,
+because NVKE's build makes the arm64 images with Docker on the hosted AMD64 runner, which has no arm64 emulation;
+its run summary therefore names fewer legs than the plan has streams and is never complete, and arm64 is
+covered by `nvkr-outputs` alone. In both, the deploy path, the imager EFI and
+the site profiles are NVKE's, and the summary says so. A source that is not one of the two is refused before any
+checkout.
+
+Unlike the nightly, the hardware E2E job holds credentials, scoped to a protected environment with required reviewers:
+the hardware site's API key reaches only the suite's own step, and the Teleport join uses a provision token whose allow rule
+covers this repository. A real run starts only from `refs/heads/main` and only as its first attempt, enforced by
+the plan job and by each leg. Legs run one at a time, amd64 before arm64, never fail fast and are never cancelled,
+because a cancelled leg dies before its teardown and leaks its machines.
+
+A dry run joins no Teleport and takes no machine, but it is not credential-free. A job's permissions and
+environment cannot depend on an input, so a dry run's leg still enters the protected environment and waits for its
+approval, holds the permission to request an OIDC token it never requests, and reads the environment's variables.
+It shows that the plan, the staged inputs, the configuration and the specs selected for the stage agree; it runs no
+spec and reaches no hardware site.
+
+Each leg lists the specs its label filter selects with a Ginkgo dry run and requires the real run's JUnit to contain
+every one as passed, run nothing else, and use the same label filter. The dry-run list is checked before any machine
+is taken: it must carry the filter the leg expects, and it must select at least one spec from each group the chosen
+stage needs (provisioning for `provision` and `bootstrap`, provisioning and site checks for `deployment`, and also
+the tenant group for `full`), so a stage cannot pass by selecting nothing that exercises it. At `full` every
+selected spec must have passed and a skipped one is a shortfall. Below `full` the suite stops by design, so the
+check requires no failure and at least one selected spec passed, and the record says it is not complete. The run
+summary records, per leg, the selected and passed counts in total and per group, and its contract is refused if the
+groups do not add up to the totals, if a group the stage needs was not selected, or if a `full` leg did not pass
+everything it selected. This is a coverage check on a report; it does not judge a spec or prove anything about the
+hardware. Which specs the suite registers at each stage is read from the pinned NVKE harness source, not exercised
+by a recorded run.
+
+A third authored workflow, dispatch-only, stands in for NVKR's own boot-asset publication. It pulls one disk output
+of an NVKR release by exact digest, requires a plain qcow2 of the declared architecture, copies it in a protected
+environment that holds the object-store role to a key that contains its SHA-256, reads the object back from the
+store with credentials and hashes it, and leaves an unsigned record naming the entry an outputs manifest cites. A
+real publication starts only from `refs/heads/main`. A later attempt is allowed because the key holds the digest, so
+a different image can never replace an existing object, and each attempt uploads its record under its own artifact
+name. The dry run is a separate job with no environment, no object-store role and no token permission, so it
+checks the pull, the image and the record without credentials. It signs, verifies and gates nothing, and its record states
+`qualificationAuthority: "none"`. The hardware E2E workflow does not look up the publication run a manifest cites, so the
+citation is a description.
+
+Deferred: serving boot assets through NVKR's own publication (the selective boot-asset contract in ADR-20),
+binding an NVKR-built artifact to the NVKE commit it was built from, authenticating the publication run an outputs
+manifest cites, any automatic trigger, and any use of a result to gate a Release. The node image's HTTPS host is
+operated outside NVKR; neither a fetch from a runner nor a recorded read-back shows that the hardware site's network or imager
+can use it. Reconciliation owns what has run.
+
 ### 4. Runner provenance and conditional self-hosting bootstrap
 
 - Qualified execution requires the exact runner bytes that execute from-source nodes to be measured and

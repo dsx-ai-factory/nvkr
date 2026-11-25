@@ -482,7 +482,16 @@ site/tenant workload and DNS tests. Natural tenant deletion and VM, backend and
 network cleanup must join before success. Product bytes and raw deployment captures
 stay private on that runner; no products are published or uploaded. Its unsigned
 outcomes are diagnostics, not release qualification or a seventh lifecycle object
-(ADR-16/18). The ARM64 dispatch-and-consume nightly is retired.
+(ADR-16/18). The ARM64 dispatch-and-consume nightly is retired. A second, dispatch-only
+workflow, the NVKE hardware E2E, runs NVKE's hardware site-controller suite on real hardware, for a subject
+the dispatch names by NVKE commit and version, against a plan NVKE's own planner generates for it each run
+(refused unless the plan names that commit). The artifacts are chosen by a required source: NVKR-built outputs (a node
+image another CI run published is named as not NVKR-built), or the amd64 stream's artifacts built from the subject
+commit and labelled NVKE-built (an incomplete run by construction). It holds the hardware site's credentials only in a protected
+environment, publishes and gates nothing, and its run summary asserts
+`qualificationAuthority: "none"` (ADR-18). A third dispatch-only workflow copies NVKR-built
+node images to the HTTPS location the hardware site's imager reads, as a stand-in until NVKR's own boot-asset
+publication serves it, and leaves an unsigned record with the same assertion.
 _Avoid_: Nightly qualification, qualified runtime, product fleet operator
 
 **Clearance**:

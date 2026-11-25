@@ -53,6 +53,70 @@ pull request against the PR's base and head. `make status-restated-check` runs i
 `origin/main` is not your base, and `STATUS_HEAD` to check a commit instead. For a deliberate exception, add
 `<!-- status-ok: reason -->` to the matched line; an escape without a reason is itself a finding.
 
+## NVKE hardware E2E
+
+The [NVKE hardware E2E](../.github/workflows/nvkr-nvke-hardware-e2e.yml) workflow calls these scripts and the
+`internal/hwe2e` command. Their contract tests (the Go tests in `internal/cicontract` and `internal/hwe2e`, which run in
+`make test`) replace every external dependency (the hardware site, a registry, an object store, the container engine)
+with a stand-in, so they show what the scripts and checks do with the inputs the stand-ins give them. Whether the real
+services behave as the stand-ins do is a question only a recorded run answers;
+the [ADR-18 reconciliation row](../docs/adr/reconciliation/adr-18.md) says which runs exist.
+
+`internal/hwe2e` is one Go command with three subcommands, `check-junit`, `check-node-image` and
+`publish-node-image`. Both workflows build it from the checkout with the repository's pinned Go toolchain
+(`go build -trimpath -o hwe2e ./internal/hwe2e`) and run the binary; no interpreter is involved. `hwe2e SUBCOMMAND -h`
+prints a subcommand's arguments, and each source file's header comment states its exit codes.
+
+`hardware-e2e-substitute-plan.sh SUBJECT PLAN OUTPUTS OUT` takes the plan NVKE's `qualify plan` generated in the run,
+where `SUBJECT` is `--subject-commit COMMIT --subject-version VERSION --scope SCOPE`. It refuses (exit 22) a plan
+that is not for `nvke` at exactly that commit, version and scope, or (exit 13) one that is not one JSON object with a
+single combination declaring the slots below; nothing else about the plan is checked, so a plan's content is as trusted as
+the planner and the harness checkout it came from. It then replaces the slots NVKR builds with the references in an
+outputs manifest and writes `plan.json` and `substitutions.json` into a fresh `OUT`; the record carries the digest of the
+plan as generated. OCI references must be pinned by digest, node images must be
+plain HTTPS `.qcow2` URLs with a SHA-256 and a named verification (`http-get`, or `s3-readback` citing the
+publication run and what it read back), every slot is required, and a result that still names an `nvcr.io`
+artifact is refused. Each replaced node image carries its verification and its source into `substitutions.json`; the source
+is `nvkr-release` (an NVKR release digest) or `ci-run` (another CI run's HTTPS URL, such as the NVKE run that published a
+release image), and only the first is NVKR-built. A node image built at another NVKE version than the plan's is refused unless
+`--allow-node-image-version-skew` is given. `hardware-e2e-substitute-plan.sh --build-subject SUBJECT PLAN OUT` makes the same checks, keeps the
+plan byte for byte and records that nothing was replaced. Failures carry the stable `NVKR-E-*` codes and leave no
+partial output.
+
+- `hardware-e2e-matrix.sh [--amd64-only] HARNESS_SCRIPT PLAN` builds the stream matrix with NVKE's own `matrix` step and
+  admits only streams of the harness's `forge` provider, amd64 before arm64. `--amd64-only`, which the workflow passes
+  for a build from the subject commit, leaves the arm64 streams out after the whole matrix has passed its checks, names
+  them on stderr and refuses a matrix with no amd64 stream.
+- `hwe2e check-node-image` checks a node image by the method its output names. With `--url` and `--sha256` it
+  fetches the URL the way the hardware site's imager will (anonymous GET, no redirects, streamed SHA-256, qcow2 header) and
+  records what the URL served. With `--substitutions` it takes the URL, SHA-256 and `s3-readback` verification from
+  `substitutions.json`, fetches nothing and records the read-back as not observed by this run.
+- `hwe2e publish-node-image` pulls one disk output of an NVKR release by exact digest, checks it is a plain
+  qcow2, copies it under a key holding its SHA-256, reads it back from the object store with credentials and writes
+  the record, with the outputs-manifest entry, that the
+  [publication workflow](../.github/workflows/nvkr-nvke-node-image-publish.yml) uploads. The declared architecture is
+  required and the image must declare a positive virtual size. Its tests replace the pull and the object store with
+  fake executables, run as real child processes, so the streaming, the deadlines and the exit handling are the code that
+  ships.
+- `hardware-e2e-stage-inputs.sh` pulls the NVKR-built controller, capi-provisioned and nvkectl by digest, retags the
+  images under a `localhost/` name and saves the archives the suite loads onto the node. It records the node image as
+  not NVKR-built unless the substitution record shows an NVKR release as its source for that architecture.
+- `hardware-e2e-build-subject.sh` builds the same inputs from the subject commit with NVKE's own `make site-inputs`,
+  after checking the checkout is exactly that commit. Nothing it produces is NVKR-built. The workflow runs it for the
+  amd64 stream only: NVKE's arm64 image build needs emulation that a hosted AMD64 runner does not have, so a build from
+  the subject commit names fewer legs than the plan has streams and its summary is never complete.
+- `hwe2e check-junit` compares a run's JUnit with the specs a Ginkgo dry run selected. The dry run must carry
+  the leg's label filter and select a spec from each group the stage registers (site checks from `deployment`, tenant
+  specs at `full`); `--dry-only` checks that before any machine is taken. At `full` every selected spec must pass; below
+  it the check requires no failure and at least one pass and records that it is not complete.
+- `hardware-e2e-summary.sh` stamps each leg, writes the run summary and asserts its contract, including
+  `qualificationAuthority: "none"`, that a node image is named as not NVKR-built unless it is an NVKR release, that the
+  matrix, plan, staged record and node-image check name the same streams, digests and URLs, and that each leg's
+  coverage counts agree with its stage.
+
+Each script's header states its arguments and exit codes. The `hwe2e` tests are ordinary Go tests and run in
+`make test`.
+
 ## CLI artifact validation baseline
 
 ```sh

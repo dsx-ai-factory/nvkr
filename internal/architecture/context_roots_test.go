@@ -54,6 +54,7 @@ var contextRootExceptions = map[contextRoot]contextRootException{
 	{"internal/checkstatus/main.go", "main", "Background"}:                                                            {1, processRoot},
 	{"internal/citestshard/main.go", "main", "Background"}:                                                            {1, processRoot},
 	{"internal/gennotices/main.go", "main", "Background"}:                                                             {1, processRoot},
+	{"internal/hwe2e/main.go", "main", "Background"}:                                                                  {1, processRoot},
 	{"internal/quicke2e/main.go", "main", "Background"}:                                                               {1, processRoot},
 	{"internal/quicke2e/runner.go", "(*runner).cleanupContainer", "Background"}:                                       {1, boundedCleanup},
 	{"pkg/nvkr/conformance/run.go", "(*Producer).produce", "Background"}:                                              {3, boundedRecovery},
