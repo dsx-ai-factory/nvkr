@@ -39,7 +39,7 @@ type fakeRun struct {
 func (r *fakeRun) Description() (lifecycle.LocalDiagnosticDescription, error) {
 	return r.description, r.descriptionErr
 }
-func (r *fakeRun) Producer(output string) (*factory.CLIArtifactTestInputs, error) {
+func (r *fakeRun) Producer(output, _ string) (*factory.CLIArtifactTestInputs, error) {
 	if r.producerErr != nil {
 		return nil, r.producerErr
 	}

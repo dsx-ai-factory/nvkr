@@ -262,7 +262,7 @@ func TestSelectCLIArtifactTestInputsFromHeldPlan(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	got, err := SelectCLIArtifactTestInputs(plan, "renamed-cli")
+	got, err := SelectCLIArtifactTestInputs(plan, "renamed-cli", ArtifactTestComponent)
 	if err != nil || *got != *want {
 		t.Fatalf("held-Plan selection differs: %+v, %v", got, err)
 	}
@@ -277,11 +277,30 @@ func TestSelectCLIArtifactTestInputsFromHeldPlan(t *testing.T) {
 		{"unknown-output", plan, "missing"},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			inputs, err := SelectCLIArtifactTestInputs(tc.plan, tc.output)
+			inputs, err := SelectCLIArtifactTestInputs(tc.plan, tc.output, ArtifactTestComponent)
 			assertFactoryErrorCode(t, err, e.CodeUsage)
 			if inputs != nil {
 				t.Fatal("refusal returned inputs")
 			}
 		})
+	}
+}
+
+// Selection admits CLI recipe variants, but a caller binding one component
+// never receives a variant's inputs.
+func TestSelectCLIArtifactTestInputsRequiresComponent(t *testing.T) {
+	plan := cliTestPlan(t, "amd64", "component:nvkectl-local-site", 1)
+	if _, err := SelectCLIArtifactTestInputs(plan, "renamed-cli", "nvkectl-local-site"); err != nil {
+		t.Fatal(err)
+	}
+	inputs, err := SelectCLIArtifactTestInputs(plan, "renamed-cli", ArtifactTestComponent)
+	assertFactoryErrorCode(t, err, e.CodeEngineCapability)
+	if inputs != nil {
+		t.Fatal("variant returned inputs")
+	}
+	inputs, err = SelectCLIArtifactTestInputs(plan, "renamed-cli", "")
+	assertFactoryErrorCode(t, err, e.CodeUsage)
+	if inputs != nil {
+		t.Fatal("implicit component returned inputs")
 	}
 }
