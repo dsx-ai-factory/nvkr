@@ -1,0 +1,29 @@
+# SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# SPDX-License-Identifier: Apache-2.0
+
+# The streams an NVKR release can be validated on and the scopes over them.
+# A stream is one configuration NVKE's end-to-end suite runs in. A stream is
+# added together with the runner that backs it, because a plan naming
+# capabilities no runner has produces targets nothing can schedule.
+
+apiVersion: nvke.nvidia.com/v1alpha1
+kind: QualificationPolicy
+metadata:
+  name: nvkr
+  description: The streams an NVKR release can be validated on and the scopes over them.
+spec:
+  scopes:
+    # Every stream below. A narrower default would silently cover less of the
+    # matrix than the person running it believed.
+    full:
+      selector: {provider: forge}
+    amd64:
+      selector: {provider: forge, arch: amd64}
+    arm64:
+      selector: {provider: forge, arch: arm64}
+
+  streams:
+    - name: forge-gb200-amd64-ubuntu-26.04-kube-1.36
+      capabilities: {provider: forge, gpu: gb200, arch: amd64, ubuntu: "26.04", kube: "1.36"}
+    - name: forge-gb200-arm64-ubuntu-26.04-kube-1.36
+      capabilities: {provider: forge, gpu: gb200, arch: arm64, ubuntu: "26.04", kube: "1.36"}

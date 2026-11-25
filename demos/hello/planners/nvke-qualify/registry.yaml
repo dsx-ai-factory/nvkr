@@ -1,0 +1,17 @@
+# SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# SPDX-License-Identifier: Apache-2.0
+
+apiVersion: nvke.nvidia.com/v1alpha1
+kind: QualificationRegistry
+metadata:
+  name: nvkr
+  description: Maps the controller component to the hello output of a local Run.
+spec:
+  components:
+    - name: nvkr
+      resolve:
+        version: {strategy: nvkrReleaseVersion}
+    - name: controller
+      resolve:
+        version:  {strategy: nvkrReleaseVersion,  with: {output: hello}}
+        location: {strategy: nvkrReleaseLocation, with: {output: hello}}

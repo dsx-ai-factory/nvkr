@@ -1,0 +1,15 @@
+# SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# SPDX-License-Identifier: Apache-2.0
+
+apiVersion: nvke.nvidia.com/v1alpha1
+kind: QualificationPolicy
+metadata:
+  name: nvkr
+  description: One stream for the local test.
+spec:
+  scopes:
+    full:
+      selector: {provider: forge}
+  streams:
+    - name: forge-local-amd64
+      capabilities: {provider: forge, gpu: gb200, arch: amd64, ubuntu: "26.04", kube: "1.36"}

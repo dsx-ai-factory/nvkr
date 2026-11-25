@@ -1,0 +1,12 @@
+# SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# SPDX-License-Identifier: Apache-2.0
+
+apiVersion: nvke.nvidia.com/v1alpha1
+kind: Qualification
+metadata:
+  name: nvkr
+  description: A local test subject that maps one component to the hello output.
+spec:
+  subject: nvkr
+  components:
+    - {name: controller, selectors: [latest]}

@@ -171,6 +171,70 @@ emits a canonical array of output descriptions, preserving partial outputs and o
 outputs never activate qualification signing or publication; external execution of this rewritten route
 is not yet established.
 
+## Plan what to validate for a release
+
+`nvkr validate --plan` describes what to validate for one published release and runs nothing. It
+authenticates the release under a qualification policy, reads the outputs from that authenticated
+description, and builds a validation plan (`nvkr.dev/validation-plan/v1`) from the planners an authored
+directory lists:
+
+```sh
+nvkr validate --plan \
+  --reference <repository>@sha256:<reviewed-root-digest> \
+  --policy qualification.yaml \
+  --planners inputs/testing/planners \
+  --planner-var nvke-qualify.nvke-root=./nvke-source \
+  --planner-var nvke-qualify.overrides=os-image-amd64=https://images.example.test/node-amd64.qcow2 \
+  --out validation-plan.json
+```
+
+The plan is a list of targets sorted by id. Each target names the executor that runs it and the inputs that
+executor takes, so independent workflow jobs can run the targets in parallel. A target's inputs name release
+outputs and never carry a path or a digest. The executor selects them from the authenticated release.
+
+`--plan` takes no check name, `--config` or `--workspace`, and the plan flags are refused without `--plan`.
+`--planner-var` is `planner.key=value`. Only that planner receives it, and each planner rejects a variable it
+does not take and owns the form of its values. Any failure returns a coded
+error and writes nothing. The same release and inputs produce byte-identical output.
+
+A planners directory holds `config.yaml` and each planner's own files. Each entry pairs a built-in planner
+with the executor that runs its targets and the planner's own configuration. Planners are a closed set
+compiled into `nvkr`, and executors are workflow jobs that this repository does not run. The
+`nvke-qualify` planner resolves the release through NVKE's qualification planner. The maintained inputs are
+under [inputs/testing/planners](../inputs/testing/planners/README.md).
+
+A plan is descriptive and carries `qualificationAuthority: "none"`. It issues no receipt, signs nothing,
+and gates no release. Planning establishes neither that a target passes nor that its inputs exist where an
+executor would look. Only fixture-based contract tests exercise it. No real published release has been
+planned, and no executor consumes a plan yet.
+
+### Plan for a local Run
+
+`nvkr validate --plan --local-run <attempt directory>` plans for a complete local Run instead of a published
+release, so planning can be tested without a registry, credentials or `cosign`. The existing local owner checks
+the Run's Plan, compiler inputs, output membership and held payloads, and signs and publishes nothing. A local
+output has no registry location, so the plan names each one as `local/<attempt>/<output>@<digest>`, which no
+executor can fetch. `--local-run` replaces `--reference` and `--policy`, and the command refuses a mix.
+
+The Run has to retain its compiler inputs, so build it with `--capture-inputs-root=.` and repository-relative
+Definition and Environment paths. [demos/hello/planners](../demos/hello/planners) maps the hello demo's one
+output to a component. From the repository root, with Docker running:
+
+```sh
+bash demos/demo-local.sh                      # prints a workspace such as .nvkr/demo-local.XXXXXX
+W=.nvkr/demo-local.XXXXXX
+export GIT_CONFIG_NOSYSTEM=1 GIT_CONFIG_GLOBAL=/dev/null GIT_CONFIG_COUNT=1 \
+  GIT_CONFIG_KEY_0="url.$PWD/$W/source.insteadOf" GIT_CONFIG_VALUE_0=https://demo.example.invalid/hello
+bin/nvkr run local --definition $W/definition.yaml --environment $W/environment.yaml \
+  --attempt hello-captured --attempts-root .nvkr/runs --runner-source . --capture-inputs-root=. --ui plain
+bin/nvkr validate --plan --local-run .nvkr/runs/hello-captured --planners demos/hello/planners \
+  --planner-var nvke-qualify.nvke-root=/tmp
+```
+
+`nvke-root` can be any existing directory here, because the hello registry uses no NVKE-tree strategy. This
+exercises the lifecycle capture, the planner and the plan encoding. It does not exercise hosted
+authentication, a registry, or the output names of a real NVKE release.
+
 ## Optional post-publication bindings
 
 Standalone outputs need no NVKR binding. A supplied `Binding` may describe input identities, named

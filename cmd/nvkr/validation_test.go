@@ -144,8 +144,16 @@ func TestValidateCLIRegisteredHelp(t *testing.T) {
 			t.Fatalf("missing help %q", want)
 		}
 	}
-	if strings.Contains(output.String(), "--run") || strings.Contains(output.String(), "--policy") {
+	if strings.Contains(output.String(), "--run") {
 		t.Fatal("generic validate exposes source-provider flags")
+	}
+	// Plan mode names its release and policy by flag because they change with
+	// every run. Generic validation takes its source from the profile, so each
+	// such flag must say it belongs to --plan.
+	for _, line := range strings.Split(output.String(), "\n") {
+		if strings.Contains(line, "--policy") && !strings.Contains(line, "with --plan") {
+			t.Fatalf("generic validate exposes a source-provider flag: %q", line)
+		}
 	}
 }
 

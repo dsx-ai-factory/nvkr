@@ -1,0 +1,92 @@
+# SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# SPDX-License-Identifier: Apache-2.0
+
+# How each component resolves. This file holds the rule that finds a value and
+# never a value itself.
+#
+# nvkrReleaseVersion and nvkrReleaseLocation read the authenticated release.
+# Each takes the name of one release output in with.output, and the release
+# fails the plan when no output, or more than one, has that name. With no
+# output, the version is the digest of the release itself.
+#
+# An override goes to the version half of an entry that has one. So the node
+# images have a location only, and an override of one names the https URL a
+# copy is served at, which is how a run points the node image at where
+# hardware can boot it. Until it is overridden, the location carries the
+# image's digest.
+#
+# nvkrDeclared returns what is declared for the entry, either as written in the
+# subject or, with a table in with, looked up from the subject's constraint. It
+# reads nothing, so it cannot say whether the declaration matches what the
+# release contains.
+#
+# A component's name is also its key in the end-to-end suite's version flag, so
+# the plan hands the suite what it resolved without a mapping in between.
+
+apiVersion: nvke.nvidia.com/v1alpha1
+kind: QualificationRegistry
+metadata:
+  name: nvkr
+  description: How each component resolves to a version and a location.
+spec:
+  sources:
+    - {name: artifact-cdn, base: https://d1veq6e8nuk2fy.cloudfront.net}
+
+  components:
+    - name: nvkr
+      resolve:
+        version: {strategy: nvkrReleaseVersion}
+
+    - name: controller
+      resolve:
+        version:  {strategy: nvkrReleaseVersion,  with: {output: nvke-controller}}
+        location: {strategy: nvkrReleaseLocation, with: {output: nvke-controller}}
+
+    - name: capi-provisioned
+      resolve:
+        version:  {strategy: nvkrReleaseVersion,  with: {output: cluster-api-provider-provisioned}}
+        location: {strategy: nvkrReleaseLocation, with: {output: cluster-api-provider-provisioned}}
+
+    # nvkectl is one output for each platform, so each architecture names its own.
+    - name: cli-amd64
+      resolve:
+        version:  {strategy: nvkrReleaseVersion,  with: {output: nvkectl}}
+        location: {strategy: nvkrReleaseLocation, with: {output: nvkectl}}
+    - name: cli-arm64
+      resolve:
+        version:  {strategy: nvkrReleaseVersion,  with: {output: nvkectl-linux-arm64}}
+        location: {strategy: nvkrReleaseLocation, with: {output: nvkectl-linux-arm64}}
+
+    - name: os-image-amd64
+      resolve:
+        location: {strategy: nvkrReleaseLocation, with: {output: nvke-node-image-amd64}}
+    - name: os-image-arm64
+      resolve:
+        location: {strategy: nvkrReleaseLocation, with: {output: nvke-node-image-arm64}}
+
+    # The bootloader is declared because nothing derives it, so it has a
+    # location and no version.
+    - name: os-image-bootloader-amd64
+      resolve:
+        location: {strategy: url, with: {source: artifact-cdn}}
+    - name: os-image-bootloader-arm64
+      resolve:
+        location: {strategy: url, with: {source: artifact-cdn}}
+
+    # What a reviewer declares, since the release carries neither as an output
+    # and nothing checks them against the node image. The values are the ones
+    # NVKE locks at the tag the catalog pins (v0.23.0), without a leading v. The
+    # Kubernetes version is looked up from the stream's own minor, and a minor
+    # with no entry fails the plan. A stream for another minor needs an entry
+    # here, and a pin that moves needs these values to move with it.
+    - name: kube
+      resolve:
+        version: {strategy: nvkrDeclared, with: {"1.36": "1.36.3"}}
+    - name: cni-ovn
+      resolve:
+        version: {strategy: nvkrDeclared}
+
+    # Read from make/tool-versions.mk in the NVKE tree, which owns every tool pin.
+    - {name: kind,       resolve: {version: {strategy: makeVar, with: {var: KIND_VERSION}}}}
+    - {name: clusterctl, resolve: {version: {strategy: makeVar, with: {var: CAPI_VERSION}}}}
+    - {name: nerdctl,    resolve: {version: {strategy: makeVar, with: {var: NERDCTL_VERSION}}}}

@@ -1,0 +1,9 @@
+# SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# SPDX-License-Identifier: Apache-2.0
+
+apiVersion: nvkr.dev/validation-planners/v1
+kind: ValidationPlanners
+planners:
+  - name: nvke-qualify
+    executor: nvke-e2e-gotest
+    config: nvke-qualify/planner.json
