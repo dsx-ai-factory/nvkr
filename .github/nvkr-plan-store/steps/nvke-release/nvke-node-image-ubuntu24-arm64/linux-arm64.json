@@ -1,21 +1,22 @@
 {
   "appliedOverlays": [
     {
-      "inputCatalogDigest": "sha256:7530654a7a231392fee069f0d78e0289c8024b1998e376446baad82282c94ae1",
+      "inputCatalogDigest": "sha256:8a30daf4dc7a654b1b4a69cc27fdc59fbc7ce7f46246ae712f7f0162b1c117c5",
       "name": "nvke-native-toolchains",
-      "outputCatalogDigest": "sha256:4a02391f4c14d5c07f75bee2c1d5465c0561d357dc2fccb7e9f15630ce08a031",
-      "overlayDigest": "sha256:701be8ec05cf563600821e039bef30358fb42ab29aa0c2395e49853f647d55f7"
+      "outputCatalogDigest": "sha256:753aa2b0c58158547619e46f97ef0d193c32711ac86afb3e526e60966ca6976a",
+      "overlayDigest": "sha256:5d9f3d73f18501a5fbedd065216f422c63019e803d2357d38ea8573d179c2549"
     },
     {
-      "inputCatalogDigest": "sha256:4a02391f4c14d5c07f75bee2c1d5465c0561d357dc2fccb7e9f15630ce08a031",
+      "inputCatalogDigest": "sha256:753aa2b0c58158547619e46f97ef0d193c32711ac86afb3e526e60966ca6976a",
       "name": "nvke-os-ubuntu24",
-      "outputCatalogDigest": "sha256:bcc5704c08108a3fa4fab9019283c2f7f05174511da2fbd87ac854172de69bdb",
-      "overlayDigest": "sha256:d2acbe67ccdba7802b40f8ea01f3c5390c646c8af753726aa73070ade8ae6fd3"
+      "outputCatalogDigest": "sha256:56db81e4bdc0656210b1c6b0629fd51cf259a04b757c71e3aad3132186e038aa",
+      "overlayDigest": "sha256:078adaaeacf5b47c80a0a6c99e3c7f59a5163f413b51a1ba481b58b6b42f041d"
     }
   ],
-  "buildDigest": "sha256:a04517a4d91a2645b1b34c525b151351d23870ae4966e8046aa4f6208c6aba22",
-  "catalogDigest": "sha256:bcc5704c08108a3fa4fab9019283c2f7f05174511da2fbd87ac854172de69bdb",
+  "buildDigest": "sha256:8533dbf8b885d857e74468810eae260d52ec2e11addb2db8ffd4f72d75a51fac",
+  "catalogDigest": "sha256:56db81e4bdc0656210b1c6b0629fd51cf259a04b757c71e3aad3132186e038aa",
   "components": [
+    "dsx-imds-node-attestor-agent",
     "nvke-agent",
     "nvke-cni-calico",
     "nvke-cni-ovn",
@@ -31,6 +32,73 @@
   ],
   "executionGraph": {
     "nodes": [
+      {
+        "artifactPath": "nvkr-output/dsx-imds-node-attestor-agent",
+        "builderType": "oci-hermetic",
+        "command": [
+          "sh",
+          "-ec",
+          {
+            "file": ".github/nvkr-plan-store/scripts/dsx-imds-node-attestor-agent/build@29e7bc421bfe.sh"
+          }
+        ],
+        "component": "dsx-imds-node-attestor-agent",
+        "env": [
+          {
+            "name": "CGO_ENABLED",
+            "value": "0"
+          },
+          {
+            "name": "GOARCH",
+            "value": "arm64"
+          },
+          {
+            "name": "GOARM64",
+            "value": "v8.0"
+          },
+          {
+            "name": "GOFLAGS",
+            "value": "-trimpath -buildvcs=false"
+          },
+          {
+            "name": "GOOS",
+            "value": "linux"
+          },
+          {
+            "name": "GOTOOLCHAIN",
+            "value": "local"
+          },
+          {
+            "name": "LC_ALL",
+            "value": "C"
+          },
+          {
+            "name": "SOURCE_DATE_EPOCH",
+            "value": "1792708538"
+          },
+          {
+            "name": "TZ",
+            "value": "UTC"
+          }
+        ],
+        "id": "build-dsx-imds-node-attestor-agent",
+        "kind": "build",
+        "needs": [
+          "fetch-source-cda11b4482f1637e753d800f0a6536f2636d5e420ead7b19ff5f372cd45de177"
+        ],
+        "network": "none",
+        "outputType": "host-package",
+        "platform": "linux/arm64",
+        "sourceCommit": "cd76f1d5ab4a887b9577ff601ce7cda52d5003b4",
+        "sourceDest": "source-cda11b4482f1637e753d800f0a6536f2636d5e420ead7b19ff5f372cd45de177",
+        "sourceReadOnly": true,
+        "sourceTreeHash": "b9c85948e417d42d7529d2306f1b80db61c629ae",
+        "toolchain": "docker.io/library/golang@sha256:7117c9e4e2c0becd23d1dbede3aea73ba91d084847c68e12d7e1fa3d9b3abf20",
+        "vendorSpecDigest": "sha256:a947ea347cf64f32befc4f8c94930b73620cf222bd955f5ed01da0f39496cb4c",
+        "version": "1.15.0",
+        "workdir": "/src",
+        "writeDir": "nvkr-output"
+      },
       {
         "artifactPath": "agent/bin/nvke-agent.deb",
         "builderType": "oci-hermetic",
@@ -697,7 +765,7 @@
           "bash",
           "-ec",
           {
-            "file": ".github/nvkr-plan-store/scripts/nvke-spire-agent/build@69af79f5f659.sh"
+            "file": ".github/nvkr-plan-store/scripts/nvke-spire-agent/build@88bf5c0e2312.sh"
           }
         ],
         "component": "nvke-spire-agent",
@@ -741,7 +809,15 @@
         ],
         "id": "build-nvke-spire-agent",
         "kind": "build",
+        "materials": [
+          {
+            "binding": "imds-agent",
+            "component": "dsx-imds-node-attestor-agent",
+            "producer": "build-dsx-imds-node-attestor-agent"
+          }
+        ],
         "needs": [
+          "build-dsx-imds-node-attestor-agent",
           "fetch-source-36d80d4a605b6832c125fb7de0bcf180330aaae88614597287d599043f25818c"
         ],
         "network": "none",
@@ -1029,6 +1105,24 @@
         "vendorSpecDigest": "sha256:00b96bdefc97e661ef679e89418b73fb0da8e8b46724be3ce3d4c1ac1000b480"
       },
       {
+        "commit": "cd76f1d5ab4a887b9577ff601ce7cda52d5003b4",
+        "dest": "source-cda11b4482f1637e753d800f0a6536f2636d5e420ead7b19ff5f372cd45de177",
+        "id": "fetch-source-cda11b4482f1637e753d800f0a6536f2636d5e420ead7b19ff5f372cd45de177",
+        "kind": "fetch",
+        "network": "default",
+        "repo": "https://github.com/dsx-ai-factory/nvidia-workload-identity",
+        "treeHash": "b9c85948e417d42d7529d2306f1b80db61c629ae",
+        "vendorCmd": [
+          "sh",
+          "-ec",
+          {
+            "file": ".github/nvkr-plan-store/scripts/nvidia-workload-identity/vendor@47bdd564b19b.sh"
+          }
+        ],
+        "vendorImage": "docker.io/library/golang@sha256:7117c9e4e2c0becd23d1dbede3aea73ba91d084847c68e12d7e1fa3d9b3abf20",
+        "vendorSpecDigest": "sha256:a947ea347cf64f32befc4f8c94930b73620cf222bd955f5ed01da0f39496cb4c"
+      },
+      {
         "commit": "8af51273d52dfa07454435d18d37230e582d797a",
         "dest": "source-cf1266760164ee1f78d52cdae26ac814a7f02404bffbd484b73eda017ef47f2a",
         "id": "fetch-source-cf1266760164ee1f78d52cdae26ac814a7f02404bffbd484b73eda017ef47f2a",
@@ -1055,6 +1149,7 @@
         "id": "verify",
         "kind": "verify",
         "needs": [
+          "build-dsx-imds-node-attestor-agent",
           "build-nvke-agent",
           "build-nvke-cni-calico",
           "build-nvke-cni-ovn",
@@ -1076,6 +1171,41 @@
   "name": "nvke-node-image-ubuntu24-arm64",
   "platform": "linux/arm64",
   "resolvedComponents": [
+    {
+      "Name": "dsx-imds-node-attestor-agent",
+      "artifactPath": "nvkr-output/dsx-imds-node-attestor-agent",
+      "buildCommand": [
+        "sh",
+        "-ec",
+        {
+          "file": ".github/nvkr-plan-store/scripts/dsx-imds-node-attestor-agent/build@c3db711d9a0c.sh"
+        }
+      ],
+      "builderType": "oci-hermetic",
+      "commit": "cd76f1d5ab4a887b9577ff601ce7cda52d5003b4",
+      "fromSource": true,
+      "outputType": "host-package",
+      "platforms": [
+        "linux/amd64",
+        "linux/arm64"
+      ],
+      "repo": "https://github.com/dsx-ai-factory/nvidia-workload-identity",
+      "sourceDateEpoch": 1792708538,
+      "tag": "v1.15.0",
+      "toolchainImages": {
+        "amd64": "docker.io/library/golang@sha256:78773c59d6d4ecedc0845b1a8e5379e7bf0e0be62f4ea796e689bbc97dab3ceb",
+        "arm64": "docker.io/library/golang@sha256:7117c9e4e2c0becd23d1dbede3aea73ba91d084847c68e12d7e1fa3d9b3abf20"
+      },
+      "treeHash": "b9c85948e417d42d7529d2306f1b80db61c629ae",
+      "vendorCommand": [
+        "sh",
+        "-ec",
+        {
+          "file": ".github/nvkr-plan-store/scripts/nvidia-workload-identity/vendor@47bdd564b19b.sh"
+        }
+      ],
+      "writeDir": "nvkr-output"
+    },
     {
       "Name": "nvke-agent",
       "artifactPath": "agent/bin/nvke-agent.deb",
@@ -1429,12 +1559,15 @@
         "bash",
         "-ec",
         {
-          "file": ".github/nvkr-plan-store/scripts/nvke-spire-agent/build@880033d43a5b.sh"
+          "file": ".github/nvkr-plan-store/scripts/nvke-spire-agent/build@920bcb1ced74.sh"
         }
       ],
       "builderType": "oci-hermetic",
       "commit": "2cfd00081b468d85a4894ec17e9deac13c9d8169",
       "fromSource": true,
+      "materials": {
+        "imds-agent": "dsx-imds-node-attestor-agent"
+      },
       "outputType": "tarball",
       "platforms": [
         "linux/amd64",

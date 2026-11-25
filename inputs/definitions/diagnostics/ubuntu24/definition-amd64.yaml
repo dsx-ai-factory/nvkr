@@ -13,6 +13,7 @@ metadata:
   name: nvke-os-ubuntu24-amd64
 outputs:
 - components:
+  - dsx-imds-node-attestor-agent
   - nvke-agent
   - nvke-cni-calico
   - nvke-cni-ovn

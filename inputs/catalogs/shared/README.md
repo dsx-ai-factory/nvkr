@@ -13,6 +13,7 @@ for each consumer and `make workflows-check` after changing a shared declaration
 | [installer-tools](installer-tools.yaml) | `clusterctl`, `helm-linux` (source and component), `kind`, `kubectl`, `oras` | `tools` |
 | [native-tools](native-tools.yaml) | `native-capi-exec-init-image` | `tools` |
 | [node-images](node-images.yaml) | `nvke-os`, `nvke-cni-calico-source`, `nvke-kubeadm-distro-source`, `nvke-spire-agent-source`, `nvke-doca-ovs-source`, `nvke-doca-ovs`, `nvke-image-inputs`, `nvke-patched-installer-iso`, `nvke-patched-installer-iso-amd64`, `nvke-spire-agent`, `ubuntu-installer-iso`, `ubuntu-installer-iso-amd64` | `node-images` |
+| [nvidia-workload-identity](nvidia-workload-identity.yaml) | `nvidia-workload-identity`, `dsx-imds-node-attestor-agent` | `nvidia-workload-identity`, `node-images` |
 | [nvke](nvke.yaml) | `nvke-cli`, `nvke-cli-local-site-arm64`, `nvke-controller` (source and component), `nvkectl`, `nvkectl-release` | `nvke` |
 | [syft](syft.yaml) | `syft-arm64`, `syft` | `nvke`, `tools` |
 | [kubernetes-tools](kubernetes-tools.yaml) | `kubectl` | `kubernetes-conformance` |

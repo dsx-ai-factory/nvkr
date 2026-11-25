@@ -122,12 +122,13 @@ func TestMaintainedNVKENativeCaptureGraph(t *testing.T) {
 				}
 			}
 			spire := cat.Components["nvke-spire-agent"]
-			if len(spire.Materials) != 0 || !strings.Contains(strings.Join(spire.VendorCommand, "\n"), "make -C os-image/packages/spire-agent bundle nfpm") ||
+			if len(spire.Materials) != 1 || spire.Materials["imds-agent"] != "dsx-imds-node-attestor-agent" ||
+				!strings.Contains(strings.Join(spire.VendorCommand, "\n"), "make -C os-image/packages/spire-agent bundle nfpm") ||
 				!strings.Contains(strings.Join(spire.BuildCommand, "\n"), "/src/nvkr-output/work/os-image/packages/spire-agent/packaging/build-deb.sh") {
-				t.Fatal("SPIRE producer must retain source-owned acquisition and offline packaging without DSX materials")
+				t.Fatal("SPIRE producer must retain source-owned acquisition and offline packaging with its native IMDS material")
 			}
-			if _, exists := cat.Components["dsx-imds-node-attestor-agent"]; exists || slices.Contains(output.Components, "dsx-imds-node-attestor-agent") {
-				t.Fatal("SPIRE selection unexpectedly reintroduced DSX")
+			if _, exists := cat.Components["dsx-imds-node-attestor-agent"]; !exists || !slices.Contains(output.Components, "dsx-imds-node-attestor-agent") {
+				t.Fatal("SPIRE selection omits its IMDS producer")
 			}
 			agent := cat.Components["nvke-agent"]
 			if agent.VersionStamp["BUILD_VERSION"] != catalog.StripTagPrefix(selectedSource.Tag) || !strings.Contains(strings.Join(agent.BuildCommand, "\n"), `VERSION="${BUILD_VERSION:?}"`) {
@@ -151,8 +152,12 @@ func TestMaintainedNVKENativeCaptureGraph(t *testing.T) {
 			for _, node := range graph.Nodes {
 				if node.Kind == ir.KindBuild && node.Component == "nvke-spire-agent" {
 					spireFound = true
-					if node.SourceCommit != spire.Commit || node.Network != ir.NetworkNone || len(node.Materials) != 0 {
+					if node.SourceCommit != spire.Commit || node.Network != ir.NetworkNone || len(node.Materials) != 1 {
 						t.Fatal("SPIRE packaging must use its selected source and acquired closure offline")
+					}
+					binding := node.Materials[0]
+					if binding.Binding != "imds-agent" || binding.Component != "dsx-imds-node-attestor-agent" || !slices.Contains(node.Needs, binding.Producer) {
+						t.Fatal("SPIRE packaging lost its explicit IMDS producer dependency")
 					}
 				}
 				if node.Kind == ir.KindBuild && node.Component == "nvke-image-inputs" {

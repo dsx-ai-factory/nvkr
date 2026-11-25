@@ -6,6 +6,14 @@ host-package executable per Linux architecture. It is the fourth maintained
 bundle beside the three NVKE composite bundles, without adding a member to any
 NVKE composite or changing its derived inventory.
 
+The same [producer declaration](../../catalogs/shared/nvidia-workload-identity.yaml)
+is imported into the node-images catalog with its own WLI pin. NVKE disk selections
+consume the executable as the `imds-agent` material of `nvke-spire-agent`; they do
+not add standalone executable Release members. Each disk output builds its own
+complete closure. Cross-output and cross-Run reuse are not implied. The package
+integration requires the optional-input NVKE source contract described in
+[reconciliation](../../../docs/adr/reconciliation/adr-22.md#nvidia-workload-identity-agent).
+
 The [generation inventory](../../policies/maintained-generation.json) and
 [NVKE refresh policy](../../policies/nvke-catalog-maintenance.yaml) explicitly
 include this build-only Run. That shared refresh keeps the generator, shared Plan

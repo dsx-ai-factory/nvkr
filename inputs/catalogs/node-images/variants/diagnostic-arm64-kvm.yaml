@@ -104,4 +104,4 @@ components:
         }
 kind: CatalogOverlay
 name: nvke-os-arm64-native-kvm
-requiresCatalogDigest: sha256:7530654a7a231392fee069f0d78e0289c8024b1998e376446baad82282c94ae1
+requiresCatalogDigest: sha256:8a30daf4dc7a654b1b4a69cc27fdc59fbc7ce7f46246ae712f7f0162b1c117c5

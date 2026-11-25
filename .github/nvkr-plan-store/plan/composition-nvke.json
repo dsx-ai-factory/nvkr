@@ -1,5 +1,5 @@
 {
-  "effectiveDefinitionDigest": "sha256:076764eafbcae7b0f6d7de38406c574b265a611b5bd901f2361bb51f5ef3769f",
+  "effectiveDefinitionDigest": "sha256:037249d20852809a73cdc55627a2b3e94cd21df408938f0aa633d617455348d1",
   "kind": "CompositeDefinition",
   "members": [
     {
@@ -11,11 +11,11 @@
       "name": "nvke-core"
     },
     {
-      "digest": "sha256:6d0770da5060e5a17620ee6678f16218172234b76f65a95fa37dd1c53fdec7b5",
+      "digest": "sha256:37e4ee792ec089a1169236403426dd7545984cc9f3cb165abc8b68d599d4f9d6",
       "name": "nvke-disks"
     },
     {
-      "digest": "sha256:4590053e9d1e607e9b37faf697a72d93237cebe3ba7139527b106da6715c61cf",
+      "digest": "sha256:43a9346ec46910091a6545fecdb45ceb0cb0f01b6c50bf0f4565b9926bcfe462",
       "name": "nvke-disks-ubuntu24"
     },
     {

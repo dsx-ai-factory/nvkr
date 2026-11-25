@@ -141,7 +141,7 @@ func TestNightlyDOCAAcquisitionFeedsOfflineImageComposition(t *testing.T) {
 	for _, arch := range []string{"amd64", "arm64"} {
 		t.Run(arch, func(t *testing.T) {
 			selected, err := buildgraph.Resolve(stack.Catalog, buildgraph.Selection{Platform: "linux/" + arch, Components: []string{
-				"nvke-agent", "nvke-cni-calico", "nvke-cni-ovn", "nvke-image-inputs", "nvke-kubeadm-distro", "nvke-spire-agent", "ovn-kube-ubuntu", "ovn-kubernetes-chart",
+				"dsx-imds-node-attestor-agent", "nvke-agent", "nvke-cni-calico", "nvke-cni-ovn", "nvke-image-inputs", "nvke-kubeadm-distro", "nvke-spire-agent", "ovn-kube-ubuntu", "ovn-kubernetes-chart",
 			}})
 			if err != nil {
 				t.Fatal(err)

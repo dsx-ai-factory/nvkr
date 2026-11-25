@@ -1,3 +1,4 @@
+# Machine-managed by `nvkr catalog pin` / `nvkr catalog bump`. Do not hand-edit.
 apiVersion: nvkr.dev/lock/v1
 artifacts:
   ubuntu-installer-iso:
@@ -10,6 +11,11 @@ artifacts:
     tag: 26.04.1
 kind: PinLock
 pins:
+  nvidia-workload-identity:
+    commit: cd76f1d5ab4a887b9577ff601ce7cda52d5003b4
+    sourceDateEpoch: 1792708538
+    tag: v1.15.0
+    treeHash: b9c85948e417d42d7529d2306f1b80db61c629ae
   nvke-cni-calico-source:
     commit: 2cfd00081b468d85a4894ec17e9deac13c9d8169
     sourceDateEpoch: 1793236039

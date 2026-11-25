@@ -172,10 +172,12 @@ material schema and required Ubuntu-series input. NVKE telemetry pipelines is pa
 The native installer bundle carries the in-tree chart when the selected NVKE source has it, and extraction
 requires it when that source installs NKTP by path, as `v0.23.0` does. The nightly's NVKE `main` installs
 the published chart instead ([#465](https://github.com/dsx-ai-factory/nvkr/issues/465)).
-SPIRE uses that release's revision-4
-package and source-owned public acquisition/packaging commands; no pre-DSX source
-rollback is selected. The default package's removal of DSX IMDS is an upstream release
-contract, not a missing private dependency waived by NVKR. Historical DSX source,
+That source contains the revision-4 SPIRE package and public acquisition commands;
+no pre-DSX source rollback is selected. The current adapter requests revision 5 with
+the native WLI IMDS material. It requires a future NVKE source pin containing the
+optional-input contract and fails its embedded-byte check at the retained v0.23.0
+pin; [ADR-22 reconciliation](adr-22.md#nvidia-workload-identity-agent) records that
+pending integration and its test scope. Historical DSX source,
 distribution and compatibility questions are recorded in
 [NVKE #1641](https://github.com/dsx-ai-factory/nvke/issues/1641); the older HTTP-403
 observations are not a current v0.23.0 build blocker. No source gate, submodule rejection

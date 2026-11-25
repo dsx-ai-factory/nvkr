@@ -101,7 +101,7 @@ func nvkeUbuntu24Disk(name, platform, root string) definition.DefinitionOutput {
 		Catalog: &definition.Catalog{Base: "../../catalogs/node-images", Overlays: []string{
 			"../../catalogs/node-images/variants/native-toolchains.yaml", "../../catalogs/node-images/variants/ubuntu24.json"}},
 		Format: definition.OutputDiskImage,
-		Components: []string{"nvke-agent", "nvke-cni-calico", "nvke-cni-ovn", "nvke-doca-ovs", "nvke-image-inputs",
+		Components: []string{"dsx-imds-node-attestor-agent", "nvke-agent", "nvke-cni-calico", "nvke-cni-ovn", "nvke-doca-ovs", "nvke-image-inputs",
 			"nvke-kubeadm-distro", root, patched, "nvke-spire-agent", "ovn-kube-ubuntu", "ovn-kubernetes-chart", installer},
 	}
 }

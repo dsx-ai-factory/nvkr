@@ -955,10 +955,13 @@ below. NVKR verifies the pinned commit and tree; NVIDIA OVN retains its separate
 These host architectures use the same NVKE source selections. SPIRE packaging
 and its startup renderer come from the same NVKE `v0.23.0` source as the OS, CLI and controller.
 The source-owned lock pins public SPIRE 1.14.1 and TPM plugin 1.9.0 archives.
-The package revision is `1.14.1+tpm1.9.0-4`; no DSX binary is downloaded or
-included by that producer.
-Tenant nodes use join-token attestation and the site uses TPM. This package does
-not provide the plugin for `dsxImds` attestation.
+That source's historical package revision is `1.14.1+tpm1.9.0-4`, which excludes
+the DSX IMDS executable. The current NVKR adapter requests revision 5 with the
+source-built WLI v1.15.0 IMDS material and verifies its packaged bytes. The retained
+NVKE pin lacks the optional-input contract, so package builds fail until a compatible
+pin is selected; see the [pending source requirement and evidence scope](adr/reconciliation/adr-22.md#nvidia-workload-identity-agent).
+Tenant nodes use join-token attestation and the site uses TPM. This wiring does
+not change those defaults or establish real IMDS attestation acceptance.
 
 The [implementation and evidence ledger](adr/reconciliation/local-arm64-demo-presentation.md#local-arm64-demo-presentation)
 owns the exact Ubuntu conformance result, completed cleanup, failed Mac attempt

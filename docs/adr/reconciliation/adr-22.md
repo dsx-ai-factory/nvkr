@@ -71,6 +71,33 @@ The shared maintenance policy explicitly includes its generated closure to keep
 shared action declarations, generator interfaces and Plan-store ownership coherent.
 It does not repin the WLI source, select a server plugin, or add signing/publication.
 
+The shared WLI declaration also feeds the node-images catalog's SPIRE package
+through the explicit `imds-agent` material. Maintained and diagnostic disk
+Definitions select the matching native producer, preserving the package → image
+inputs → disk edges and Release membership. The package adapter supplies
+`IMDS_AGENT_FILE`, `IMDS_AGENT_SHA256` (bare hex) and `IMDS_AGENT_ARCH` at build
+time, reuses the vendor cache offline, requests Debian revision 5, and verifies
+the packaged executable against the runtime-authenticated material before emitting
+the package tar. No OCI SPIRE image or server plugin is added.
+
+The NVKE source pins remain at v0.23.0 pending the merge of
+[NVKE #2416](https://github.com/dsx-ai-factory/nvke/issues/2416). That source lacks
+the optional-input contract, so the package adapter deliberately fails its
+embedded-executable check until the source pins advance. Planning this closure
+does not establish an executable package build at the old pins.
+
+`TestNVKEIMDSDiskClosure` covers the eight maintained disk selections, complete
+material edges and missing/wrong-platform refusal. `TestNVKEIMDSPackageAdapter`
+executes the catalog shell against controlled package fixtures for input/digest
+forwarding and omitted/substituted executable rejection. `TestNVKEIMDSNamedOutputEvidence`
+binds each disk's IMDS producer SBOM to its exact observed subject, WLI source and
+native toolchain, and rejects subject and sibling-output substitution. These
+documents retain producer-only disk scope; they do not claim an inspected guest
+filesystem. Existing authenticated material-consumption checks own runtime byte
+substitution refusal. Real package builds, disk boots, two-architecture IMDS/JWKS
+attestation acceptance and the paired WLI server plugin remain unexercised or
+deferred; no fixture or generated Plan establishes them.
+
 Catalog, graph and generation contracts cover exact source/toolchain selection,
 unsigned build-only topology and invalid selections. Controlled Linux fixtures use
 catalog-loaded command bytes, held source/vendor transport, receipt reuse and

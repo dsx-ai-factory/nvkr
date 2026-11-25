@@ -16,7 +16,7 @@ the complete maintained composite. Its current membership is owned by the pinned
 |---|---|---|
 | Each disk's exact root and complete material set | NVKE Definition and `inputs/catalogs/node-images/registry.yaml` | Resolve the explicitly selected closure for its native platform. |
 | OS, Calico and kubeadm source | `inputs/catalogs/node-images/pins.lock.yaml`, NVKE `v0.23.0` at `2cfd00081b468d85a4894ec17e9deac13c9d8169` | Exact commit/tree/epoch; each producer retains its own source binding. |
-| SPIRE packaging selection | The same v0.23.0 lock selects `nvke-spire-agent-source` | Source-owned SPIRE 1.14.1 and TPM plugin 1.9.0, Debian revision 4; this release package omits DSX IMDS. |
+| SPIRE packaging selection | The same v0.23.0 lock selects `nvke-spire-agent-source`; WLI v1.15.0 supplies the native IMDS material | SPIRE 1.14.1 and TPM plugin 1.9.0, Debian revision 5, with checked IMDS bytes. The NVKE pin must advance to the optional-input implementation before this package can build; v0.23.0 fails the embedded-byte check. TPM remains the default attestor. |
 | DOCA OVS packages | The same v0.23.0 lock selects `nvke-doca-ovs-source` | NVIDIA's DOCA OVS 3.5.0 debs for the image's Ubuntu series, each checked against NVKE's committed lock; binary-only, with no published source. |
 | Runtime image selection | `inputs/catalogs/runtime-dependencies` plus NVKE deploy values at `2cfd00081b468d85a4894ec17e9deac13c9d8169` and their pinned charts | Exact native manifest pins for the twelve selected non-test images on both architectures. |
 | Release-component pins | CLI/controller/operator catalogs and their own locks | Validate each source independently; one shared repository URL does not imply one release. |
