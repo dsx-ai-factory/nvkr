@@ -13,7 +13,7 @@ import (
 	"testing"
 )
 
-// These contracts cover artifact source "build-subject": the plan kept as the fixture, the script
+// These contracts cover artifact source "build-subject": the plan kept as generated, the script
 // that builds from the subject commit, and the summary that says nothing in the run was NVKR-built.
 // The container engine, `make` and `timeout` are fakes; git is real, on a repository the test
 // makes. They prove what the scripts refuse and record. They do not prove that NVKE's build
@@ -26,8 +26,7 @@ func TestHardwareE2ESubstitutePlanRecordsTheArtifactSource(t *testing.T) {
 	scratch := t.TempDir()
 	outputs := hardwareE2EWriteJSON(t, scratch, "outputs.json", hardwareE2EOutputs())
 	out := filepath.Join(scratch, "out")
-	if result := hardwareE2ERun(t, hardwareE2ESubstituteTool,
-		filepath.Join(root, hardwareE2EPlanFile), filepath.Join(root, hardwareE2EProvenanceFile), outputs, out); result.exit != 0 {
+	if result := hardwareE2ESubstitute(t, filepath.Join(root, hardwareE2EPlanFile), outputs, out); result.exit != 0 {
 		t.Fatalf("exit %d\n%s", result.exit, result.output)
 	}
 	if got := hardwareE2EReadMap(t, filepath.Join(out, "substitutions.json"))["artifactSource"]; got != "nvkr-outputs" {
@@ -37,21 +36,20 @@ func TestHardwareE2ESubstitutePlanRecordsTheArtifactSource(t *testing.T) {
 
 func TestHardwareE2ESubstitutePlanBuildSubjectKeepsThePlanAndSaysNothingIsNvkrBuilt(t *testing.T) {
 	root := hardwareE2ERoot(t)
-	fixture, err := os.ReadFile(filepath.Join(root, hardwareE2EPlanFile))
+	generated, err := os.ReadFile(filepath.Join(root, hardwareE2EPlanFile))
 	if err != nil {
 		t.Fatal(err)
 	}
 	out := filepath.Join(t.TempDir(), "out")
-	result := hardwareE2ERun(t, hardwareE2ESubstituteTool, "--build-subject",
-		filepath.Join(root, hardwareE2EPlanFile), filepath.Join(root, hardwareE2EProvenanceFile), out)
+	result := hardwareE2ESubstitute(t, "--build-subject", filepath.Join(root, hardwareE2EPlanFile), out)
 	if result.exit != 0 {
 		t.Fatalf("exit %d, want 0:\n%s", result.exit, result.output)
 	}
 	if !strings.Contains(result.output, "not by NVKR") {
 		t.Errorf("the script should say NVKR built nothing:\n%s", result.output)
 	}
-	if got := hardwareE2EReadFile(t, filepath.Join(out, "plan.json")); got != string(fixture) {
-		t.Error("the plan was changed; a build from the subject commit must keep the fixture byte for byte")
+	if got := hardwareE2EReadFile(t, filepath.Join(out, "plan.json")); got != string(generated) {
+		t.Error("the plan was changed; a build from the subject commit must keep the generated plan byte for byte")
 	}
 	for filename, mask := range map[string]os.FileMode{out: 0o077, filepath.Join(out, "plan.json"): 0o077, filepath.Join(out, "substitutions.json"): 0o077} {
 		if info, err := os.Stat(filename); err != nil || info.Mode().Perm()&mask != 0 {
@@ -62,13 +60,14 @@ func TestHardwareE2ESubstitutePlanBuildSubjectKeepsThePlanAndSaysNothingIsNvkrBu
 	record := hardwareE2EReadMap(t, filepath.Join(out, "substitutions.json"))
 	plan := record["plan"].(map[string]any)
 	for name, check := range map[string][2]any{
-		"schema":         {record["schema"], "nvkr.dev/hardware-e2e-substitutions/v1"},
-		"artifact":       {record["artifactSource"], "build-subject"},
-		"producer":       {record["producerRunId"], nil},
-		"skew":           {record["nodeImageVersionSkew"], false},
-		"plan commit":    {plan["commit"], hardwareE2ECommit},
-		"plan version":   {plan["version"], hardwareE2EVersion},
-		"fixture digest": {plan["fixtureSha256"], hardwareE2ESHA256(fixture)},
+		"schema":       {record["schema"], "nvkr.dev/hardware-e2e-substitutions/v1"},
+		"artifact":     {record["artifactSource"], "build-subject"},
+		"producer":     {record["producerRunId"], nil},
+		"skew":         {record["nodeImageVersionSkew"], false},
+		"plan commit":  {plan["commit"], hardwareE2ECommit},
+		"plan version": {plan["version"], hardwareE2EVersion},
+		"plan scope":   {plan["scope"], hardwareE2EScope},
+		"plan digest":  {plan["generatedSha256"], hardwareE2ESHA256(generated)},
 	} {
 		if check[0] != check[1] {
 			t.Errorf("%s = %v, want %v", name, check[0], check[1])
@@ -88,67 +87,22 @@ func TestHardwareE2ESubstitutePlanBuildSubjectKeepsThePlanAndSaysNothingIsNvkrBu
 	}
 }
 
-func TestHardwareE2ESubstitutePlanBuildSubjectRefuses(t *testing.T) {
+// A plan that names another subject, or has another shape, is refused in both artifact sources:
+// hardwareE2ESubstituteForms runs those cases in hardware_e2e_test.go. This is the form's own usage.
+func TestHardwareE2ESubstitutePlanBuildSubjectRefusesUsageAndExistingOutput(t *testing.T) {
 	root := hardwareE2ERoot(t)
-	planBytes, err := os.ReadFile(filepath.Join(root, hardwareE2EPlanFile))
-	if err != nil {
-		t.Fatal(err)
-	}
-	provenanceBytes, err := os.ReadFile(filepath.Join(root, hardwareE2EProvenanceFile))
-	if err != nil {
-		t.Fatal(err)
-	}
-	rederive := func(plan []byte) []byte {
-		return []byte(strings.Replace(string(provenanceBytes), hardwareE2ESHA256(planBytes), hardwareE2ESHA256(plan), 1))
-	}
-	tests := []struct {
-		name     string
-		plan     []byte
-		prov     []byte
-		wantExit int
-		wantCode string
-	}{
-		{"fixture bytes changed after the record was made", append(append([]byte{}, planBytes...), '\n'), provenanceBytes, 22, "NVKR-E-VERIFY-FAILED"},
-		{"fixture commit disagrees with the provenance commit",
-			[]byte(strings.Replace(string(planBytes), hardwareE2ECommit, strings.Repeat("0", 40), 1)),
-			rederive([]byte(strings.Replace(string(planBytes), hardwareE2ECommit, strings.Repeat("0", 40), 1))), 13, "NVKR-E-UNSUPPORTED"},
-		{"fixture no longer declares a slot as an OCI artifact",
-			[]byte(strings.Replace(string(planBytes), `"locationStrategy": "ociArtifact"`, `"locationStrategy": "url"`, 1)),
-			rederive([]byte(strings.Replace(string(planBytes), `"locationStrategy": "ociArtifact"`, `"locationStrategy": "url"`, 1))), 13, "NVKR-E-UNSUPPORTED"},
-	}
-	for _, test := range tests {
-		t.Run(test.name, func(t *testing.T) {
-			scratch := t.TempDir()
-			planFile, provenanceFile := filepath.Join(scratch, "plan.json"), filepath.Join(scratch, "provenance.json")
-			if err := os.WriteFile(planFile, test.plan, 0o600); err != nil {
-				t.Fatal(err)
-			}
-			if err := os.WriteFile(provenanceFile, test.prov, 0o600); err != nil {
-				t.Fatal(err)
-			}
-			out := filepath.Join(scratch, "out")
-			result := hardwareE2ERun(t, hardwareE2ESubstituteTool, "--build-subject", planFile, provenanceFile, out)
-			if result.exit != test.wantExit || !strings.Contains(result.output, "["+test.wantCode+"]") {
-				t.Fatalf("exit %d, want %d with %s:\n%s", result.exit, test.wantExit, test.wantCode, result.output)
-			}
-			if _, err := os.Lstat(out); err == nil {
-				t.Error("a refusal left an output directory")
-			}
-		})
-	}
-
 	scratch := t.TempDir()
 	outputs := hardwareE2EWriteJSON(t, scratch, "outputs.json", hardwareE2EOutputs())
-	plan, provenance := filepath.Join(root, hardwareE2EPlanFile), filepath.Join(root, hardwareE2EProvenanceFile)
+	plan := filepath.Join(root, hardwareE2EPlanFile)
 	for name, args := range map[string][]string{
-		"no OUT":                      {"--build-subject", plan, provenance},
-		"an outputs manifest":         {"--build-subject", plan, provenance, outputs, filepath.Join(scratch, "a")},
-		"the skew flag with it":       {"--build-subject", "--allow-node-image-version-skew", plan, provenance, filepath.Join(scratch, "b")},
-		"the flag twice":              {"--build-subject", "--build-subject", plan, provenance, filepath.Join(scratch, "c")},
-		"a missing plan":              {"--build-subject", filepath.Join(scratch, "absent.json"), provenance, filepath.Join(scratch, "d")},
-		"the flag after the operands": {plan, provenance, filepath.Join(scratch, "e"), "--build-subject"},
+		"no OUT":                      {"--build-subject", plan},
+		"an outputs manifest":         {"--build-subject", plan, outputs, filepath.Join(scratch, "a")},
+		"the skew flag with it":       {"--build-subject", "--allow-node-image-version-skew", plan, filepath.Join(scratch, "b")},
+		"the flag twice":              {"--build-subject", "--build-subject", plan, filepath.Join(scratch, "c")},
+		"a missing plan":              {"--build-subject", filepath.Join(scratch, "absent.json"), filepath.Join(scratch, "d")},
+		"the flag after the operands": {plan, filepath.Join(scratch, "e"), "--build-subject"},
 	} {
-		if result := hardwareE2ERun(t, hardwareE2ESubstituteTool, args...); result.exit != 2 || !strings.Contains(result.output, "[NVKR-E-USAGE]") {
+		if result := hardwareE2ESubstitute(t, args...); result.exit != 2 || !strings.Contains(result.output, "[NVKR-E-USAGE]") {
 			t.Errorf("%s: exit %d\n%s", name, result.exit, result.output)
 		}
 	}
@@ -156,7 +110,7 @@ func TestHardwareE2ESubstitutePlanBuildSubjectRefuses(t *testing.T) {
 	if err := os.Mkdir(existing, 0o700); err != nil {
 		t.Fatal(err)
 	}
-	if result := hardwareE2ERun(t, hardwareE2ESubstituteTool, "--build-subject", plan, provenance, existing); result.exit != 47 ||
+	if result := hardwareE2ESubstitute(t, "--build-subject", plan, existing); result.exit != 47 ||
 		!strings.Contains(result.output, "[NVKR-E-IMMUTABLE-VIOLATION]") {
 		t.Errorf("existing OUT: exit %d\n%s", result.exit, result.output)
 	}
@@ -680,41 +634,30 @@ func TestHardwareE2EBuildSubjectKeepsAnExistingInputsDirectoryItRefusedToReplace
 	}
 }
 
-// hardwareE2ESubjectFixture is the plan fixture and its provenance re-derived for a subject commit
-// the test can check out: same plan, one commit, digests recomputed.
-func hardwareE2ESubjectFixture(t *testing.T, directory, commit string) (planFile, provenanceFile string) {
+// hardwareE2ESubjectPlan is the sample plan re-derived for a subject commit the test can check out:
+// the same plan, with one commit.
+func hardwareE2ESubjectPlan(t *testing.T, directory, commit string) (planFile string) {
 	t.Helper()
-	root := hardwareE2ERoot(t)
-	plan, err := os.ReadFile(filepath.Join(root, hardwareE2EPlanFile))
+	plan, err := os.ReadFile(filepath.Join(hardwareE2ERoot(t), hardwareE2EPlanFile))
 	if err != nil {
 		t.Fatal(err)
 	}
-	provenance, err := os.ReadFile(filepath.Join(root, hardwareE2EProvenanceFile))
-	if err != nil {
+	planFile = filepath.Join(directory, "subject-plan.json")
+	if err := os.WriteFile(planFile, []byte(strings.ReplaceAll(string(plan), hardwareE2ECommit, commit)), 0o600); err != nil {
 		t.Fatal(err)
 	}
-	rederived := strings.ReplaceAll(string(plan), hardwareE2ECommit, commit)
-	prov := strings.ReplaceAll(string(provenance), hardwareE2ECommit, commit)
-	prov = strings.Replace(prov, hardwareE2ESHA256(plan), hardwareE2ESHA256([]byte(rederived)), 1)
-	planFile, provenanceFile = filepath.Join(directory, "subject-plan.json"), filepath.Join(directory, "subject-provenance.json")
-	if err := os.WriteFile(planFile, []byte(rederived), 0o600); err != nil {
-		t.Fatal(err)
-	}
-	if err := os.WriteFile(provenanceFile, []byte(prov), 0o600); err != nil {
-		t.Fatal(err)
-	}
-	return planFile, provenanceFile
+	return planFile
 }
 
 // The staged records are what the run summary reads, so the real build script's output must
 // satisfy the real summary's contract, not a fixture written to match it.
 func TestHardwareE2EBuildSubjectRecordsSatisfyTheSummaryContract(t *testing.T) {
 	seed := hardwareE2ENewBuildRun(t, "amd64")
-	planFile, provenanceFile := hardwareE2ESubjectFixture(t, seed.scratch, seed.head)
-	in := hardwareE2EBuildSubjectSummaryInputsFrom(t, "full", hardwareE2EArmStart, planFile, provenanceFile, seed.head)
+	planFile := hardwareE2ESubjectPlan(t, seed.scratch, seed.head)
+	in := hardwareE2EBuildSubjectSummaryInputsFrom(t, "full", hardwareE2EArmStart, planFile, seed.head)
 	for _, stream := range in.streams {
 		r := hardwareE2ENewBuildRun(t, stream.arch)
-		planFile, _ := hardwareE2ESubjectFixture(t, r.scratch, r.head)
+		planFile := hardwareE2ESubjectPlan(t, r.scratch, r.head)
 		staged := filepath.Join(in.leg(stream.arch), "staged.json")
 		if err := os.Remove(staged); err != nil {
 			t.Fatal(err)

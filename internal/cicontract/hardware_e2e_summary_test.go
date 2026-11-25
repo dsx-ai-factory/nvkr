@@ -15,7 +15,7 @@ import (
 )
 
 // These contracts cover the script that records what a hardware E2E run covered and
-// refuses a record that claims more. Every input is synthetic or the committed plan fixture;
+// refuses a record that claims more. Every input is synthetic or the sample plan under testdata;
 // nothing here is evidence about a run on hardware.
 
 const (
@@ -59,8 +59,8 @@ type hardwareE2ESummary struct {
 		RunID string `json:"runId"`
 	} `json:"producer"`
 	Plan struct {
-		SHA256        string `json:"sha256"`
-		FixtureSHA256 string `json:"fixtureSha256"`
+		SHA256          string `json:"sha256"`
+		GeneratedSHA256 string `json:"generatedSha256"`
 	} `json:"plan"`
 	NodeImages []struct {
 		Slot   string `json:"slot"`
@@ -342,8 +342,8 @@ func hardwareE2EBuildSummaryInputsFrom(t *testing.T, stage, armStart string, man
 	for _, slot := range hardwareE2ENodeImageSlots {
 		hardwareE2EWriteJSON(t, in.scratch, "check-"+slot+".json", hardwareE2ENodeImageCheck(manifest, slot))
 	}
-	substituted := hardwareE2ERun(t, hardwareE2ESubstituteTool, append(slices.Clone(substituteFlags),
-		filepath.Join(root, hardwareE2EPlanFile), filepath.Join(root, hardwareE2EProvenanceFile), outputs, in.path("sub"))...)
+	substituted := hardwareE2ESubstitute(t, append(slices.Clone(substituteFlags),
+		filepath.Join(root, hardwareE2EPlanFile), outputs, in.path("sub"))...)
 	if substituted.exit != 0 {
 		t.Fatalf("substitute plan: exit %d\n%s", substituted.exit, substituted.output)
 	}
@@ -351,21 +351,21 @@ func hardwareE2EBuildSummaryInputsFrom(t *testing.T, stage, armStart string, man
 }
 
 // hardwareE2EBuildSubjectSummaryInputs builds the inputs for a run whose artifacts were built from the
-// subject commit: the plan is kept as the fixture, there are no node image checks, and each leg
+// subject commit: the plan is kept as generated, there are no node image checks, and each leg
 // staged what hardware-e2e-build-subject.sh records.
 func hardwareE2EBuildSubjectSummaryInputs(t *testing.T, stage, armStart string) hardwareE2ESummaryInputs {
 	t.Helper()
 	root := hardwareE2ERoot(t)
 	return hardwareE2EBuildSubjectSummaryInputsFrom(t, stage, armStart,
-		filepath.Join(root, hardwareE2EPlanFile), filepath.Join(root, hardwareE2EProvenanceFile), hardwareE2ECommit)
+		filepath.Join(root, hardwareE2EPlanFile), hardwareE2ECommit)
 }
 
-// hardwareE2EBuildSubjectSummaryInputsFrom takes the plan, its provenance and the harness commit the
-// legs were built at, for a test that needs a subject commit it can check out.
-func hardwareE2EBuildSubjectSummaryInputsFrom(t *testing.T, stage, armStart, planFile, provenanceFile, harnessCommit string) hardwareE2ESummaryInputs {
+// hardwareE2EBuildSubjectSummaryInputsFrom takes the plan and the harness commit the legs were built
+// at, which is also the plan's commit, for a test that needs a subject commit it can check out.
+func hardwareE2EBuildSubjectSummaryInputsFrom(t *testing.T, stage, armStart, planFile, harnessCommit string) hardwareE2ESummaryInputs {
 	t.Helper()
 	in := hardwareE2ESummaryInputs{scratch: t.TempDir(), stage: stage, source: "build-subject", harnessCommit: harnessCommit}
-	substituted := hardwareE2ERun(t, hardwareE2ESubstituteTool, "--build-subject", planFile, provenanceFile, in.path("sub"))
+	substituted := hardwareE2ESubstituteFor(t, harnessCommit, hardwareE2EVersion, hardwareE2EScope, "--build-subject", planFile, in.path("sub"))
 	if substituted.exit != 0 {
 		t.Fatalf("keep plan: exit %d\n%s", substituted.exit, substituted.output)
 	}
@@ -393,7 +393,7 @@ func hardwareE2EFinishSummaryInputs(t *testing.T, in hardwareE2ESummaryInputs, a
 		t.Fatal(err)
 	}
 	if len(plan.Combinations) != 1 {
-		t.Fatalf("the fixture has %d combinations, want 1", len(plan.Combinations))
+		t.Fatalf("the plan has %d combinations, want 1", len(plan.Combinations))
 	}
 	in.combination = plan.Combinations[0].ID
 	var amd, arm []hardwareE2ESummaryStream
@@ -499,7 +499,7 @@ func TestHardwareE2ESummaryRecordsAFullRunAndDescribesItself(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	fixture, err := os.ReadFile(filepath.Join(root, hardwareE2EPlanFile))
+	generated, err := os.ReadFile(filepath.Join(root, hardwareE2EPlanFile))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -522,7 +522,7 @@ func TestHardwareE2ESummaryRecordsAFullRunAndDescribesItself(t *testing.T) {
 		{"orchestrator run", summary.Orchestrator.RunID, hardwareE2EOrchestratorRun},
 		{"producer run", summary.Producer.RunID, "1234567890"},
 		{"substituted plan digest", summary.Plan.SHA256, hardwareE2ESHA256(substituted)},
-		{"fixture digest", summary.Plan.FixtureSHA256, hardwareE2ESHA256(fixture)},
+		{"generated plan digest", summary.Plan.GeneratedSHA256, hardwareE2ESHA256(generated)},
 		{"planned streams", summary.PlannedStreams, 2},
 		{"arm started after amd", summary.ArmStartedAfterAmd, true},
 		{"node images", len(summary.NodeImages), 2},

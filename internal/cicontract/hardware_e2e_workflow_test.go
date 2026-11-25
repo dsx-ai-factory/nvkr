@@ -165,6 +165,8 @@ func TestHardwareE2EWorkflowInputsAreExplicit(t *testing.T) {
 	doc, raw := hardwareE2ELoadWorkflow(t)
 	inputs := hardwareE2EWorkflowInputs(t, doc)
 	for name, want := range map[string]hardwareE2EWorkflowInput{
+		"subject-commit":  {Type: "string", Required: true, Default: nil},
+		"subject-version": {Type: "string", Required: true, Default: nil},
 		"artifact-source": {Type: "choice", Required: true, Default: nil, Options: []string{"nvkr-outputs", "build-subject"}},
 		"stage":           {Type: "choice", Default: "full", Options: []string{"provision", "bootstrap", "deployment", "full"}},
 		"harness-commit":  {Type: "string", Default: ""},
@@ -185,12 +187,12 @@ func TestHardwareE2EWorkflowInputsAreExplicit(t *testing.T) {
 			t.Fatalf("input %q is %+v, want %+v", name, got, want)
 		}
 	}
-	if len(inputs) != 9 {
-		t.Fatalf("the workflow takes exactly nine inputs, got %d", len(inputs))
+	if len(inputs) != 11 {
+		t.Fatalf("the workflow takes exactly eleven inputs, got %d", len(inputs))
 	}
-	// A 40-hex literal anywhere authored as a default would pin a commit outside the committed plan.
+	// A 40-hex literal anywhere authored as a default would pin a subject outside the dispatch.
 	if regexp.MustCompile(`default:\s*['"]?[0-9a-f]{40}`).MatchString(raw) {
-		t.Fatal("no input may default to a commit; the plan fixture and its provenance own the subject commit")
+		t.Fatal("no input may default to a commit; the dispatcher names the subject")
 	}
 }
 
@@ -537,20 +539,152 @@ func TestHardwareE2EWorkflowAdmitsOnlyARealRunFromMainAndItsFirstAttempt(t *test
 	// The harness refuses a real run from any other ref; the workflow refuses before the harness does.
 	_, commits := hardwareE2EWorkflowStepNamed(t, plan, "Resolve the subject and harness commits")
 	for _, want := range []string{
-		`.source.commit | select(test("^[0-9a-f]{40}$"))`,
+		`[[ "$harness" =~ ^[0-9a-f]{40}$ ]]`,
 		`[ "$SOURCE" = build-subject ] && [ "$harness" != "$subject" ]`,
 	} {
 		if !strings.Contains(commits.Run, want) {
 			t.Fatalf("the commit step lacks %q", want)
 		}
 	}
-	if plan.Env["PLAN_FIXTURE"] != "nvkr/"+hardwareE2EPlanFile || plan.Env["PLAN_PROVENANCE"] != "nvkr/"+hardwareE2EProvenanceFile {
-		t.Fatalf("the workflow must name the committed plan fixture and its provenance, got %q and %q", plan.Env["PLAN_FIXTURE"], plan.Env["PLAN_PROVENANCE"])
+	for _, want := range []string{
+		`[[ "$SUBJECT_COMMIT_INPUT" =~ ^[0-9a-f]{40}$ ]]`,
+		`[[ "$SUBJECT_VERSION" =~ ^v[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.]+)?$ ]]`,
+	} {
+		if !strings.Contains(admit.Run, want) {
+			t.Fatalf("the admission step lacks %q: the dispatch's subject is refused before a checkout", want)
+		}
+	}
+	for _, want := range []string{
+		`subject="$SUBJECT_COMMIT_INPUT"`,
+		`harness="${HARNESS_INPUT:-$subject}"`,
+	} {
+		if !strings.Contains(commits.Run, want) {
+			t.Fatalf("the commit step lacks %q", want)
+		}
+	}
+	for name, want := range map[string]string{
+		"SUBJECT_COMMIT_INPUT": "${{ inputs.subject-commit }}",
+		"SUBJECT_VERSION":      "${{ inputs.subject-version }}",
+		"HARNESS_INPUT":        "${{ inputs.harness-commit }}",
+	} {
+		if plan.Env[name] != want {
+			t.Fatalf("the plan job's %s = %q, want %q", name, plan.Env[name], want)
+		}
 	}
 	_, nvke := hardwareE2EWorkflowStepNamed(t, plan, "Check out the NVKE harness")
 	if nvke.With["repository"] != "dsx-ai-factory/nvke" || nvke.With["ref"] != "${{ steps.commits.outputs.harness }}" ||
 		nvke.With["fetch-depth"] != float64(0) || nvke.With["fetch-tags"] != true {
 		t.Fatalf("the harness checkout must be NVKE at the resolved commit with its whole history and tags, got %v", nvke.With)
+	}
+}
+
+// No plan is committed: every run generates it with NVKE's planner, from the harness checkout, for the
+// subject the dispatch names, and the substitution script refuses a plan that names another. These
+// pins fix what the generation may read and may be told, so a changed default or a secret cannot
+// quietly change what the legs run.
+func TestHardwareE2EWorkflowGeneratesItsPlanForTheDispatchedSubject(t *testing.T) {
+	doc, raw := hardwareE2ELoadWorkflow(t)
+	plan := doc.Jobs["plan"]
+
+	if got := plan.Env["SCOPE"]; got != "golden-path" {
+		t.Fatalf("the plan job's SCOPE = %q, want golden-path: the scope is authored here, not dispatched", got)
+	}
+	for _, retired := range []string{"PLAN_FIXTURE", "PLAN_PROVENANCE", "plan-fixture", "provenance.json", "inputs/qualification/nvke-plan"} {
+		if strings.Contains(raw, retired) {
+			t.Fatalf("the workflow still names %q, but no plan is committed", retired)
+		}
+	}
+
+	// The order is the contract: the planner exists before it runs, runs against the checkout that holds
+	// the subject, and its output is checked before a matrix is built from it.
+	order := []string{
+		"Admit the dispatch",
+		"Check out the NVKE harness",
+		"Check the harness checkout holds the subject commit",
+		"Build qualify",
+		"Generate the plan",
+		"Prepare the plan",
+		"Build the matrix",
+		"Upload the plan",
+	}
+	previous := -1
+	for _, name := range order {
+		index, _ := hardwareE2EWorkflowStepNamed(t, plan, name)
+		if index <= previous {
+			t.Fatalf("step %q is at %d, but must follow the step before it in %v", name, index, order)
+		}
+		previous = index
+	}
+
+	_, generate := hardwareE2EWorkflowStepNamed(t, plan, "Generate the plan")
+	if generate.WorkingDirectory != "nvke" || generate.If != "" || generate.Uses != "" {
+		t.Fatalf("the plan is generated unconditionally by a script step inside the harness checkout, got dir %q if %q uses %q",
+			generate.WorkingDirectory, generate.If, generate.Uses)
+	}
+	// One variable, a placeholder: NVKE's registry reads the organization from it, and this job is
+	// given no secret or variable, so the plan can never carry the real organization.
+	if !reflect.DeepEqual(generate.Env, map[string]string{"QUALIFY_E2E_NGC_ORG": "<ngc-org>"}) {
+		t.Fatalf("the planner may be told only the placeholder organization, got %v", generate.Env)
+	}
+	for _, want := range []string{
+		`"$GITHUB_WORKSPACE/qualify-bin/qualify" plan`,
+		`--subject nvke`,
+		`--scope "$SCOPE"`,
+		`--version "$SUBJECT_VERSION"`,
+		`--resolution commitDescribe`,
+		`--output "$GITHUB_WORKSPACE/generated-plan/plan.json"`,
+	} {
+		if !strings.Contains(generate.Run, want) {
+			t.Fatalf("the plan generation lacks %q:\n%s", want, generate.Run)
+		}
+	}
+	// --overrides and --policy would change what the plan says without the dispatch naming it;
+	// --check-exists and --registry reach a registry, which this job holds no credentials for.
+	for _, forbidden := range []string{"--overrides", "--policy", "--check-exists", "--registry", "--root", "--resolution gitTag"} {
+		if strings.Contains(generate.Run, forbidden) {
+			t.Fatalf("the plan generation must not pass %q:\n%s", forbidden, generate.Run)
+		}
+	}
+
+	// The plan job reads no secret and no variable: nothing in it can put one into a plan or an artifact.
+	serialized, err := json.Marshal(plan)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, forbidden := range []string{"secrets.", "vars."} {
+		if strings.Contains(string(serialized), forbidden) {
+			t.Fatalf("the plan job must not read %q", forbidden)
+		}
+	}
+
+	// The script gets the same three facts the planner was given and the plan as generated, so what it
+	// checks is that the plan says what the dispatch asked.
+	_, prepare := hardwareE2EWorkflowStepNamed(t, plan, "Prepare the plan")
+	if prepare.Env["SUBJECT"] != "${{ steps.commits.outputs.subject }}" {
+		t.Fatalf("the script's subject commit must be the resolved one, got %q", prepare.Env["SUBJECT"])
+	}
+	for _, want := range []string{
+		`subject=(--subject-commit "$SUBJECT" --subject-version "$SUBJECT_VERSION" --scope "$SCOPE")`,
+		`hardware-e2e-substitute-plan.sh --build-subject "${subject[@]}" generated-plan/plan.json plan-out`,
+		`${flags[@]+"${flags[@]}"} "${subject[@]}"`,
+		`generated-plan/plan.json "nvkr/$MANIFEST" plan-out`,
+		`--allow-node-image-version-skew`,
+	} {
+		if !strings.Contains(prepare.Run, want) {
+			t.Fatalf("the plan preparation lacks %q:\n%s", want, prepare.Run)
+		}
+	}
+
+	// What NVKE generated is kept as its own artifact, because it is committed nowhere: the summary's
+	// generatedSha256 names exactly these bytes.
+	_, upload := hardwareE2EWorkflowStepNamed(t, plan, "Upload the plan as generated")
+	if upload.With["name"] != "nvkr-hardware-e2e-generated-plan-${{ github.run_id }}" ||
+		upload.With["path"] != "generated-plan/plan.json" || upload.With["if-no-files-found"] != "error" {
+		t.Fatalf("the plan as generated must be uploaded under its own name from where it was written, got %v", upload.With)
+	}
+	_, substituted := hardwareE2EWorkflowStepNamed(t, plan, "Upload the plan")
+	if substituted.With["path"] != "plan-out" {
+		t.Fatalf("the plan the legs run is uploaded from the script's output, got %v", substituted.With)
 	}
 }
 
@@ -755,6 +889,47 @@ func TestHardwareE2EWorkflowSelectsItsArtifactSourceBeforeAnyMachine(t *testing.
 	}
 	if !strings.Contains(covered.Run, "--real nvke/controller/test/e2e/qualify-e2e.junit.xml") || strings.Contains(covered.Run, "--dry-only") {
 		t.Fatalf("the post-run check reads the real report, got %q", covered.Run)
+	}
+}
+
+// NVKE's site-input build makes the arm64 images with Docker on the hosted AMD64 runner, which has no
+// arm64 emulation, so only a build from the subject commit is narrowed to the amd64 stream. NVKR outputs
+// are pulled, not built, and keep both streams.
+func TestHardwareE2EWorkflowDispatchesOnlyTheAmd64StreamForABuildFromTheSubjectCommit(t *testing.T) {
+	doc, text := hardwareE2ELoadWorkflow(t)
+	_, step := hardwareE2EWorkflowStepNamed(t, doc.Jobs["plan"], "Build the matrix")
+	const flag = "--amd64-only"
+	if got := strings.Count(text, flag); got != 1 {
+		t.Fatalf("%s appears %d times in the workflow, want once, in the build-subject branch of the matrix step", flag, got)
+	}
+	ifAt := strings.Index(step.Run, `if [ "$SOURCE" = build-subject ]; then`)
+	flagAt := strings.Index(step.Run, "flags+=("+flag+")")
+	fiAt := strings.Index(step.Run, "\nfi\n")
+	if ifAt < 0 || flagAt < ifAt || fiAt < flagAt {
+		t.Fatalf("the flag must be added only when the artifact source is build-subject, got:\n%s", step.Run)
+	}
+	for _, want := range []string{
+		`flags=()`,
+		`hardware-e2e-matrix.sh ${flags[@]+"${flags[@]}"} "$GITHUB_WORKSPACE/nvke/release/hack/qualify-e2e.sh"`,
+		`>> "$GITHUB_STEP_SUMMARY"`,
+	} {
+		if !strings.Contains(step.Run, want) {
+			t.Errorf("the matrix step lacks %q:\n%s", want, step.Run)
+		}
+	}
+	if len(step.Env) != 0 || step.If != "" {
+		t.Errorf("the matrix step reads SOURCE from the plan job's environment and always runs, got env %v and if %q", step.Env, step.If)
+	}
+	if got := doc.Jobs["plan"].Env["SOURCE"]; got != "${{ inputs.artifact-source }}" {
+		t.Errorf("the plan job's SOURCE = %q, want the artifact-source input", got)
+	}
+	// The legs and the summary read the one matrix the plan job printed, so a stream left out of it is not
+	// dispatched and the summary compares the legs with the same list.
+	if got := doc.Jobs["hardware-e2e"].Strategy.Matrix; got != "${{ fromJSON(needs.plan.outputs.matrix) }}" {
+		t.Errorf("the legs' matrix = %q, want the plan job's output", got)
+	}
+	if got := doc.Jobs["summarize"].Env["MATRIX"]; got != "${{ needs.plan.outputs.matrix }}" {
+		t.Errorf("the summary's MATRIX = %q, want the plan job's output", got)
 	}
 }
 

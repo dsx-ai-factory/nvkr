@@ -164,8 +164,7 @@ func hardwareE2EStageSubstitutions(t *testing.T, root string) []byte {
 		}
 		defer os.RemoveAll(scratch)
 		outputs := hardwareE2EWriteJSON(t, scratch, "outputs.json", hardwareE2EOutputs())
-		substituted := hardwareE2ERun(t, hardwareE2ESubstituteTool,
-			filepath.Join(root, hardwareE2EPlanFile), filepath.Join(root, hardwareE2EProvenanceFile), outputs, filepath.Join(scratch, "sub"))
+		substituted := hardwareE2ESubstitute(t, filepath.Join(root, hardwareE2EPlanFile), outputs, filepath.Join(scratch, "sub"))
 		if substituted.exit != 0 {
 			t.Fatalf("substitute plan: exit %d\n%s", substituted.exit, substituted.output)
 		}

@@ -6,17 +6,28 @@
 # `matrix` step, so the harness decides what a stream is, then admit it for this workflow:
 # streams of the harness's `forge` provider only (no DSX credentials exist here) and amd64 before arm64.
 #
-#   hardware-e2e-matrix.sh HARNESS_SCRIPT PLAN
+#   hardware-e2e-matrix.sh [--amd64-only] HARNESS_SCRIPT PLAN
 #
 # HARNESS_SCRIPT is release/hack/qualify-e2e.sh from the harness checkout; PLAN is the
 # substituted plan. Prints {"include":[...]} on stdout, compact, in run order. The
 # workflow runs the legs with max-parallel 1 in that order, which is GitHub's matrix
 # expansion order and not a scheduling guarantee; the run summary records the order
 # the legs actually started in.
+#
+# --amd64-only leaves the arm64 streams out, after the whole matrix has passed every check below, and
+# names them on stderr. It is for a build from the subject commit: NVKE's site-input build makes the
+# arm64 images with Docker on the hosted AMD64 runner, which has no arm64 emulation. A matrix with no
+# amd64 stream is refused. The run summary then names fewer legs than the plan has streams and says the
+# run is not complete.
 set -euo pipefail
 
 fail() { printf 'nvkr: [%s] %s\n' "$1" "$2" >&2; exit "$3"; }
-[[ $# == 2 ]] || fail NVKR-E-USAGE 'hardware-e2e-matrix.sh HARNESS_SCRIPT PLAN' 2
+amd64_only=false
+if [[ ${1:-} == --amd64-only ]]; then
+  amd64_only=true
+  shift
+fi
+[[ $# == 2 ]] || fail NVKR-E-USAGE 'hardware-e2e-matrix.sh [--amd64-only] HARNESS_SCRIPT PLAN' 2
 harness=$1 plan=$2
 command -v jq >/dev/null || fail NVKR-E-ENGINE-CAPABILITY 'missing jq' 29
 [[ -f $harness && -x $harness && ! -L $harness ]] ||
@@ -46,6 +57,14 @@ unknown=$(jq -r '[.include[] | select(.arch != "amd64" and .arch != "arm64") | "
 [[ -z $unknown ]] || fail NVKR-E-UNSUPPORTED "streams with an architecture other than amd64 or arm64: $unknown" 13
 duplicate=$(jq -r '[.include | group_by([.combination, .stream])[] | select(length > 1) | .[0].stream] | join(", ")' <<<"$matrix")
 [[ -z $duplicate ]] || fail NVKR-E-UNSUPPORTED "the matrix names a stream more than once: $duplicate" 13
+
+if [[ $amd64_only == true ]]; then
+  left_out=$(jq -r '[.include[] | select(.arch != "amd64") | "\(.combination)/\(.stream)"] | join(", ")' <<<"$matrix")
+  matrix=$(jq -c '{include: [.include[] | select(.arch == "amd64")]}' <<<"$matrix")
+  jq -e '.include | length > 0' <<<"$matrix" >/dev/null ||
+    fail NVKR-E-UNSUPPORTED 'the plan names no amd64 stream, and this selection dispatches amd64 streams only' 13
+  [[ -z $left_out ]] || printf 'nvkr: not dispatching %s: this selection dispatches amd64 streams only\n' "$left_out" >&2
+fi
 
 # amd64 before arm64. sort_by is stable, so each architecture keeps the plan's order.
 jq -c '{include: (.include | sort_by(if .arch == "amd64" then 0 else 1 end))}' <<<"$matrix"

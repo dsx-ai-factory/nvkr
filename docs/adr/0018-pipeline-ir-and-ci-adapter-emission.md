@@ -865,9 +865,14 @@ machine except a person's dispatch. It signs, publishes and tags nothing, upload
 cannot gate an NVKR Release. Its run summary states `qualificationAuthority: "none"`, and the final job fails
 the run unless the summary meets that contract.
 
-The suite runs from an NVKE checkout at a pinned harness commit, against a committed copy of NVKE's `qualify plan`
-output whose bytes are checked against a provenance record before use. A required `artifact-source` input, with no
-default, selects one of two admitted sources. `nvkr-outputs` runs the controller, capi-provisioned and nvkectl images
+The suite runs from an NVKE checkout at the harness commit, against the plan NVKE's own `qualify plan` generates
+in the run's first job. The dispatch names the subject with two required inputs, a full commit and the version tag
+at it, because the planner derives the commit from a version and one commit can carry several tags. The plan is
+generated from the full-history harness checkout under the default resolution, with no registry credential and a
+placeholder organization, and the run is refused before any matrix is built unless the plan names that commit,
+that version and the lane's authored scope. Nothing is committed: the plan as generated is kept as a run artifact and
+its digest is recorded in the summary. A required `artifact-source` input, with no default, selects one of two
+admitted sources. `nvkr-outputs` runs the controller, capi-provisioned and nvkectl images
 NVKR built, pulled by digest, with the node image served at an HTTPS URL. The outputs manifest names,
 for each node image, how its bytes are checked before any machine is taken: fetched and hashed from the runner
 (`http-get`), or the read-back a publication run recorded (`s3-readback`), which the lane records without
@@ -876,7 +881,10 @@ also names each node image's source. An image whose source is an NVKR release is
 is another CI run, such as the NVKE run that published a release image, is recorded and summarized as not
 NVKR-built, and the run summary is refused if it claims otherwise in either direction.
 `build-subject` runs the same three built from the plan's subject commit by NVKE's own
-build, keeps the plan unmodified and labels every artifact NVKE-built. In both, the deploy path, the imager EFI and
+build, keeps the plan unmodified and labels every artifact NVKE-built. It dispatches the amd64 stream only,
+because NVKE's build makes the arm64 images with Docker on the hosted AMD64 runner, which has no arm64 emulation;
+its run summary therefore names fewer legs than the plan has streams and is never complete, and arm64 is
+covered by `nvkr-outputs` alone. In both, the deploy path, the imager EFI and
 the site profiles are NVKE's, and the summary says so. A source that is not one of the two is refused before any
 checkout.
 

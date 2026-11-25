@@ -4,10 +4,14 @@
 name: NVKR NVKE hardware E2E
 
 # Runs NVKE's hardware site-controller suite on real hardware, from an NVKE checkout at a
-# pinned harness commit, against the plan fixture committed under inputs/qualification/
-# (ADR-18). Nothing here qualifies, gates or releases anything: the run records a
-# summary whose qualificationAuthority is "none", and the final job refuses to pass unless that
-# summary meets its contract.
+# pinned harness commit, against the plan NVKE's own `qualify plan` generates in the first job
+# for the dispatched subject (ADR-18). Nothing here qualifies, gates or releases anything: the run
+# records a summary whose qualificationAuthority is "none", and the final job refuses to pass unless
+# that summary meets its contract.
+#
+# The subject is named by two required inputs, with no default: the NVKE commit and the version tag
+# at it. `qualify plan` derives the commit from the version, and a commit can carry several tags, so
+# the plan is generated for the version and the run is refused unless the plan names the commit.
 #
 # What the node runs is chosen by the required artifact-source input, with no default:
 #
@@ -18,7 +22,9 @@ name: NVKR NVKE hardware E2E
 #                  such as an NVKE release image, is not, and the summary says so.
 #   build-subject  the controller, capi-provisioned and nvkectl built inside the job from the
 #                  subject commit, and the node image the plan itself names. Nothing is NVKR-built,
-#                  and the summary says so.
+#                  and the summary says so. It runs the amd64 stream only, because NVKE's arm64 image
+#                  build needs emulation the hosted AMD64 runner lacks, so its summary names fewer legs
+#                  than the plan has streams and is never complete.
 #
 # Either way the deploy path, the imager EFI and the site profiles are NVKE's. Each stream holds two
 # CPU machines and one GPU machine for about an hour on the hardware site NVKE's own lanes use. Never
@@ -34,8 +40,16 @@ name: NVKR NVKE hardware E2E
 'on':
   workflow_dispatch:
     inputs:
+      subject-commit:
+        description: The NVKE commit under test, a full lower-case 40-hex commit. The plan is generated for subject-version and the run is refused unless the plan names this commit.
+        type: string
+        required: true
+      subject-version:
+        description: The NVKE version tag at that commit, such as v0.24.0-beta.12. Several tags can point at one commit, so the commit alone cannot pick the plan.
+        type: string
+        required: true
       artifact-source:
-        description: nvkr-outputs runs NVKR-built artifacts. build-subject builds them from the subject commit in the job and says nothing is NVKR-built.
+        description: nvkr-outputs runs NVKR-built artifacts. build-subject builds them from the subject commit in the job, runs the amd64 stream only, and says nothing is NVKR-built.
         type: choice
         required: true
         options: [nvkr-outputs, build-subject]
@@ -49,7 +63,7 @@ name: NVKR NVKE hardware E2E
         type: string
         default: ''
       harness-commit:
-        description: The NVKE commit whose suite and harness run. Empty means the plan fixture's commit. For build-subject it must be that commit.
+        description: The NVKE commit whose suite and harness run. Empty means subject-commit. For build-subject it must be subject-commit.
         type: string
         default: ''
       node-user:
@@ -96,11 +110,13 @@ jobs:
     env:
       SOURCE: ${{ inputs.artifact-source }}
       MANIFEST: ${{ inputs.outputs-manifest }}
+      SUBJECT_COMMIT_INPUT: ${{ inputs.subject-commit }}
+      SUBJECT_VERSION: ${{ inputs.subject-version }}
       HARNESS_INPUT: ${{ inputs.harness-commit }}
       SKEW: ${{ inputs.allow-node-image-version-skew && 'true' || 'false' }}
       DRY_RUN: ${{ inputs.dry-run && 'true' || 'false' }}
-      PLAN_FIXTURE: nvkr/inputs/qualification/nvke-plan-v0.24.0-beta.12.json
-      PLAN_PROVENANCE: nvkr/inputs/qualification/nvke-plan-v0.24.0-beta.12.provenance.json
+      # How much of NVKE's matrix the plan covers. The substitution script requires the plan to say it.
+      SCOPE: golden-path
     steps:
       # Everything that can be refused before a checkout or a machine is refused here.
       - name: Admit the dispatch
@@ -114,6 +130,10 @@ jobs:
             nvkr-outputs | build-subject) ;;
             *) die "artifact-source is '$SOURCE'; it must be nvkr-outputs or build-subject" ;;
           esac
+          [[ "$SUBJECT_COMMIT_INPUT" =~ ^[0-9a-f]{40}$ ]] ||
+            die "subject-commit must be a full lower-case 40-hex NVKE commit"
+          [[ "$SUBJECT_VERSION" =~ ^v[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.]+)?$ ]] ||
+            die "subject-version must be an NVKE version tag such as v0.24.0-beta.12"
           if [ "$DRY_RUN" != true ]; then
             # The Teleport join token admits refs/heads/main only, and a re-run of failed legs would
             # mix evidence from two attempts into one summary.
@@ -136,23 +156,22 @@ jobs:
           path: nvkr
           persist-credentials: false
 
-      # The plan fixture names the subject commit. The harness commit is the same commit unless a
-      # caller asks for another, and a build from the subject commit cannot ask: it builds from the
-      # checkout the harness runs in.
+      # The dispatch names the subject commit. The harness commit is the same commit unless a caller asks
+      # for another, and a build from the subject commit cannot ask: it builds from the checkout the
+      # harness runs in.
       - name: Resolve the subject and harness commits
         id: commits
         run: |
           set -euo pipefail
           die() { echo "::error::$*"; exit 1; }
-          subject="$(jq -er '.source.commit | select(test("^[0-9a-f]{40}$"))' "$PLAN_PROVENANCE")" ||
-            die "the plan provenance names no 40-hex subject commit"
+          subject="$SUBJECT_COMMIT_INPUT"
           harness="${HARNESS_INPUT:-$subject}"
           [[ "$harness" =~ ^[0-9a-f]{40}$ ]] || die "harness-commit must be empty or a full lower-case 40-hex commit"
           if [ "$SOURCE" = build-subject ] && [ "$harness" != "$subject" ]; then
             die "a build from the subject commit builds from the harness checkout, so harness-commit must be the subject commit $subject"
           fi
           printf 'subject=%s\nharness=%s\n' "$subject" "$harness" >> "$GITHUB_OUTPUT"
-          printf 'Subject %s, harness %s, artifact source %s\n' "$subject" "$harness" "$SOURCE" >> "$GITHUB_STEP_SUMMARY"
+          printf 'Subject %s at %s, harness %s, artifact source %s\n' "$SUBJECT_VERSION" "$subject" "$harness" "$SOURCE" >> "$GITHUB_STEP_SUMMARY"
 
       # Every tag and the history behind it: the plan describes each component against its own tags,
       # and the deploy path is exported from the subject commit's tree.
@@ -182,28 +201,7 @@ jobs:
           go-version-file: nvke/go.work
           cache: false
 
-      # nvkr-outputs swaps NVKR's references into the fixture; build-subject keeps it byte for byte.
-      - name: Prepare the plan
-        run: |
-          set -euo pipefail
-          if [ "$SOURCE" = build-subject ]; then
-            nvkr/scripts/hardware-e2e-substitute-plan.sh --build-subject "$PLAN_FIXTURE" "$PLAN_PROVENANCE" plan-out
-          else
-            flags=()
-            if [ "$SKEW" = true ]; then flags+=(--allow-node-image-version-skew); fi
-            nvkr/scripts/hardware-e2e-substitute-plan.sh ${flags[@]+"${flags[@]}"} \
-              "$PLAN_FIXTURE" "$PLAN_PROVENANCE" "nvkr/$MANIFEST" plan-out
-          fi
-
-      - name: Build the matrix
-        id: matrix
-        run: |
-          set -euo pipefail
-          matrix="$(nvkr/scripts/hardware-e2e-matrix.sh "$GITHUB_WORKSPACE/nvke/release/hack/qualify-e2e.sh" "$GITHUB_WORKSPACE/plan-out/plan.json")"
-          printf 'matrix=%s\n' "$matrix" >> "$GITHUB_OUTPUT"
-          jq . <<<"$matrix"
-
-      # Built once from the harness checkout, so every leg runs the same tool.
+      # Built once from the harness checkout, so the plan job and every leg run the same tool.
       - name: Build qualify
         id: qualify
         working-directory: nvke
@@ -213,11 +211,72 @@ jobs:
           go build -trimpath -o "$GITHUB_WORKSPACE/qualify-bin/qualify" ./release/cmd/qualify
           printf 'sha256=%s\n' "$(sha256sum "$GITHUB_WORKSPACE/qualify-bin/qualify" | cut -d' ' -f1)" >> "$GITHUB_OUTPUT"
 
+      # NVKE's own planner, run for the version the dispatch named. It reads git and the harness
+      # checkout's qualification spec, release registry and release policy, and needs no credentials.
+      # commitDescribe is NVKE's default, set here so a changed default cannot change the plan. The
+      # registry names nvcr.io references through QUALIFY_E2E_NGC_ORG, which this job is not given: the
+      # placeholder keeps the organization out of every artifact, and a run of NVKR outputs whose plan
+      # still names nvcr.io after substitution is refused.
+      - name: Generate the plan
+        working-directory: nvke
+        env:
+          QUALIFY_E2E_NGC_ORG: '<ngc-org>'
+        run: |
+          set -euo pipefail
+          mkdir -p "$GITHUB_WORKSPACE/generated-plan"
+          "$GITHUB_WORKSPACE/qualify-bin/qualify" plan \
+            --subject nvke --scope "$SCOPE" --version "$SUBJECT_VERSION" --resolution commitDescribe \
+            --output "$GITHUB_WORKSPACE/generated-plan/plan.json"
+
+      # The plan must name the commit the dispatch named. nvkr-outputs swaps NVKR's references into it;
+      # build-subject keeps it byte for byte.
+      - name: Prepare the plan
+        env:
+          SUBJECT: ${{ steps.commits.outputs.subject }}
+        run: |
+          set -euo pipefail
+          subject=(--subject-commit "$SUBJECT" --subject-version "$SUBJECT_VERSION" --scope "$SCOPE")
+          if [ "$SOURCE" = build-subject ]; then
+            nvkr/scripts/hardware-e2e-substitute-plan.sh --build-subject "${subject[@]}" generated-plan/plan.json plan-out
+          else
+            flags=()
+            if [ "$SKEW" = true ]; then flags+=(--allow-node-image-version-skew); fi
+            nvkr/scripts/hardware-e2e-substitute-plan.sh ${flags[@]+"${flags[@]}"} "${subject[@]}" \
+              generated-plan/plan.json "nvkr/$MANIFEST" plan-out
+          fi
+
+      # NVKE's site-input build makes the arm64 images with Docker on this AMD64 runner, which has no
+      # arm64 emulation, so a build from the subject commit dispatches the amd64 stream only. The run
+      # summary then names fewer legs than the plan has streams and says the run is not complete.
+      # NVKR outputs are pulled, not built, and run both streams.
+      - name: Build the matrix
+        id: matrix
+        run: |
+          set -euo pipefail
+          flags=()
+          if [ "$SOURCE" = build-subject ]; then
+            flags+=(--amd64-only)
+            echo 'A build from the subject commit dispatches the amd64 stream only, so this run is not complete.' >> "$GITHUB_STEP_SUMMARY"
+          fi
+          matrix="$(nvkr/scripts/hardware-e2e-matrix.sh ${flags[@]+"${flags[@]}"} "$GITHUB_WORKSPACE/nvke/release/hack/qualify-e2e.sh" "$GITHUB_WORKSPACE/plan-out/plan.json")"
+          printf 'matrix=%s\n' "$matrix" >> "$GITHUB_OUTPUT"
+          jq . <<<"$matrix"
+
       - name: Upload the plan
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: nvkr-hardware-e2e-plan-${{ github.run_id }}
           path: plan-out
+          if-no-files-found: error
+          retention-days: 30
+
+      # The plan as NVKE generated it, before any substitution. It is not committed anywhere, so this is
+      # the bytes the summary's generatedSha256 names.
+      - name: Upload the plan as generated
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: nvkr-hardware-e2e-generated-plan-${{ github.run_id }}
+          path: generated-plan/plan.json
           if-no-files-found: error
           retention-days: 30
 

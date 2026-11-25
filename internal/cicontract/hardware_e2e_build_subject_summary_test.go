@@ -19,7 +19,7 @@ import (
 const (
 	hardwareE2EMessageSource       = "artifactSource must be nvkr-outputs or build-subject"
 	hardwareE2EMessageProducer     = "producer must name a run id for NVKR outputs and be null for a build from the subject commit"
-	hardwareE2EMessagePlan         = "a build from the subject commit must keep the plan unmodified, and a run of NVKR outputs must have changed it"
+	hardwareE2EMessagePlan         = "a build from the subject commit must run the plan as generated, and a run of NVKR outputs must have changed it"
 	hardwareE2EMessageImages       = "nodeImages must be empty for a build from the subject commit, and nonempty https locations with a sha256 for NVKR outputs"
 	hardwareE2EMessageLegSource    = "every leg must have staged from the artifact source the summary names"
 	hardwareE2EMessageCommit       = "a build from the subject commit must name that commit as the harness commit and the plan's, and NVKR outputs must name none"
@@ -31,7 +31,7 @@ const (
 
 func TestHardwareE2ESummaryBuildSubjectRecordsAFullRunAndSaysNothingIsNvkrBuilt(t *testing.T) {
 	root := hardwareE2ERoot(t)
-	fixture, err := os.ReadFile(filepath.Join(root, hardwareE2EPlanFile))
+	generated, err := os.ReadFile(filepath.Join(root, hardwareE2EPlanFile))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -59,8 +59,8 @@ func TestHardwareE2ESummaryBuildSubjectRecordsAFullRunAndSaysNothingIsNvkrBuilt(
 		{"harness commit", summary.Harness.Commit, hardwareE2ECommit},
 		{"subject commit", summary.Subject.Commit, hardwareE2ECommit},
 		{"subject version", summary.Subject.Version, hardwareE2EVersion},
-		{"substituted plan digest", summary.Plan.SHA256, hardwareE2ESHA256(fixture)},
-		{"fixture digest", summary.Plan.FixtureSHA256, hardwareE2ESHA256(fixture)},
+		{"plan digest", summary.Plan.SHA256, hardwareE2ESHA256(generated)},
+		{"generated plan digest", summary.Plan.GeneratedSHA256, hardwareE2ESHA256(generated)},
 		{"node image version skew", summary.NodeImageVersionSkew, false},
 		{"node images", len(summary.NodeImages), 0},
 		{"legs", len(summary.Legs), 2},
@@ -94,6 +94,33 @@ func TestHardwareE2ESummaryBuildSubjectRecordsAFullRunAndSaysNothingIsNvkrBuilt(
 	if asserted := hardwareE2ERun(t, hardwareE2ESummaryTool, "assert", out); asserted.exit != 0 {
 		t.Errorf("assert of a written summary: exit %d\n%s", asserted.exit, asserted.output)
 	}
+}
+
+// A build from the subject commit dispatches the amd64 stream only, so its summary names one leg of the
+// two the plan has streams for. It is a record of that run, and it must say the run is not complete.
+func TestHardwareE2ESummaryBuildSubjectWithOnlyTheAmd64LegIsRecordedAsIncomplete(t *testing.T) {
+	in := hardwareE2EBuildSubjectSummaryInputs(t, "full", hardwareE2EArmStart)
+	hardwareE2EEditJSON(t, in.path("matrix.json"), func(m map[string]any) { m["include"] = m["include"].([]any)[:1] })
+	args := hardwareE2EDropFlag(in.writeArgs(in.path("summary.json")), "--leg", in.leg("arm64"))
+	out := hardwareE2ERequireSummaryWritten(t, in, args)
+
+	summary := hardwareE2EReadSummary(t, out)
+	if summary.ArtifactSource != "build-subject" || summary.QualificationAuthority != "none" {
+		t.Errorf("source %q, authority %q, want build-subject and none", summary.ArtifactSource, summary.QualificationAuthority)
+	}
+	if summary.Complete {
+		t.Error("a build from the subject commit that ran one of the plan's two streams is complete")
+	}
+	if len(summary.Legs) != 1 || summary.Legs[0].Arch != "amd64" || summary.PlannedStreams != 2 {
+		t.Errorf("legs = %v, planned streams = %d, want the amd64 leg alone and 2 planned streams", summary.Legs, summary.PlannedStreams)
+	}
+	if asserted := hardwareE2ERun(t, hardwareE2ESummaryTool, "assert", out); asserted.exit != 0 {
+		t.Errorf("assert: exit %d\n%s", asserted.exit, asserted.output)
+	}
+	// Edited to claim the whole plan ran, the same summary is refused.
+	hardwareE2EEditJSON(t, out, func(s map[string]any) { s["complete"] = true })
+	hardwareE2EExpectFailure(t, hardwareE2ERun(t, hardwareE2ESummaryTool, "assert", out), 22, "NVKR-E-VERIFY-FAILED",
+		"complete must be true exactly for a full-stage run")
 }
 
 func TestHardwareE2ESummaryBuildSubjectWriteRefusesWhatItCannotSupport(t *testing.T) {
@@ -158,25 +185,25 @@ func TestHardwareE2ESummaryBuildSubjectWriteRefusesWhatItCannotSupport(t *testin
 		// What the plan, the legs and the commits must say.
 		{name: "a plan that was modified", exit: 22, code: verify, message: hardwareE2EMessagePlan,
 			mutate: hardwareE2EEdit(func(m map[string]any) { m["note"] = "edited" }, "sub", "plan.json")},
-		{name: "a run of NVKR outputs whose plan is the fixture", source: "nvkr-outputs", exit: 22, code: verify, message: hardwareE2EMessagePlan,
+		{name: "a run of NVKR outputs whose plan is the one generated", source: "nvkr-outputs", exit: 22, code: verify, message: hardwareE2EMessagePlan,
 			mutate: func(t *testing.T, in hardwareE2ESummaryInputs, a []string) []string {
 				t.Helper()
-				fixture, err := os.ReadFile(filepath.Join(hardwareE2ERoot(t), hardwareE2EPlanFile))
+				generated, err := os.ReadFile(filepath.Join(hardwareE2ERoot(t), hardwareE2EPlanFile))
 				if err != nil {
 					t.Fatal(err)
 				}
-				// Make the record and the checks name the fixture's own node image locations, so that
+				// Make the record and the checks name the generated plan's own node image locations, so that
 				// only the rule about an unchanged plan can refuse this run.
 				var plan map[string]any
-				if err := json.Unmarshal(fixture, &plan); err != nil {
+				if err := json.Unmarshal(generated, &plan); err != nil {
 					t.Fatal(err)
 				}
 				for _, slot := range []string{"os-image-amd64", "os-image-arm64"} {
 					url := hardwareE2EPlanNodeURLOf(t, plan, slot)
 					hardwareE2ENodeImageBoth(slot, "to", "url", url)(t, in, a)
 				}
-				// The fixture's exact bytes go last: the edits above re-encode the plan they touch.
-				if err := os.WriteFile(in.path("sub", "plan.json"), fixture, 0o600); err != nil {
+				// The generated plan's exact bytes go last: the edits above re-encode the plan they touch.
+				if err := os.WriteFile(in.path("sub", "plan.json"), generated, 0o600); err != nil {
 					t.Fatal(err)
 				}
 				return a
@@ -280,8 +307,13 @@ func TestHardwareE2ESummaryAssertRefusesAnArtifactSourceThatDisagreesWithTheRest
 		{"a node image added", subjectBytes, func(s map[string]any) { s["nodeImages"] = []any{someImage()} }, hardwareE2EMessageImages},
 		{"node images that are not a list", subjectBytes, func(s map[string]any) { s["nodeImages"] = nil }, hardwareE2EMessageImages},
 		{"a skew declared with no node image to differ", subjectBytes, func(s map[string]any) { s["nodeImageVersionSkew"] = true }, hardwareE2EMessageSkew},
-		{"a plan digest that is not the fixture's", subjectBytes, func(s map[string]any) { s["plan"].(map[string]any)["sha256"] = hardwareE2EDigest("a") }, hardwareE2EMessagePlan},
-		{"a fixture digest that is not the plan's", subjectBytes, func(s map[string]any) { s["plan"].(map[string]any)["fixtureSha256"] = hardwareE2EDigest("a") }, hardwareE2EMessagePlan},
+		{"a plan digest that is not the generated plan's", subjectBytes, func(s map[string]any) { s["plan"].(map[string]any)["sha256"] = hardwareE2EDigest("a") }, hardwareE2EMessagePlan},
+		{"a generated plan digest that is not the plan's", subjectBytes, func(s map[string]any) { s["plan"].(map[string]any)["generatedSha256"] = hardwareE2EDigest("a") }, hardwareE2EMessagePlan},
+		{"a plan with the old fixture digest field", subjectBytes, func(s map[string]any) {
+			plan := s["plan"].(map[string]any)
+			plan["fixtureSha256"] = plan["generatedSha256"]
+			delete(plan, "generatedSha256")
+		}, "plan must carry two sha256 digests"},
 		{"a leg built from no commit", subjectBytes, func(s map[string]any) { staged(s, 0)["builtFromCommit"] = nil }, hardwareE2EMessageCommit},
 		{"a leg built from another commit", subjectBytes, func(s map[string]any) { staged(s, 1)["builtFromCommit"] = strings.Repeat("0", 40) }, hardwareE2EMessageCommit},
 		{"a harness at another commit than the legs were built from", subjectBytes, func(s map[string]any) {
@@ -307,9 +339,9 @@ func TestHardwareE2ESummaryAssertRefusesAnArtifactSourceThatDisagreesWithTheRest
 		// A summary of NVKR outputs.
 		{"NVKR outputs relabelled as a build from the subject commit", outputsBytes, func(s map[string]any) { s["artifactSource"] = "build-subject" }, hardwareE2EMessageProducer},
 		{"NVKR outputs with the producer nulled", outputsBytes, func(s map[string]any) { s["producer"] = nil }, hardwareE2EMessageProducer},
-		{"NVKR outputs with a plan digest equal to the fixture's", outputsBytes, func(s map[string]any) {
+		{"NVKR outputs with a plan digest equal to the generated plan's", outputsBytes, func(s map[string]any) {
 			plan := s["plan"].(map[string]any)
-			plan["sha256"] = plan["fixtureSha256"]
+			plan["sha256"] = plan["generatedSha256"]
 		}, hardwareE2EMessagePlan},
 		{"NVKR outputs with no node images", outputsBytes, func(s map[string]any) { s["nodeImages"] = []any{} }, hardwareE2EMessageImages},
 		{"NVKR outputs whose leg names a commit", outputsBytes, func(s map[string]any) { staged(s, 0)["builtFromCommit"] = hardwareE2ECommit }, hardwareE2EMessageCommit},

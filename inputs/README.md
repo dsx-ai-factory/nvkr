@@ -14,7 +14,7 @@ inputs/
   environments/  # Execution, credentials, signing and publication policy
   policies/      # Verification policy and maintained generation selections
   testing/       # Retained downstream test inputs; maintained hosted nightly configuration lives in demos/
-  qualification/ # Committed NVKE plan fixtures and their provenance for the NVKE hardware E2E
+  qualification/ # NVKE hardware E2E outputs manifests; absent until the first is committed
   experiments/   # Producers outside the maintained release catalog
 ```
 
@@ -96,14 +96,16 @@ remains supported per the migration map. Other authoring and pin-set teaching fi
 
 ## NVKE hardware E2E plan
 
-`qualification/` holds the copy of NVKE's `qualify plan` output that the NVKE hardware E2E workflow (`.github/workflows/nvkr-nvke-hardware-e2e.yml`)
-runs against, with a provenance record naming the NVKE run, commit, tag, retrieval date and the SHA-256 of both the
-original artifact and the committed bytes. The fixture masks the NGC organization identifier in its `nvcr.io`
-references. It is a description of NVKE's plan, not an authored Definition: the lane substitutes NVKR-built references
-for the slots NVKR produces, and leaves NVKE's imager and tool pins as they are. Replace the fixture only by
-retrieving a newer NVKE plan and updating both files in one reviewed change.
+No NVKE plan is committed. The NVKE hardware E2E workflow (`.github/workflows/nvkr-nvke-hardware-e2e.yml`) generates
+one in every run with NVKE's `qualify plan`, for the `subject-commit` and `subject-version` the dispatch names, and
+refuses the run unless the plan names that commit, version and scope. The plan is a description of NVKE's release,
+not an authored Definition: the lane substitutes NVKR-built references for the slots NVKR produces, and leaves NVKE's
+imager and tool pins as they are. The generated plan is uploaded with the run, and the run summary records its digest.
+The job gives the planner a placeholder NGC organization and no credential, so the plan holds no organization identifier.
+A sample of the planner's output under `internal/cicontract/testdata/hardware-e2e/` exercises the scripts in tests; no run
+reads it.
 
-An outputs manifest for the lane's `nvkr-outputs` source also belongs directly under `qualification/`, added in a
+`qualification/` holds the outputs manifest for the lane's `nvkr-outputs` source, added directly under it in a
 reviewed change after a producer run. Each node image entry names its verification, `http-get` or `s3-readback`
 with the publication run it cites; `scripts/hardware-e2e-substitute-plan.sh` owns the schema.
 

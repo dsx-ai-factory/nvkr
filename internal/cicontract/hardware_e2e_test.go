@@ -13,27 +13,33 @@ import (
 	"os/exec"
 	"path/filepath"
 	"reflect"
+	"slices"
 	"strconv"
 	"strings"
 	"testing"
 	"time"
 )
 
-// These contracts cover the hardware E2E workflow's offline pieces: the committed
-// plan fixture and the plan substitution script. They do not exercise hardware, the
-// object store, a registry or a hosted run; the ADR-18 reconciliation row states that scope.
+// These contracts cover the hardware E2E workflow's offline pieces: the plan substitution
+// script and the sample plan it is tested against. They do not exercise hardware, the object
+// store, a registry or a hosted run; the ADR-18 reconciliation row states that scope.
+//
+// No run reads the sample plan. The workflow generates its plan with NVKE's planner, which
+// these tests do not run, so the sample stands for the shape the substitution script was
+// written against, not for what NVKE generates today.
 
 const (
-	hardwareE2EPlanFile       = "inputs/qualification/nvke-plan-v0.24.0-beta.12.json"
-	hardwareE2EProvenanceFile = "inputs/qualification/nvke-plan-v0.24.0-beta.12.provenance.json"
+	// hardwareE2EPlanFile is a sample of the planner's output for the subject named below.
+	hardwareE2EPlanFile       = "internal/cicontract/testdata/hardware-e2e/nvke-plan.json"
 	hardwareE2ESubstituteTool = "scripts/hardware-e2e-substitute-plan.sh"
 	hardwareE2ECommit         = "c044392984cdd74149d00110cbb68adfd1075024"
 	hardwareE2EVersion        = "v0.24.0-beta.12"
+	hardwareE2EScope          = "golden-path"
 )
 
-// Integration boundary: these are the pinned NVKE harness's own spellings, not NVKR's. The plan
-// fixture is a byte-exact copy of NVKE's output, so its provider and stream names, and the label
-// its Ginkgo specs carry, stay as NVKE writes them. Tests name them here and nowhere else.
+// Integration boundary: these are the pinned NVKE harness's own spellings, not NVKR's. The sample
+// plan is a copy of NVKE's output, so its provider and stream names, and the label its Ginkgo
+// specs carry, stay as NVKE writes them. Tests name them here and nowhere else.
 const (
 	hardwareE2EHarnessProvider = "forge"
 	hardwareE2ETenantLabel     = "nico-forge"
@@ -189,88 +195,56 @@ func hardwareE2EReadPlan(t *testing.T, filename string) hardwareE2EPlan {
 	return plan
 }
 
-func TestHardwareE2EPlanFixtureMatchesItsProvenance(t *testing.T) {
-	root := hardwareE2ERoot(t)
-	planBytes, err := os.ReadFile(filepath.Join(root, hardwareE2EPlanFile))
-	if err != nil {
-		t.Fatal(err)
-	}
-	var provenance struct {
-		Schema string `json:"schema"`
-		Source struct {
-			Repository  string `json:"repository"`
-			WorkflowRun string `json:"workflowRun"`
-			Commit      string `json:"commit"`
-			Tag         string `json:"tag"`
-			Scope       string `json:"scope"`
-		} `json:"source"`
-		RetrievedOn    string `json:"retrievedOn"`
-		OriginalSHA256 string `json:"originalSha256"`
-		Fixture        struct {
-			File       string   `json:"file"`
-			SHA256     string   `json:"sha256"`
-			Redactions []string `json:"redactions"`
-		} `json:"fixture"`
-	}
-	provenanceBytes, err := os.ReadFile(filepath.Join(root, hardwareE2EProvenanceFile))
-	if err != nil {
-		t.Fatal(err)
-	}
-	if err := json.Unmarshal(provenanceBytes, &provenance); err != nil {
-		t.Fatal(err)
-	}
+// hardwareE2ESubjectFlags names a subject the way the workflow passes it to the substitution tool.
+func hardwareE2ESubjectFlags(commit, version, scope string) []string {
+	return []string{"--subject-commit", commit, "--subject-version", version, "--scope", scope}
+}
 
-	if provenance.Schema != "nvkr.dev/hardware-e2e-plan-provenance/v1" {
-		t.Errorf("provenance schema = %q", provenance.Schema)
-	}
-	if got := hardwareE2ESHA256(planBytes); got != provenance.Fixture.SHA256 {
-		t.Errorf("fixture sha256 = %s, provenance records %s; update the record only with a reviewed fixture change", got, provenance.Fixture.SHA256)
-	}
-	if provenance.Fixture.File != filepath.Base(hardwareE2EPlanFile) {
-		t.Errorf("provenance fixture file = %q", provenance.Fixture.File)
-	}
-	if len(provenance.OriginalSHA256) != 64 || provenance.OriginalSHA256 == provenance.Fixture.SHA256 {
-		t.Errorf("originalSha256 %q must be the distinct hash of the unredacted artifact", provenance.OriginalSHA256)
-	}
-	if provenance.Source.Repository != "dsx-ai-factory/nvke" || provenance.RetrievedOn == "" ||
-		!strings.HasPrefix(provenance.Source.WorkflowRun, "https://github.com/dsx-ai-factory/nvke/actions/runs/") {
-		t.Errorf("provenance must name the NVKE run and the retrieval date: %+v", provenance)
-	}
-	if len(provenance.Fixture.Redactions) == 0 {
-		t.Error("the fixture is redacted, so the provenance record must say what was redacted")
-	}
+// hardwareE2ESubstitute runs the substitution tool for the sample plan's subject. The arguments
+// are the other flags, if any, and then the operands from PLAN onward.
+func hardwareE2ESubstitute(t *testing.T, args ...string) hardwareE2EResult {
+	t.Helper()
+	return hardwareE2ESubstituteFor(t, hardwareE2ECommit, hardwareE2EVersion, hardwareE2EScope, args...)
+}
 
-	plan := hardwareE2EReadPlan(t, filepath.Join(root, hardwareE2EPlanFile))
-	if plan.Subject != "nvke" || plan.Commit != hardwareE2ECommit || plan.Commit != provenance.Source.Commit ||
-		plan.Version != provenance.Source.Tag || plan.Scope != provenance.Source.Scope {
-		t.Errorf("plan identity %s %s %s disagrees with provenance %+v", plan.Subject, plan.Version, plan.Commit, provenance.Source)
+// hardwareE2ESubstituteFor runs the substitution tool asking for the given subject.
+func hardwareE2ESubstituteFor(t *testing.T, commit, version, scope string, args ...string) hardwareE2EResult {
+	t.Helper()
+	return hardwareE2ERun(t, hardwareE2ESubstituteTool, append(hardwareE2ESubjectFlags(commit, version, scope), args...)...)
+}
+
+func TestHardwareE2EPlanSampleHasTheShapeTheLaneSubstitutes(t *testing.T) {
+	plan := hardwareE2EReadPlan(t, filepath.Join(hardwareE2ERoot(t), hardwareE2EPlanFile))
+	if plan.Subject != "nvke" || plan.Commit != hardwareE2ECommit || plan.Version != hardwareE2EVersion || plan.Scope != hardwareE2EScope {
+		t.Errorf("sample plan identity %s %s %s %s; the tests ask for nvke %s at %s with scope %s",
+			plan.Subject, plan.Version, plan.Commit, plan.Scope, hardwareE2EVersion, hardwareE2ECommit, hardwareE2EScope)
 	}
 	if len(plan.Combinations) != 1 || len(plan.Combinations[0].Streams) != 2 {
-		t.Fatalf("plan shape changed: %d combinations", len(plan.Combinations))
+		t.Fatalf("sample plan shape changed: %d combinations", len(plan.Combinations))
 	}
 	// Streams are listed amd64 first; the workflow's ordering rule relies on the harness
-	// matrix, but a fixture that lists them the other way round would be a review signal.
+	// matrix, but a sample that lists them the other way round would be a review signal.
 	streams := plan.Combinations[0].Streams
 	if !strings.Contains(streams[0].Name, "-amd64-") || !strings.Contains(streams[1].Name, "-arm64-") {
-		t.Errorf("fixture streams = %q, %q; want amd64 then arm64", streams[0].Name, streams[1].Name)
+		t.Errorf("sample streams = %q, %q; want amd64 then arm64", streams[0].Name, streams[1].Name)
 	}
 }
 
-// The NGC organization identifier is withheld from the repository. The fixture may name
-// nvcr.io only through the placeholder, and the substitution tool must never forward an
-// NVKE-owned NVCR reference into an NVKR run.
-func TestHardwareE2EPlanFixtureWithholdsTheOrganization(t *testing.T) {
+// The NGC organization identifier is withheld from the repository. The sample may name nvcr.io
+// only through the placeholder the workflow also generates its plan with, and the substitution
+// tool must never forward an NVKE-owned NVCR reference into an NVKR run.
+func TestHardwareE2EPlanSampleWithholdsTheOrganization(t *testing.T) {
 	data, err := os.ReadFile(filepath.Join(hardwareE2ERoot(t), hardwareE2EPlanFile))
 	if err != nil {
 		t.Fatal(err)
 	}
 	text := string(data)
 	if !strings.Contains(text, "nvcr.io/<ngc-org>/") {
-		t.Fatal("fixture no longer carries the redaction placeholder")
+		t.Fatal("sample plan no longer carries the placeholder")
 	}
 	for _, line := range strings.Split(text, "\n") {
 		if i := strings.Index(line, "nvcr.io/"); i >= 0 && !strings.HasPrefix(line[i:], "nvcr.io/<ngc-org>/") {
-			t.Errorf("fixture names an unredacted nvcr.io organization: %s", strings.TrimSpace(line))
+			t.Errorf("sample plan names an unredacted nvcr.io organization: %s", strings.TrimSpace(line))
 		}
 	}
 }
@@ -289,8 +263,7 @@ func TestHardwareE2ESubstitutePlanAccepts(t *testing.T) {
 	outputs := hardwareE2EWriteJSON(t, scratch, "outputs.json", manifest)
 	out := filepath.Join(scratch, "out")
 
-	result := hardwareE2ERun(t, hardwareE2ESubstituteTool,
-		filepath.Join(root, hardwareE2EPlanFile), filepath.Join(root, hardwareE2EProvenanceFile), outputs, out)
+	result := hardwareE2ESubstitute(t, filepath.Join(root, hardwareE2EPlanFile), outputs, out)
 	if result.exit != 0 {
 		t.Fatalf("exit %d, want 0:\n%s", result.exit, result.output)
 	}
@@ -333,8 +306,8 @@ func TestHardwareE2ESubstitutePlanAccepts(t *testing.T) {
 		Schema        string `json:"schema"`
 		ProducerRunID string `json:"producerRunId"`
 		Plan          struct {
-			Commit        string `json:"commit"`
-			FixtureSHA256 string `json:"fixtureSha256"`
+			Commit          string `json:"commit"`
+			GeneratedSHA256 string `json:"generatedSha256"`
 		} `json:"plan"`
 		NodeImageVersionSkew *bool `json:"nodeImageVersionSkew"`
 		Replaced             []struct {
@@ -354,6 +327,15 @@ func TestHardwareE2ESubstitutePlanAccepts(t *testing.T) {
 	}
 	if record.Schema != "nvkr.dev/hardware-e2e-substitutions/v1" || record.ProducerRunID != "1234567890" || record.Plan.Commit != hardwareE2ECommit {
 		t.Errorf("record identity = %+v", record)
+	}
+	// The record names the plan as generated, which substitution then changes, so the two digests differ.
+	generated, err := os.ReadFile(filepath.Join(root, hardwareE2EPlanFile))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if record.Plan.GeneratedSHA256 != hardwareE2ESHA256(generated) || record.Plan.GeneratedSHA256 == hardwareE2ESHA256(planBytes) {
+		t.Errorf("generatedSha256 = %s, want the digest of the plan as generated %s and not of the substituted plan %s",
+			record.Plan.GeneratedSHA256, hardwareE2ESHA256(generated), hardwareE2ESHA256(planBytes))
 	}
 	if len(record.Replaced) != 6 {
 		t.Fatalf("replaced %d slots, want 6", len(record.Replaced))
@@ -478,8 +460,7 @@ func TestHardwareE2ESubstitutePlanRejects(t *testing.T) {
 			test.mutate(manifest)
 			outputs := hardwareE2EWriteJSON(t, scratch, "outputs.json", manifest)
 			out := filepath.Join(scratch, "out")
-			result := hardwareE2ERun(t, hardwareE2ESubstituteTool,
-				filepath.Join(root, hardwareE2EPlanFile), filepath.Join(root, hardwareE2EProvenanceFile), outputs, out)
+			result := hardwareE2ESubstitute(t, filepath.Join(root, hardwareE2EPlanFile), outputs, out)
 			if result.exit != test.wantExit || !strings.Contains(result.output, "["+test.wantCode+"]") {
 				t.Fatalf("exit %d, want %d with %s:\n%s", result.exit, test.wantExit, test.wantCode, result.output)
 			}
@@ -550,8 +531,8 @@ func TestHardwareE2ESubstitutePlanRequiresEachNodeImageToNameHowItIsChecked(t *t
 			manifest := hardwareE2EOutputs()
 			test.mutate(manifest)
 			out := filepath.Join(scratch, "out")
-			result := hardwareE2ERun(t, hardwareE2ESubstituteTool, filepath.Join(root, hardwareE2EPlanFile),
-				filepath.Join(root, hardwareE2EProvenanceFile), hardwareE2EWriteJSON(t, scratch, "outputs.json", manifest), out)
+			result := hardwareE2ESubstitute(t, filepath.Join(root, hardwareE2EPlanFile),
+				hardwareE2EWriteJSON(t, scratch, "outputs.json", manifest), out)
 			hardwareE2EExpectFailure(t, result, 49, "NVKR-E-UNPINNED-INPUT", message)
 			if _, err := os.Stat(out); !errors.Is(err, os.ErrNotExist) {
 				t.Errorf("a rejected substitution must leave no partial output: %v", err)
@@ -566,8 +547,8 @@ func TestHardwareE2ESubstitutePlanCarriesEachNodeImageVerificationAndOnlyThose(t
 	hardwareE2ESlots(manifest)["os-image-arm64"].(map[string]any)["verification"] = hardwareE2EReadback()
 	scratch := t.TempDir()
 	out := filepath.Join(scratch, "out")
-	result := hardwareE2ERun(t, hardwareE2ESubstituteTool, filepath.Join(root, hardwareE2EPlanFile),
-		filepath.Join(root, hardwareE2EProvenanceFile), hardwareE2EWriteJSON(t, scratch, "outputs.json", manifest), out)
+	result := hardwareE2ESubstitute(t, filepath.Join(root, hardwareE2EPlanFile),
+		hardwareE2EWriteJSON(t, scratch, "outputs.json", manifest), out)
 	if result.exit != 0 {
 		t.Fatalf("exit %d, want 0:\n%s", result.exit, result.output)
 	}
@@ -644,8 +625,7 @@ func TestHardwareE2ESubstitutePlanRecordsReadbackSizesAsWholeNumbers(t *testing.
 		t.Fatal(err)
 	}
 	out := filepath.Join(scratch, "out")
-	result := hardwareE2ERun(t, hardwareE2ESubstituteTool, filepath.Join(root, hardwareE2EPlanFile),
-		filepath.Join(root, hardwareE2EProvenanceFile), outputs, out)
+	result := hardwareE2ESubstitute(t, filepath.Join(root, hardwareE2EPlanFile), outputs, out)
 	if result.exit != 0 {
 		t.Fatalf("exit %d, want 0:\n%s", result.exit, result.output)
 	}
@@ -675,12 +655,12 @@ func TestHardwareE2ESubstitutePlanNodeImageVersionSkew(t *testing.T) {
 		hardwareE2ENodeSource(manifest, "os-image-amd64")["version"] = amd64
 		hardwareE2ENodeSource(manifest, "os-image-arm64")["version"] = arm64
 		out := filepath.Join(scratch, "out")
-		args := []string{filepath.Join(root, hardwareE2EPlanFile), filepath.Join(root, hardwareE2EProvenanceFile),
+		args := []string{filepath.Join(root, hardwareE2EPlanFile),
 			hardwareE2EWriteJSON(t, scratch, "outputs.json", manifest), out}
 		if flag {
 			args = append([]string{"--allow-node-image-version-skew"}, args...)
 		}
-		return hardwareE2ERun(t, hardwareE2ESubstituteTool, args...), out
+		return hardwareE2ESubstitute(t, args...), out
 	}
 
 	accepted := []struct {
@@ -740,60 +720,155 @@ func TestHardwareE2ESubstitutePlanNodeImageVersionSkew(t *testing.T) {
 	}
 }
 
-func TestHardwareE2ESubstitutePlanRejectsAChangedFixture(t *testing.T) {
-	root := hardwareE2ERoot(t)
-	planBytes, err := os.ReadFile(filepath.Join(root, hardwareE2EPlanFile))
+// hardwareE2EEditedPlan is the sample plan with an edit applied, re-encoded as JSON.
+func hardwareE2EEditedPlan(t *testing.T, edit func(plan map[string]any)) []byte {
+	t.Helper()
+	data, err := os.ReadFile(filepath.Join(hardwareE2ERoot(t), hardwareE2EPlanFile))
 	if err != nil {
 		t.Fatal(err)
 	}
-	provenanceBytes, err := os.ReadFile(filepath.Join(root, hardwareE2EProvenanceFile))
+	var plan map[string]any
+	if err := json.Unmarshal(data, &plan); err != nil {
+		t.Fatal(err)
+	}
+	edit(plan)
+	edited, err := json.MarshalIndent(plan, "", "  ")
 	if err != nil {
 		t.Fatal(err)
 	}
-	otherCommit := strings.Repeat("0", 40)
+	return append(edited, '\n')
+}
 
-	tests := []struct {
-		name     string
-		plan     func() []byte
-		prov     func(plan []byte) []byte
-		wantExit int
-		wantCode string
-	}{
-		{"fixture bytes changed after the record was made",
-			func() []byte { return append(append([]byte{}, planBytes...), '\n') },
-			func([]byte) []byte { return provenanceBytes },
-			22, "NVKR-E-VERIFY-FAILED"},
-		{"fixture commit disagrees with the provenance commit",
-			func() []byte { return []byte(strings.Replace(string(planBytes), hardwareE2ECommit, otherCommit, 1)) },
-			func(plan []byte) []byte {
-				return []byte(strings.Replace(string(provenanceBytes), hardwareE2ESHA256(planBytes), hardwareE2ESHA256(plan), 1))
-			},
-			13, "NVKR-E-UNSUPPORTED"},
-		{"fixture no longer declares a slot as an OCI artifact",
-			func() []byte {
-				return []byte(strings.Replace(string(planBytes), `"locationStrategy": "ociArtifact"`, `"locationStrategy": "url"`, 1))
-			},
-			func(plan []byte) []byte {
-				return []byte(strings.Replace(string(provenanceBytes), hardwareE2ESHA256(planBytes), hardwareE2ESHA256(plan), 1))
-			},
-			13, "NVKR-E-UNSUPPORTED"},
-	}
-	for _, test := range tests {
-		t.Run(test.name, func(t *testing.T) {
+// hardwareE2ESubstituteForms runs the substitution tool in both artifact sources on one plan and
+// one requested subject, for a check that must hold in both. A refusal must leave no output.
+func hardwareE2ESubstituteForms(t *testing.T, commit, version, scope string, plan []byte, check func(t *testing.T, result hardwareE2EResult)) {
+	t.Helper()
+	for _, form := range []string{"nvkr-outputs", "build-subject"} {
+		t.Run(form, func(t *testing.T) {
 			scratch := t.TempDir()
-			plan := test.plan()
 			planFile := filepath.Join(scratch, "plan.json")
-			provenanceFile := filepath.Join(scratch, "provenance.json")
 			if err := os.WriteFile(planFile, plan, 0o600); err != nil {
 				t.Fatal(err)
 			}
-			if err := os.WriteFile(provenanceFile, test.prov(plan), 0o600); err != nil {
-				t.Fatal(err)
+			out := filepath.Join(scratch, "out")
+			args := []string{"--build-subject", planFile, out}
+			if form == "nvkr-outputs" {
+				args = []string{planFile, hardwareE2EWriteJSON(t, scratch, "outputs.json", hardwareE2EOutputs()), out}
 			}
-			outputs := hardwareE2EWriteJSON(t, scratch, "outputs.json", hardwareE2EOutputs())
-			result := hardwareE2ERun(t, hardwareE2ESubstituteTool, planFile, provenanceFile, outputs, filepath.Join(scratch, "out"))
-			if result.exit != test.wantExit || !strings.Contains(result.output, "["+test.wantCode+"]") {
-				t.Fatalf("exit %d, want %d with %s:\n%s", result.exit, test.wantExit, test.wantCode, result.output)
+			check(t, hardwareE2ESubstituteFor(t, commit, version, scope, args...))
+			if _, err := os.Lstat(out); err == nil {
+				t.Error("a refusal left an output directory")
+			}
+		})
+	}
+}
+
+// The plan is generated at dispatch time, so this check is the only thing that ties it to the subject
+// the dispatcher named: `qualify plan` derives the commit from the version, and a moved tag, another
+// scope or a plan for another subject must not reach a machine.
+func TestHardwareE2ESubstitutePlanRefusesAPlanThatDoesNotNameTheRequestedSubject(t *testing.T) {
+	other := strings.Repeat("0", 40)
+	keep := func(map[string]any) {}
+	tests := []struct {
+		name                   string
+		edit                   func(plan map[string]any)
+		commit, version, scope string
+		wantNamed              []string
+	}{
+		{"a commit the version does not point at", keep, other, hardwareE2EVersion, hardwareE2EScope, []string{hardwareE2ECommit, other}},
+		{"another version of the same commit", keep, hardwareE2ECommit, "v0.24.0-rc.11", hardwareE2EScope, []string{hardwareE2EVersion, "v0.24.0-rc.11"}},
+		{"another scope", keep, hardwareE2ECommit, hardwareE2EVersion, "full", []string{"scope " + hardwareE2EScope, "scope full"}},
+		{"a plan edited to another commit", func(p map[string]any) { p["commit"] = other }, hardwareE2ECommit, hardwareE2EVersion, hardwareE2EScope, []string{other, hardwareE2ECommit}},
+		{"a plan edited to another version", func(p map[string]any) { p["version"] = "v0.24.0-rc.11" }, hardwareE2ECommit, hardwareE2EVersion, hardwareE2EScope, []string{"v0.24.0-rc.11", hardwareE2EVersion}},
+		{"a plan edited to another scope", func(p map[string]any) { p["scope"] = "full" }, hardwareE2ECommit, hardwareE2EVersion, hardwareE2EScope, []string{"scope full", "scope " + hardwareE2EScope}},
+		{"a plan for another subject", func(p map[string]any) { p["subject"] = "nico" }, hardwareE2ECommit, hardwareE2EVersion, hardwareE2EScope, []string{"subject nico"}},
+		{"a plan with no commit", func(p map[string]any) { delete(p, "commit") }, hardwareE2ECommit, hardwareE2EVersion, hardwareE2EScope, []string{"at none"}},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			hardwareE2ESubstituteForms(t, test.commit, test.version, test.scope, hardwareE2EEditedPlan(t, test.edit),
+				func(t *testing.T, result hardwareE2EResult) {
+					hardwareE2EExpectFailure(t, result, 22, "NVKR-E-VERIFY-FAILED", "")
+					for _, named := range test.wantNamed {
+						if !strings.Contains(result.output, named) {
+							t.Errorf("the refusal does not name %q:\n%s", named, result.output)
+						}
+					}
+				})
+		})
+	}
+}
+
+func TestHardwareE2ESubstitutePlanRefusesAPlanOfAnotherShape(t *testing.T) {
+	sample, err := os.ReadFile(filepath.Join(hardwareE2ERoot(t), hardwareE2EPlanFile))
+	if err != nil {
+		t.Fatal(err)
+	}
+	tests := []struct {
+		name string
+		plan []byte
+	}{
+		{"not JSON", []byte("not a plan\n")},
+		{"an empty file", nil},
+		{"a JSON array", []byte("[]\n")},
+		{"two documents", append(append([]byte{}, sample...), sample...)},
+		{"no combinations", hardwareE2EEditedPlan(t, func(p map[string]any) { delete(p, "combinations") })},
+		{"two combinations", hardwareE2EEditedPlan(t, func(p map[string]any) {
+			combinations := p["combinations"].([]any)
+			p["combinations"] = append(combinations, combinations[0])
+		})},
+		{"a slot no longer declared as an OCI artifact", []byte(strings.Replace(string(sample), `"locationStrategy": "ociArtifact"`, `"locationStrategy": "url"`, 1))},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			hardwareE2ESubstituteForms(t, hardwareE2ECommit, hardwareE2EVersion, hardwareE2EScope, test.plan,
+				func(t *testing.T, result hardwareE2EResult) {
+					hardwareE2EExpectFailure(t, result, 13, "NVKR-E-UNSUPPORTED", "")
+				})
+		})
+	}
+}
+
+// The subject flags are the only thing that says what the plan must name, so each is required, strictly
+// shaped and given once, and none is accepted after the operands.
+func TestHardwareE2ESubstitutePlanRequiresAWellFormedSubject(t *testing.T) {
+	root := hardwareE2ERoot(t)
+	scratch := t.TempDir()
+	operands := []string{filepath.Join(root, hardwareE2EPlanFile), hardwareE2EWriteJSON(t, scratch, "outputs.json", hardwareE2EOutputs()), filepath.Join(scratch, "out")}
+	with := func(flags ...string) []string { return append(slices.Clone(flags), operands...) }
+	subject := func(commit, version, scope string, extra ...string) []string {
+		return append(hardwareE2ESubjectFlags(commit, version, scope), extra...)
+	}
+	good := func(extra ...string) []string {
+		return subject(hardwareE2ECommit, hardwareE2EVersion, hardwareE2EScope, extra...)
+	}
+	tests := map[string][]string{
+		"no subject flags":                 slices.Clone(operands),
+		"no commit":                        with("--subject-version", hardwareE2EVersion, "--scope", hardwareE2EScope),
+		"no version":                       with("--subject-commit", hardwareE2ECommit, "--scope", hardwareE2EScope),
+		"no scope":                         with("--subject-commit", hardwareE2ECommit, "--subject-version", hardwareE2EVersion),
+		"an upper-case commit":             with(subject(strings.ToUpper(hardwareE2ECommit), hardwareE2EVersion, hardwareE2EScope)...),
+		"an abbreviated commit":            with(subject(hardwareE2ECommit[:12], hardwareE2EVersion, hardwareE2EScope)...),
+		"a commit that is not hex":         with(subject(strings.Repeat("g", 40), hardwareE2EVersion, hardwareE2EScope)...),
+		"a version without the v":          with(subject(hardwareE2ECommit, "0.24.0-beta.12", hardwareE2EScope)...),
+		"a branch for the version":         with(subject(hardwareE2ECommit, "main", hardwareE2EScope)...),
+		"a version with a path":            with(subject(hardwareE2ECommit, "refs/tags/"+hardwareE2EVersion, hardwareE2EScope)...),
+		"a scope with a space":             with(subject(hardwareE2ECommit, hardwareE2EVersion, "golden path")...),
+		"an upper-case scope":              with(subject(hardwareE2ECommit, hardwareE2EVersion, "Golden-Path")...),
+		"an empty scope":                   with(subject(hardwareE2ECommit, hardwareE2EVersion, "")...),
+		"the commit flag twice":            with(good("--subject-commit", hardwareE2ECommit)...),
+		"the scope flag twice":             with(good("--scope", hardwareE2EScope)...),
+		"a flag with no value":             append(good(), "--subject-commit"),
+		"the subject after the operands":   append(slices.Clone(operands), good()...),
+		"a flag the tool does not know":    with(good("--plan-from-commit")...),
+		"build-subject twice":              with(good("--build-subject", "--build-subject")...),
+		"the skew flag with build-subject": with(good("--build-subject", "--allow-node-image-version-skew")...),
+	}
+	for name, args := range tests {
+		t.Run(name, func(t *testing.T) {
+			hardwareE2EExpectFailure(t, hardwareE2ERun(t, hardwareE2ESubstituteTool, args...), 2, "NVKR-E-USAGE", "")
+			if _, err := os.Lstat(operands[2]); err == nil {
+				t.Error("a usage error left an output directory")
 			}
 		})
 	}
@@ -803,9 +878,9 @@ func TestHardwareE2ESubstitutePlanRefusesUsageAndExistingOutput(t *testing.T) {
 	root := hardwareE2ERoot(t)
 	scratch := t.TempDir()
 	outputs := hardwareE2EWriteJSON(t, scratch, "outputs.json", hardwareE2EOutputs())
-	plan, provenance := filepath.Join(root, hardwareE2EPlanFile), filepath.Join(root, hardwareE2EProvenanceFile)
+	plan := filepath.Join(root, hardwareE2EPlanFile)
 
-	if result := hardwareE2ERun(t, hardwareE2ESubstituteTool, plan, provenance, outputs); result.exit != 2 ||
+	if result := hardwareE2ESubstitute(t, plan, outputs); result.exit != 2 ||
 		!strings.Contains(result.output, "[NVKR-E-USAGE]") {
 		t.Errorf("missing OUT argument: exit %d\n%s", result.exit, result.output)
 	}
@@ -814,16 +889,16 @@ func TestHardwareE2ESubstitutePlanRefusesUsageAndExistingOutput(t *testing.T) {
 		t.Fatal(err)
 	}
 	for name, args := range map[string][]string{
-		"the skew flag after the positional arguments": {plan, provenance, outputs, filepath.Join(scratch, "a"), "--allow-node-image-version-skew"},
-		"an unknown flag":                  {"--force", plan, provenance, outputs, filepath.Join(scratch, "b")},
-		"the skew flag with a missing OUT": {"--allow-node-image-version-skew", plan, provenance, outputs},
-		"the skew flag twice":              {"--allow-node-image-version-skew", "--allow-node-image-version-skew", plan, provenance, outputs, filepath.Join(scratch, "c")},
+		"the skew flag after the positional arguments": {plan, outputs, filepath.Join(scratch, "a"), "--allow-node-image-version-skew"},
+		"an unknown flag":                  {"--force", plan, outputs, filepath.Join(scratch, "b")},
+		"the skew flag with a missing OUT": {"--allow-node-image-version-skew", plan, outputs},
+		"the skew flag twice":              {"--allow-node-image-version-skew", "--allow-node-image-version-skew", plan, outputs, filepath.Join(scratch, "c")},
 	} {
-		if result := hardwareE2ERun(t, hardwareE2ESubstituteTool, args...); result.exit != 2 || !strings.Contains(result.output, "[NVKR-E-USAGE]") {
+		if result := hardwareE2ESubstitute(t, args...); result.exit != 2 || !strings.Contains(result.output, "[NVKR-E-USAGE]") {
 			t.Errorf("%s: exit %d\n%s", name, result.exit, result.output)
 		}
 	}
-	if result := hardwareE2ERun(t, hardwareE2ESubstituteTool, plan, provenance, outputs, existing); result.exit != 47 ||
+	if result := hardwareE2ESubstitute(t, plan, outputs, existing); result.exit != 47 ||
 		!strings.Contains(result.output, "[NVKR-E-IMMUTABLE-VIOLATION]") {
 		t.Errorf("existing OUT: exit %d\n%s", result.exit, result.output)
 	}
@@ -980,6 +1055,108 @@ func TestHardwareE2EMatrixRejectsStreamsTheLaneCannotRun(t *testing.T) {
 	}
 }
 
+// hardwareE2EMatrixLine returns the matrix the script printed: the one output line that is a JSON
+// object. The script's notices go to stderr, which the test helper merges into its output.
+func hardwareE2EMatrixLine(t *testing.T, output string) (streams []string, found bool) {
+	t.Helper()
+	for line := range strings.SplitSeq(output, "\n") {
+		if !strings.HasPrefix(line, "{") {
+			continue
+		}
+		var matrix struct {
+			Include []struct {
+				Stream string `json:"stream"`
+			} `json:"include"`
+		}
+		if err := json.Unmarshal([]byte(line), &matrix); err != nil {
+			t.Fatalf("a line starting with { is not the matrix: %v\n%s", err, output)
+		}
+		if found {
+			t.Fatalf("the script printed two matrices:\n%s", output)
+		}
+		found = true
+		for _, entry := range matrix.Include {
+			streams = append(streams, entry.Stream)
+		}
+	}
+	return streams, found
+}
+
+func TestHardwareE2EMatrixAmd64OnlyLeavesArm64OutAfterTheWholeMatrixIsChecked(t *testing.T) {
+	provider := hardwareE2EHarnessProvider
+	const notice = "this selection dispatches amd64 streams only"
+	tests := []struct {
+		name       string
+		streams    []map[string]any
+		wantExit   int
+		wantCode   string
+		wantText   string
+		wantStream []string
+		wantNotice bool
+	}{
+		{name: "arm64 streams are left out and named, amd64 keeps the plan's order", wantExit: 0, wantNotice: true,
+			wantText: "not dispatching c/arm64-first, c/arm64-second",
+			streams: []map[string]any{
+				hardwareE2EStream("c", "arm64-first", "arm64", provider), hardwareE2EStream("c", "amd64-first", "amd64", provider),
+				hardwareE2EStream("c", "arm64-second", "arm64", provider), hardwareE2EStream("c", "amd64-second", "amd64", provider)},
+			wantStream: []string{"amd64-first", "amd64-second"}},
+		{name: "an amd64-only matrix is unchanged and needs no notice", wantExit: 0,
+			streams:    []map[string]any{hardwareE2EStream("c", "only", "amd64", provider)},
+			wantStream: []string{"only"}},
+		{name: "a matrix with no amd64 stream is refused", wantExit: 13, wantCode: "NVKR-E-UNSUPPORTED", wantText: "names no amd64 stream",
+			streams: []map[string]any{hardwareE2EStream("c", "arm", "arm64", provider)}},
+		// The filter runs after every check, so a stream the lane cannot run is refused even when it is the
+		// one that would have been left out.
+		{name: "an arm64 stream of another provider is still refused", wantExit: 13, wantCode: "NVKR-E-UNSUPPORTED", wantText: "dsx-arm",
+			streams: []map[string]any{hardwareE2EStream("c", "amd64", "amd64", provider), hardwareE2EStream("c", "dsx-arm", "arm64", "dsx")}},
+		{name: "an arm64 duplicate is still refused", wantExit: 13, wantCode: "NVKR-E-UNSUPPORTED", wantText: "twice",
+			streams: []map[string]any{hardwareE2EStream("c", "amd64", "amd64", provider),
+				hardwareE2EStream("c", "twice", "arm64", provider), hardwareE2EStream("c", "twice", "arm64", provider)}},
+		{name: "an unknown architecture is still refused", wantExit: 13, wantCode: "NVKR-E-UNSUPPORTED", wantText: "riscv=riscv64",
+			streams: []map[string]any{hardwareE2EStream("c", "amd64", "amd64", provider), hardwareE2EStream("c", "riscv", "riscv64", provider)}},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			scratch := t.TempDir()
+			harness := hardwareE2EFakeHarness(t, scratch, 0)
+			plan := hardwareE2EMatrixFile(t, scratch, test.streams...)
+			result := hardwareE2ERun(t, hardwareE2EMatrixTool, "--amd64-only", harness, plan)
+			if result.exit != test.wantExit {
+				t.Fatalf("exit %d, want %d:\n%s", result.exit, test.wantExit, result.output)
+			}
+			if test.wantCode != "" && !strings.Contains(result.output, "["+test.wantCode+"]") {
+				t.Fatalf("want %s:\n%s", test.wantCode, result.output)
+			}
+			if !strings.Contains(result.output, test.wantText) {
+				t.Errorf("output lacks %q:\n%s", test.wantText, result.output)
+			}
+			if got := strings.Contains(result.output, notice); got != test.wantNotice && test.wantExit == 0 {
+				t.Errorf("notice present = %v, want %v:\n%s", got, test.wantNotice, result.output)
+			}
+			got, printed := hardwareE2EMatrixLine(t, result.output)
+			if test.wantExit != 0 {
+				if printed {
+					t.Errorf("a refused matrix must print no matrix:\n%s", result.output)
+				}
+				return
+			}
+			if !printed || strings.Join(got, ",") != strings.Join(test.wantStream, ",") {
+				t.Errorf("streams %v (printed %v), want %v", got, printed, test.wantStream)
+			}
+		})
+	}
+	t.Run("without the flag the same matrix keeps its arm64 streams", func(t *testing.T) {
+		scratch := t.TempDir()
+		plan := hardwareE2EMatrixFile(t, scratch,
+			hardwareE2EStream("c", "arm", "arm64", provider), hardwareE2EStream("c", "amd", "amd64", provider))
+		result := hardwareE2ERun(t, hardwareE2EMatrixTool, hardwareE2EFakeHarness(t, scratch, 0), plan)
+		got, printed := hardwareE2EMatrixLine(t, result.output)
+		if result.exit != 0 || !printed || strings.Join(got, ",") != "amd,arm" || strings.Contains(result.output, "not dispatching") {
+			t.Fatalf("exit %d, streams %v:\n%s", result.exit, got, result.output)
+		}
+	})
+}
+
 func TestHardwareE2EMatrixFailsClosedOnTheHarnessAndItsArguments(t *testing.T) {
 	scratch := t.TempDir()
 	plan := hardwareE2EMatrixFile(t, scratch, hardwareE2EStream("c", "amd64", "amd64", hardwareE2EHarnessProvider))
@@ -1014,6 +1191,10 @@ func TestHardwareE2EMatrixFailsClosedOnTheHarnessAndItsArguments(t *testing.T) {
 		{"plan is missing", []string{good, filepath.Join(scratch, "absent.json")}, 2, "NVKR-E-USAGE"},
 		{"too few arguments", []string{good}, 2, "NVKR-E-USAGE"},
 		{"too many arguments", []string{good, plan, "extra"}, 2, "NVKR-E-USAGE"},
+		{"the amd64-only flag alone", []string{"--amd64-only"}, 2, "NVKR-E-USAGE"},
+		{"the amd64-only flag twice", []string{"--amd64-only", "--amd64-only", good, plan}, 2, "NVKR-E-USAGE"},
+		{"the amd64-only flag after the arguments", []string{good, plan, "--amd64-only"}, 2, "NVKR-E-USAGE"},
+		{"another flag", []string{"--arm64-only", good, plan}, 2, "NVKR-E-USAGE"},
 	}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {

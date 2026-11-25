@@ -2,15 +2,21 @@
 # SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 # SPDX-License-Identifier: Apache-2.0
 
-# Substitute NVKR-built references into the committed NVKE plan fixture for the
-# hardware E2E workflow (ADR-18). The plan and the outputs manifest are
-# descriptions: this script authenticates only the fixture's blob integrity against
-# its provenance record and refuses any reference that is not content-addressed
-# (OCI) or not plain HTTPS (node image). It issues no authority and the result
-# carries qualificationAuthority "none" through the lane.
+# Substitute NVKR-built references into the NVKE plan that `qualify plan` generated for the
+# hardware E2E workflow (ADR-18). The plan and the outputs manifest are descriptions: this
+# script checks that the generated plan names the subject the dispatch asked for, and nothing
+# else about where the plan came from, and refuses any reference that is not content-addressed
+# (OCI) or not plain HTTPS (node image). It issues no authority and the result carries
+# qualificationAuthority "none" through the lane.
 #
-#   hardware-e2e-substitute-plan.sh [--allow-node-image-version-skew] PLAN PROVENANCE OUTPUTS OUT
-#   hardware-e2e-substitute-plan.sh --build-subject PLAN PROVENANCE OUT
+#   hardware-e2e-substitute-plan.sh [--allow-node-image-version-skew] SUBJECT PLAN OUTPUTS OUT
+#   hardware-e2e-substitute-plan.sh --build-subject SUBJECT PLAN OUT
+#
+# SUBJECT is --subject-commit COMMIT --subject-version VERSION --scope SCOPE, all three required, in
+# any order and with the other flags. COMMIT is a full lower-case 40-hex commit, VERSION a tag such as
+# v0.24.0-beta.12 and SCOPE the name `qualify plan --scope` was given. The plan must name exactly that
+# commit, version and scope: `qualify plan` derives the commit from the version, and a commit can
+# carry several tags, so the dispatch names both and the plan has to agree with the pair.
 #
 # OUT is created fresh and receives plan.json and substitutions.json.
 #
@@ -19,7 +25,8 @@
 # the job builds the controller, capi-provisioned and nvkectl from the subject commit itself
 # (hardware-e2e-build-subject.sh). Nothing in that run is NVKR-built, and the substitution record
 # says so: replaced is empty, producerRunId is null, and everything the plan names is retained
-# from NVKE. The fixture checks below apply to both forms.
+# from NVKE. The plan checks below apply to both forms. The record carries the digest of the plan
+# as generated, so the summary can show whether a run changed it.
 #
 # Each node image in the outputs manifest names its source: where it came from and the NVKE
 # version it was built at. The source kind says whether NVKR built it: nvkr-release cites an NVKR
@@ -39,32 +46,47 @@
 # must be whole numbers, and a whole number spelled 538.0 is recorded as 538, so the record never
 # carries a spelling that the image check, which reads integers, would refuse.
 #
-# Exit codes: 0 ok, 2 usage, 13 unsupported input, 22 fixture differs from its provenance,
-# 29 unsupported node image location, 41 a required slot is missing, 47 output exists,
-# 49 unpinned input or a node image with no source or no verification.
+# Exit codes: 0 ok, 2 usage, 13 unsupported input, 22 the plan names another subject than the
+# dispatch asked for, 29 unsupported node image location, 41 a required slot is missing,
+# 47 output exists, 49 unpinned input or a node image with no source or no verification.
 set -euo pipefail
 umask 077
 
 fail() { printf 'nvkr: [%s] %s\n' "$1" "$2" >&2; exit "$3"; }
 usage() {
-  fail NVKR-E-USAGE 'hardware-e2e-substitute-plan.sh {[--allow-node-image-version-skew] PLAN PROVENANCE OUTPUTS OUT | --build-subject PLAN PROVENANCE OUT}' 2
+  fail NVKR-E-USAGE 'hardware-e2e-substitute-plan.sh {[--allow-node-image-version-skew] SUBJECT PLAN OUTPUTS OUT | --build-subject SUBJECT PLAN OUT}, SUBJECT being --subject-commit COMMIT --subject-version VERSION --scope SCOPE' 2
 }
 allow_skew=false
 mode=nvkr-outputs
-case ${1:-} in
-  --allow-node-image-version-skew) allow_skew=true; shift ;;
-  --build-subject) mode=build-subject; shift ;;
-esac
+subject_commit='' subject_version='' scope=''
+while [[ ${1:-} == -* ]]; do
+  case $1 in
+    --allow-node-image-version-skew) [[ $allow_skew == false ]] || usage; allow_skew=true; shift ;;
+    --build-subject) [[ $mode == nvkr-outputs ]] || usage; mode=build-subject; shift ;;
+    --subject-commit) [[ $# -ge 2 && -z $subject_commit ]] || usage; subject_commit=$2; shift 2 ;;
+    --subject-version) [[ $# -ge 2 && -z $subject_version ]] || usage; subject_version=$2; shift 2 ;;
+    --scope) [[ $# -ge 2 && -z $scope ]] || usage; scope=$2; shift 2 ;;
+    *) usage ;;
+  esac
+done
+[[ -n $subject_commit && -n $subject_version && -n $scope ]] || usage
+[[ $mode == nvkr-outputs || $allow_skew == false ]] || usage
+[[ $subject_commit =~ ^[0-9a-f]{40}$ ]] ||
+  fail NVKR-E-USAGE '--subject-commit must be a full lower-case 40-hex commit' 2
+[[ $subject_version =~ ^v[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.]+)?$ ]] ||
+  fail NVKR-E-USAGE '--subject-version must be a version tag such as v0.24.0-beta.12' 2
+[[ $scope =~ ^[a-z][a-z0-9-]*$ ]] ||
+  fail NVKR-E-USAGE '--scope must be a lower-case scope name such as golden-path' 2
 outputs=''
 if [[ $mode == build-subject ]]; then
-  [[ $# == 3 ]] || usage
-  plan=$1 provenance=$2 out=$3
+  [[ $# == 2 ]] || usage
+  plan=$1 out=$2
 else
-  [[ $# == 4 ]] || usage
-  plan=$1 provenance=$2 outputs=$3 out=$4
+  [[ $# == 3 ]] || usage
+  plan=$1 outputs=$2 out=$3
 fi
 command -v jq >/dev/null || fail NVKR-E-ENGINE-CAPABILITY 'missing jq' 29
-for input in "$plan" "$provenance" ${outputs:+"$outputs"}; do
+for input in "$plan" ${outputs:+"$outputs"}; do
   [[ -f $input && ! -L $input ]] || fail NVKR-E-USAGE "input is not a regular file: $input" 2
 done
 
@@ -77,31 +99,27 @@ sha256_of() {
 # The NVKR-owned slots and the location strategy the plan must declare for each.
 slots='{"controller":"ociArtifact","capi-provisioned":"ociArtifact","cli-amd64":"ociArtifact","cli-arm64":"ociArtifact","os-image-amd64":"osImage","os-image-arm64":"osImage"}'
 
-# 1. Fixture bytes must be the bytes its provenance record names.
-jq -e '.schema == "nvkr.dev/hardware-e2e-plan-provenance/v1"' "$provenance" >/dev/null ||
-  fail NVKR-E-USAGE 'provenance record has an unsupported schema' 2
-want=$(jq -er '.fixture.sha256 | select(test("^[0-9a-f]{64}$"))' "$provenance") ||
-  fail NVKR-E-USAGE 'provenance record names no fixture sha256' 2
+# 1. The plan must be one document, naming the subject the dispatch asked for. The commit is the one
+# `qualify plan` derived from the version, so a tag that moved, or a commit the tag does not point at,
+# shows here. The digest is of the plan exactly as generated.
+jq -e -s 'length == 1 and (.[0] | type == "object")' "$plan" >/dev/null 2>&1 ||
+  fail NVKR-E-UNSUPPORTED 'the generated plan is not exactly one JSON object' 13
+jq -e --arg commit "$subject_commit" --arg version "$subject_version" --arg scope "$scope" '
+  .subject == "nvke" and .commit == $commit and .version == $version and .scope == $scope' "$plan" >/dev/null ||
+  fail NVKR-E-VERIFY-FAILED "the generated plan names subject $(jq -r '.subject // "none"' "$plan") $(jq -r '.version // "none"' "$plan") at $(jq -r '.commit // "none"' "$plan") with scope $(jq -r '.scope // "none"' "$plan"), not nvke $subject_version at $subject_commit with scope $scope" 22
 have=$(sha256_of "$plan")
-[[ $have == "$want" ]] ||
-  fail NVKR-E-VERIFY-FAILED "plan fixture bytes ($have) differ from its provenance record ($want)" 22
 
-# 2. The plan must still have the shape this lane understands, at the recorded commit.
-jq -e --slurpfile prov "$provenance" --argjson slots "$slots" '
+# 2. The plan must have the shape this lane understands.
+jq -e --argjson slots "$slots" '
   def entries: .combinations[] | ((.components[]), (.dependencies[]), (.streams[].dependencies[]));
-  .subject == "nvke"
-  and .commit == $prov[0].source.commit
-  and .version == $prov[0].source.tag
-  and .scope == $prov[0].source.scope
-  and (.commit | test("^[0-9a-f]{40}$"))
-  and (.combinations | length == 1)
+  (.combinations | length == 1)
   and (. as $plan | $slots | to_entries | all(
     .key as $name | .value as $strategy |
     [$plan | entries | select(.name == $name)] as $found |
     ($found | length >= 1)
     and ($found | all(.locationStrategy == $strategy and (.url | type == "string")))
     and ([$found[].url] | unique | length == 1)))' "$plan" >/dev/null ||
-  fail NVKR-E-UNSUPPORTED 'plan fixture does not match the recorded subject or the slots this lane substitutes' 13
+  fail NVKR-E-UNSUPPORTED 'the generated plan does not have one combination, or does not declare the slots this lane substitutes' 13
 
 if [[ $mode == build-subject ]]; then
   record=$(jq -n --indent 2 --slurpfile p "$plan" --arg sha "$have" '
@@ -109,7 +127,7 @@ if [[ $mode == build-subject ]]; then
     {
       schema: "nvkr.dev/hardware-e2e-substitutions/v1",
       artifactSource: "build-subject",
-      plan: {commit: $p[0].commit, version: $p[0].version, scope: $p[0].scope, fixtureSha256: $sha},
+      plan: {commit: $p[0].commit, version: $p[0].version, scope: $p[0].scope, generatedSha256: $sha},
       producerRunId: null,
       nodeImageVersionSkew: false,
       replaced: [],
@@ -188,7 +206,7 @@ record=$(jq -n --indent 2 --argjson slots "$slots" --slurpfile o "$outputs" --sl
   {
     schema: "nvkr.dev/hardware-e2e-substitutions/v1",
     artifactSource: "nvkr-outputs",
-    plan: {commit: $p[0].commit, version: $p[0].version, scope: $p[0].scope, fixtureSha256: $sha},
+    plan: {commit: $p[0].commit, version: $p[0].version, scope: $p[0].scope, generatedSha256: $sha},
     producerRunId: $o[0].producerRunId,
     nodeImageVersionSkew: ($skewed != ""),
     replaced: [$slots | keys[] as $name | {
