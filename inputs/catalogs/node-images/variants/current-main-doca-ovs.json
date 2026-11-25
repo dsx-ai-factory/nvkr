@@ -2,7 +2,7 @@
   "apiVersion": "nvkr.dev/catalog-overlay/v3",
   "kind": "CatalogOverlay",
   "name": "nvke-current-main-doca-ovs",
-  "requiresCatalogDigest": "sha256:ed38924b0053fec574fd29a6e9a78eb0959e8eae95b80b0a8b57eb4a6e3c32b2",
+  "requiresCatalogDigest": "sha256:8b29865b271edc542517b873f4547906cf2ec0c1e077d3317c31d52408ce56d7",
   "components": {
     "nvke-image-inputs": {
       "component": {

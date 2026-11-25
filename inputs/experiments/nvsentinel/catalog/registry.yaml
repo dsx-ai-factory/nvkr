@@ -39,7 +39,7 @@ sources:
     vendorCommand:
     - bash
     - -ec
-    - "make -C os-image/packages/cni-calico bundle nfpm \\\n  ARCH={{.Arch}} BIN_DIR=/usr/local/bin NFPM_BIN=/usr/local/bin/nfpm\n"
+    - "CNI_DOCKERHUB_MIRROR=mirror.gcr.io make -C os-image/packages/cni-calico bundle nfpm \\\n  ARCH={{.Arch}} BIN_DIR=/usr/local/bin NFPM_BIN=/usr/local/bin/nfpm\n"
   ovn-kubernetes:
     repo: https://github.com/ovn-kubernetes/ovn-kubernetes
     constraint: 1.4.x
