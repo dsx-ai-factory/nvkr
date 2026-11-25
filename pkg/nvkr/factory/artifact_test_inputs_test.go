@@ -255,3 +255,33 @@ func TestCLIArtifactTestCatalogVariants(t *testing.T) {
 		})
 	}
 }
+
+func TestSelectCLIArtifactTestInputsFromHeldPlan(t *testing.T) {
+	plan := cliTestPlan(t, "arm64", "scalar", 2)
+	want, err := LoadCLIArtifactTestInputs(t.Context(), writeCLIPlan(t, plan), "renamed-cli")
+	if err != nil {
+		t.Fatal(err)
+	}
+	got, err := SelectCLIArtifactTestInputs(plan, "renamed-cli")
+	if err != nil || *got != *want {
+		t.Fatalf("held-Plan selection differs: %+v, %v", got, err)
+	}
+	// A caller binding a named output never falls back to the sole CLI output.
+	for _, tc := range []struct {
+		name   string
+		plan   *Plan
+		output string
+	}{
+		{"nil-plan", nil, "renamed-cli"},
+		{"implicit-output", plan, ""},
+		{"unknown-output", plan, "missing"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			inputs, err := SelectCLIArtifactTestInputs(tc.plan, tc.output)
+			assertFactoryErrorCode(t, err, e.CodeUsage)
+			if inputs != nil {
+				t.Fatal("refusal returned inputs")
+			}
+		})
+	}
+}
