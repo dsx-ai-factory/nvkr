@@ -7,7 +7,6 @@ import (
 	"context"
 	"encoding/csv"
 	"errors"
-	"fmt"
 	"io"
 	"os"
 	"path/filepath"
@@ -57,54 +56,23 @@ func runArtifactDiagnostic(ctx context.Context, input ArtifactDiagnostic, stdout
 	if err := os.Mkdir(cache, 0o700); err != nil {
 		return e.Wrap(e.CodeBuildFailed, err, "creating empty diagnostic cache")
 	}
+	// Both phases share one owned container name and the isolated-command baseline.
 	name := containerName(ir.Node{ID: "artifact-test"})
-	args := []string{"run", "--name", name, "--rm", "--init", "--platform", input.Platform,
-		"--read-only", "--cap-drop", "ALL", "--security-opt", "no-new-privileges",
-		"--user", fmt.Sprintf("%d:%d", os.Getuid(), os.Getgid()), "--workdir", "/src/cli",
-		"--tmpfs", "/tmp:rw,exec,mode=1777", "--mount", diagnosticMount(filepath.Join(input.Workspace, "nvke"), "/src", true),
-		"--mount", diagnosticMount(cache, "/cache", false)}
-	for _, value := range []string{"GOTOOLCHAIN=local", "GOWORK=off", "GOFLAGS=-mod=readonly -modcacherw",
-		"CGO_ENABLED=0", "GOCACHE=/cache/go-build", "GOPATH=/cache/go", "HOME=/tmp"} {
-		args = append(args, "--env", value)
-	}
+	environment := []string{"GOTOOLCHAIN=local", "GOWORK=off", "GOFLAGS=-mod=readonly -modcacherw",
+		"CGO_ENABLED=0", "GOCACHE=/cache/go-build", "GOPATH=/cache/go", "HOME=/tmp"}
 	timeout := input.Timeout
 	if timeout <= 0 {
 		timeout = 30 * time.Minute
 	}
-	container := func(arguments []string, output io.Writer) error {
-		bounded, cancel := context.WithTimeout(ctx, timeout)
-		defer cancel()
-		// Use the existing runtime boundary and cleanup registry. Registration
-		// precedes process start; cleanup has an independent bounded context and
-		// is joined before the diagnostic can remove its workspace.
-		reap := newReaperWithCleanup(bounded, "docker", cleanup)
-		defer reap.close()
-		opts := RunOptions{Ctx: bounded, Runtime: "docker", Stdout: output, Stderr: stderr, reap: reap}
-		if err := registerContainer(opts, name); err != nil {
-			return err
-		}
-		err := run(opts, arguments...)
-		// Classify execution before independently bounded cleanup. Its deadline
-		// must not turn an already-completed failure into a timeout.
-		executionErr := bounded.Err()
-		if err == nil {
-			reap.forget(name)
-		}
-		cancel()
-		reap.close()
-		if executionErr != nil {
-			return e.Wrap(e.CodeTimeout, executionErr, "artifact diagnostic execution canceled")
-		}
-		return err
-	}
-	testTimeout := timeout
+	acquisitionTimeout := timeout
 	if input.DependencyTimeout > 0 {
-		timeout = input.DependencyTimeout
+		acquisitionTimeout = input.DependencyTimeout
 	}
-	if err := container(append(append([]string{}, args...), input.Image, "go", "mod", "download"), stdout); err != nil {
+	acquire := IsolatedCommand{Image: input.Image, Platform: input.Platform, Source: filepath.Join(input.Workspace, "nvke"), Cache: cache,
+		WorkingDirectory: "cli", Command: []string{"go", "mod", "download"}, Environment: environment}
+	if err := runBoundedContainer(ctx, name, acquisitionTimeout, acquire.arguments(name), stdout, stderr, run, cleanup); err != nil {
 		return err
 	}
-	timeout = testTimeout
 	log, err := os.Create(filepath.Join(input.Workspace, "tests.jsonl"))
 	if err != nil {
 		return e.Wrap(e.CodeBuildFailed, err, "creating diagnostic log")
@@ -113,11 +81,13 @@ func runArtifactDiagnostic(ctx context.Context, input ArtifactDiagnostic, stdout
 	if input.Suite == "cli" {
 		target = "test"
 	}
-	offline := append(append([]string{}, args...), "--network", "none", "--env", "GOPROXY=off",
-		"--mount", diagnosticMount(input.Artifact, "/artifact/nvkectl", true), input.Image,
-		"make", "--no-print-directory", target, "GO=go", "GO_TEST_FLAGS=-count=1 -timeout=15m -json",
-		"COVERAGE_DIR=/cache/coverage", "NVKECTL=/artifact/nvkectl", "NVKECTL_EXPECTED_VERSION="+input.Version)
-	runErr := container(offline, log)
+	offline := acquire
+	offline.Offline = true
+	offline.Environment = append(append([]string{}, environment...), "GOPROXY=off")
+	offline.Inputs = []IsolatedMount{{Source: input.Artifact, Target: "/artifact/nvkectl"}}
+	offline.Command = []string{"make", "--no-print-directory", target, "GO=go", "GO_TEST_FLAGS=-count=1 -timeout=15m -json",
+		"COVERAGE_DIR=/cache/coverage", "NVKECTL=/artifact/nvkectl", "NVKECTL_EXPECTED_VERSION=" + input.Version}
+	runErr := runBoundedContainer(ctx, name, timeout, offline.arguments(name), log, stderr, run, cleanup)
 	closeErr := log.Close()
 	// Replay only after child completion: a closed output consumer cannot replace
 	// the process's primary failure or truncate its retained raw log.

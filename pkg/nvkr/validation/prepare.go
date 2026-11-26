@@ -124,7 +124,8 @@ func (c *Registrations) resolve(selections []string) ([]string, error) {
 }
 
 // admitSuite refuses requirements the environment or executor cannot meet.
-// Producer inputs are derived only for executable outputs of one component.
+// Producer inputs are derived only for executable outputs of one component,
+// and each output name must be one file name the executor can stage.
 func admitSuite(r Registration, environment testEnvironment) error {
 	for _, capability := range r.Requires.Capabilities {
 		if !slices.Contains(environment.capabilities, capability) {
@@ -140,6 +141,9 @@ func admitSuite(r Registration, environment testEnvironment) error {
 		input := r.Inputs[role]
 		if input.Format != lifecycle.OutputExecutable || input.Component != factory.ArtifactTestComponent {
 			return e.New(e.CodeEngineCapability, "input role %q requires an unsupported format or component", role)
+		}
+		if !segment.MatchString(input.Output) {
+			return e.New(e.CodeEngineCapability, "input role %q output %q cannot be staged as one file name", role, input.Output)
 		}
 	}
 	return nil

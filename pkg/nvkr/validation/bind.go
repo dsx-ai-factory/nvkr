@@ -6,6 +6,7 @@ package validation
 import (
 	"context"
 	"errors"
+	"io"
 	"maps"
 	"slices"
 	"sync"
@@ -15,10 +16,13 @@ import (
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/lifecycle"
 )
 
-// completedRun is what binding needs from one captured, completed Run.
+// completedRun is what binding and execution need from one captured, completed
+// Run. Execution holds the Run for a whole suite and streams checked inputs.
 type completedRun interface {
 	Description() (lifecycle.LocalDiagnosticDescription, error)
 	Producer(output, component string) (*factory.CLIArtifactTestInputs, error)
+	WithDiagnosticOperation(ctx context.Context, observe func(context.Context, lifecycle.LocalDiagnosticDescription) error) error
+	WriteExecutableMember(ctx context.Context, output, member, platform string, maxBytes int64, destination io.Writer) (lifecycle.ExecutableMemberDescription, error)
 	Close() error
 }
 

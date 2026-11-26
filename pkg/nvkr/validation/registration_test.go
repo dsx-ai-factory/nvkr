@@ -219,7 +219,11 @@ func TestRegistrationOptionalFields(t *testing.T) {
 	for _, tc := range []struct{ name, old, replacement string }{
 		{"no-working-directory", "workingDirectory: cli\n", ""},
 		{"no-acquisition", "acquisition:\n  command: [go, mod, download]\n", ""},
-		{"no-environment", "environment:\n  NVKECTL: ${inputs.executable.path}\n  NVKECTL_EXPECTED_VERSION: ${inputs.executable.version}\n", ""},
+		{"no-environment", "environment:\n  # The executor mounts source read-only at /src and a writable /cache shared by\n" +
+			"  # acquisition and the offline test; Go state and HOME must point there or at /tmp.\n" +
+			"  CGO_ENABLED: \"0\"\n  GOCACHE: /cache/go-build\n  GOFLAGS: -mod=readonly -modcacherw\n  GOPATH: /cache/go\n" +
+			"  GOTOOLCHAIN: local\n  GOWORK: \"off\"\n  HOME: /tmp\n" +
+			"  NVKECTL: ${inputs.executable.path}\n  NVKECTL_EXPECTED_VERSION: ${inputs.executable.version}\n", ""},
 		{"no-capabilities", "  capabilities: [docker]\n", ""},
 		{"literal-environment", "${inputs.executable.path}", "/opt/nvkectl"},
 		{"empty-literal-environment", "${inputs.executable.path}", "''"},
