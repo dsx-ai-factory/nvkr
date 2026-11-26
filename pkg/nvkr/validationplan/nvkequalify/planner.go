@@ -98,10 +98,14 @@ func (Planner) Plan(ctx context.Context, in validationplan.Input) (validationpla
 		return validationplan.Result{}, err
 	}
 
+	roleVersions, err := roleVersions(registry, in.Release)
+	if err != nil {
+		return validationplan.Result{}, err
+	}
 	combination := plan.Combinations[0]
 	targets := make([]validationplan.Target, 0, len(combination.Streams))
 	for _, stream := range combination.Streams {
-		components, err := streamComponents(combination, stream)
+		components, err := streamComponents(combination, stream, roleVersions)
 		if err != nil {
 			return validationplan.Result{}, err
 		}
@@ -181,11 +185,36 @@ func testParams(p qualification.Parameters) map[string]string {
 	return out
 }
 
+// roleVersions gives each registry component that names a versionComponent the
+// tag of the source that built that component of its release output. NVKE's
+// resolution leaves such a component with a location and no version, so the
+// version is read from the release. It fails when the release has no tag for
+// the named component.
+func roleVersions(registry *qualification.Registry, release validationplan.Release) (map[string]string, error) {
+	versions := map[string]string{}
+	for _, c := range registry.Spec.Components {
+		rule := c.Resolve.Location
+		if rule == nil || rule.Strategy != StrategyLocation || rule.With[withVersionComponent] == "" {
+			continue
+		}
+		output, err := release.Output(rule.With[withOutput])
+		if err != nil {
+			return nil, e.Wrap(e.CodeUsage, err, "resolving the version of %s", c.Name)
+		}
+		tag := output.ComponentVersions[rule.With[withVersionComponent]]
+		if tag == "" {
+			return nil, e.New(e.CodeUsage, "%s takes its version from component %q of output %q, which was built from no tagged source", c.Name, rule.With[withVersionComponent], output.Name)
+		}
+		versions[c.Name] = tag
+	}
+	return versions, nil
+}
+
 // streamComponents lists everything one stream's suite is given: the
 // combination's components, the dependencies shared by every stream, and the
 // ones that depend on this stream. It fails closed on a stream that gets
 // nothing from the release, and on a name that appears twice.
-func streamComponents(combination qualification.Combination, stream qualification.Stream) (map[string]validationplan.Component, error) {
+func streamComponents(combination qualification.Combination, stream qualification.Stream, roleVersions map[string]string) (map[string]validationplan.Component, error) {
 	components := map[string]validationplan.Component{}
 	fromRelease := false
 	for _, list := range [][]qualification.ComponentVersion{combination.Components, combination.Dependencies, stream.Dependencies} {
@@ -194,6 +223,9 @@ func streamComponents(combination qualification.Combination, stream qualificatio
 				return nil, e.New(e.CodeInvalidCatalog, "%s resolved component %q more than once for stream %q", Name, v.Name, stream.Name)
 			}
 			c := component(v)
+			if tag, ok := roleVersions[v.Name]; ok {
+				c.Version = tag
+			}
 			fromRelease = fromRelease || c.Origin == validationplan.OriginRelease
 			components[v.Name] = c
 		}

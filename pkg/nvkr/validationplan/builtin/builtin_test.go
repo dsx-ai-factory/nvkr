@@ -33,8 +33,16 @@ func release() validationplan.Release {
 	for _, n := range names {
 		r.Outputs = append(r.Outputs, validationplan.Output{
 			Name: n.name, Kind: n.kind,
-			Reference: "registry.example.test/nvkr/" + n.name + "@" + digest(n.c), Digest: digest(n.c),
+			Reference: "registry.example.test/nvkr/" + n.name + "@" + digest(n.c), Digest: digest(n.c), Version: "v0.23.0",
 		})
+	}
+	for i := range r.Outputs {
+		switch r.Outputs[i].Name {
+		case "nvke-node-image-amd64":
+			r.Outputs[i].ComponentVersions = map[string]string{"nvke-node-image-amd64": "v0.23.0"}
+		case "nvke-node-image-arm64":
+			r.Outputs[i].ComponentVersions = map[string]string{"nvke-node-image": "v0.23.0"}
+		}
 	}
 	return r
 }

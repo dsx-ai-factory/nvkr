@@ -12,6 +12,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/canonical"
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/catalog"
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/delivery"
 	e "github.com/dsx-ai-factory/nvkr/pkg/nvkr/errors"
@@ -42,6 +43,46 @@ func TestAuthenticateRootVerifiesOnlyTheRootAndReadsItsClaims(t *testing.T) {
 	}
 	if verifier.calls != 1 || verifier.bundles != 0 {
 		t.Fatalf("verified %d subjects and %d bundles, want only the root", verifier.calls, verifier.bundles)
+	}
+	if len(claims.Outputs) == 0 {
+		t.Fatal("the root's metadata lists outputs, and none was returned")
+	}
+	for _, o := range claims.Outputs {
+		if o.Name == "" || o.Reference == "" || !canonical.IsDigest(o.Digest) {
+			t.Errorf("output = %+v, want a name, a reference and a digest", o)
+		}
+	}
+}
+
+func TestRootOutputsRefusesWhatAPullByDigestCannotUse(t *testing.T) {
+	good := delivery.PublicationOutput{Output: delivery.Output{Name: "a", Kind: "oci", Reference: "r/a@sha256:" + strings.Repeat("a", 64), Digest: "sha256:" + strings.Repeat("a", 64), OS: "linux", Arch: "arm64", Components: []string{"c"}}}
+	tests := []struct {
+		name   string
+		mutate func(*delivery.PublicationOutput)
+	}{
+		{"no name", func(o *delivery.PublicationOutput) { o.Name = "" }},
+		{"no reference", func(o *delivery.PublicationOutput) { o.Reference = "" }},
+		{"a digest that is not one", func(o *delivery.PublicationOutput) { o.Digest = "sha256:short" }},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			bad := good
+			tc.mutate(&bad)
+			outputs, err := rootOutputs([]delivery.PublicationOutput{bad})
+			if err == nil {
+				t.Fatalf("outputs were returned: %+v", outputs)
+			}
+			assertCode(t, err, e.CodeProvenanceMissing)
+		})
+	}
+	if _, err := rootOutputs([]delivery.PublicationOutput{good, good}); err == nil {
+		t.Fatal("an output listed twice was accepted")
+	} else {
+		assertCode(t, err, e.CodeAmbiguous)
+	}
+	outputs, err := rootOutputs([]delivery.PublicationOutput{good})
+	if err != nil || len(outputs) != 1 || outputs[0].Platform != "linux/arm64" || outputs[0].Components[0] != "c" {
+		t.Fatalf("outputs = %+v, %v", outputs, err)
 	}
 }
 
@@ -78,7 +119,7 @@ func TestAuthenticateRootFailsClosed(t *testing.T) {
 				t.Fatalf("claims were returned: %+v", claims)
 			}
 			assertCode(t, err, tc.code)
-			if claims != (releaseRootClaims{}) {
+			if claims.PlanDigest != "" || claims.InvocationID != "" || claims.Outputs != nil {
 				t.Fatalf("a failure returned claims: %+v", claims)
 			}
 		})
@@ -131,17 +172,23 @@ func (p *planProbe) handoff(origin qualificationorigin.Description, raw []byte, 
 func TestReadReleasePlanBindsTheHandoffToTheSignedPlanDigest(t *testing.T) {
 	f := newReleasePlanFixture(t)
 	probe := &planProbe{}
-	got, err := readReleasePlanWithPolicy(t.Context(), f.reference, qualificationPolicyFixture(),
-		probe.root(releaseRootClaims{PlanDigest: f.planDigest, InvocationID: f.origin.InvocationID}, nil),
+	claims := releaseRootClaims{PlanDigest: f.planDigest, InvocationID: f.origin.InvocationID,
+		Outputs: []PublishedOutput{{Name: "a", Kind: "oci", Reference: "r/a@sha256:" + strings.Repeat("a", 64), Digest: "sha256:" + strings.Repeat("a", 64)}}}
+	got, err := readReleaseBuildWithPolicy(t.Context(), f.reference, qualificationPolicyFixture(),
+		probe.root(claims, nil),
 		probe.handoff(f.origin, f.raw, nil, nil))
 	if err != nil {
 		t.Fatal(err)
 	}
-	if got.SchemaVersion != ReleasePlanSchemaVersion || got.Release != f.reference || got.PlanDigest != f.planDigest || got.Origin != f.origin {
-		t.Fatalf("description = %+v", got)
+	plan := got.Plan
+	if plan.SchemaVersion != ReleasePlanSchemaVersion || plan.Release != f.reference || plan.PlanDigest != f.planDigest || plan.Origin != f.origin {
+		t.Fatalf("plan = %+v", plan)
 	}
-	if len(got.Sources) == 0 {
+	if len(plan.Sources) == 0 {
 		t.Fatal("no source was read from the Plan")
+	}
+	if len(got.Outputs) != 1 || got.Outputs[0].Name != "a" {
+		t.Fatalf("outputs = %+v, want the root's, kept apart from the Plan's sources", got.Outputs)
 	}
 	if probe.rootCalls != 1 || probe.openCalls != 1 || probe.closes != 1 {
 		t.Fatalf("root=%d open=%d closes=%d, want one each", probe.rootCalls, probe.openCalls, probe.closes)
@@ -184,13 +231,13 @@ func TestReadReleasePlanFailsClosed(t *testing.T) {
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
 			probe := &planProbe{}
-			got, err := readReleasePlanWithPolicy(t.Context(), tc.reference, qualificationPolicyFixture(),
+			got, err := readReleaseBuildWithPolicy(t.Context(), tc.reference, qualificationPolicyFixture(),
 				probe.root(tc.claims, tc.rootErr), probe.handoff(tc.origin, tc.raw, tc.openErr, tc.closeErr))
 			if err == nil {
 				t.Fatalf("a description was returned: %+v", got)
 			}
 			assertCode(t, err, tc.code)
-			if got.PlanDigest != "" || len(got.Sources) != 0 {
+			if got.Plan.PlanDigest != "" || len(got.Plan.Sources) != 0 || len(got.Outputs) != 0 {
 				t.Fatalf("a failure returned a description: %+v", got)
 			}
 			if opened := probe.openCalls > 0; opened != tc.opened {
@@ -221,7 +268,7 @@ func TestReadReleasePlanAdmitsBeforeWork(t *testing.T) {
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
 			probe := &planProbe{}
-			_, err := readReleasePlanWithPolicy(tc.ctx, tc.reference, qualificationPolicyFixture(),
+			_, err := readReleaseBuildWithPolicy(tc.ctx, tc.reference, qualificationPolicyFixture(),
 				probe.root(releaseRootClaims{}, nil), probe.handoff(f.origin, f.raw, nil, nil))
 			assertCode(t, err, tc.code)
 			if probe.rootCalls != 0 || probe.openCalls != 0 {
@@ -230,7 +277,7 @@ func TestReadReleasePlanAdmitsBeforeWork(t *testing.T) {
 		})
 	}
 	t.Run("missing dependencies", func(t *testing.T) {
-		_, err := readReleasePlanWithPolicy(t.Context(), f.reference, qualificationPolicyFixture(), nil, nil)
+		_, err := readReleaseBuildWithPolicy(t.Context(), f.reference, qualificationPolicyFixture(), nil, nil)
 		assertCode(t, err, e.CodeInternal)
 	})
 }

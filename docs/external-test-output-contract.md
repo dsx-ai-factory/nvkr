@@ -174,8 +174,8 @@ is not yet established.
 ## Plan what to validate for a release
 
 `nvkr validate --plan` describes what to validate for one published release and runs nothing. It
-authenticates the release under a qualification policy, reads the outputs from that authenticated
-description, and builds a validation plan (`nvkr.dev/validation-plan/v1`) from the planners an authored
+authenticates the release root under a qualification policy, reads the outputs the signed root binds and the
+sources the producing run's signed Plan names, and builds a validation plan (`nvkr.dev/validation-plan/v1`) from the planners an authored
 directory lists:
 
 ```sh
@@ -214,8 +214,11 @@ under [inputs/testing/planners](../inputs/testing/planners/README.md).
 
 A plan is descriptive and carries `qualificationAuthority: "none"`. It issues no receipt, signs nothing,
 and gates no release. Planning establishes neither that a target passes nor that its inputs exist where an
-executor would look. Only fixture-based contract tests exercise it. No real published release has been
-planned, and no executor consumes a plan yet.
+executor would look. Authentication is the release root's signature and the producing run's handoff, which must carry the
+Plan the root's metadata names. It does not verify each output's signature or evidence, because the root binds
+every output's reference and digest and a pull by digest authenticates the bytes an executor fetches. The
+handoff is a CI artifact that expires after seven days, and a release whose handoff is gone cannot be planned.
+One published candidate release was planned this way in about 40 seconds, and no executor consumes a plan yet.
 
 ### Plan for a local Run
 

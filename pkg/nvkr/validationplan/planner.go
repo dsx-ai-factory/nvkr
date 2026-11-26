@@ -18,6 +18,15 @@ type Output struct {
 	Reference string
 	Digest    string
 	Platform  string
+
+	// Version is what a suite takes as the output's version, such as the tag
+	// of the source it was built from. It is empty when the output has none.
+	Version string
+
+	// ComponentVersions maps a component of the output to the tag of the source
+	// that built it, for an output whose own components come from sources at
+	// different tags.
+	ComponentVersions map[string]string
 }
 
 // Release is the authenticated release a planner reads. The caller

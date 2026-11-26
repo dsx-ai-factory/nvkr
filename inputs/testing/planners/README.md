@@ -24,9 +24,13 @@ reviewed like any other input and are never generated at run time. Only run-scop
 ## The `nvke-qualify` planner
 
 The release supplies the controller, the cluster API provider, the command-line binary for each architecture
-and the node image for each architecture. A component's version is the digest of its release output and its
-location is that output's reference. A node image has a location only, so a run can name the https URL a copy
-is served at with `--planner-var nvke-qualify.overrides=os-image-<arch>=<url>`. The `overrides` variable takes
+and the node image for each architecture. A component's version is the tag of the source that built its release output, such as `v0.23.0`, and its
+location is that output's digest-pinned reference. An output built from components at different source tags has
+no single version, and a component that needs one fails the plan. A node image is built from components at different source tags, so NVKE's
+resolution gives it a location and no version. Its version is the tag of the source that built its operating
+system image component, which `registry.yaml` names with `versionComponent` and the planner reads from the
+release, so the version is the NVKE tag and the plan fails when that component has no tagged source. A run can
+name the https URL a copy is served at with `--planner-var nvke-qualify.overrides=os-image-<arch>=<url>`. The `overrides` variable takes
 the form of NVKE's `qualify plan --overrides`, comma-separated `name=value` pairs, so a value cannot contain a
 comma. NVKE's tree supplies `kind`, `clusterctl` and `nerdctl` through `nvke-qualify.nvke-root`. The planner
 takes those two variables and rejects any other.
@@ -37,8 +41,8 @@ exact versions that a reviewer wrote down, through the `nvkrDeclared` strategy: 
 `subject.yaml`, and `kube` is looked up in `registry.yaml` from the stream's Kubernetes minor, so a stream for a
 minor with no entry fails the plan. The values are the ones NVKE locks at the tag the catalog pins (`v0.23.0`),
 without a leading `v`. Nothing checks them against the node image, so a change to the image's Kubernetes or OVN
-version, or to that pin, needs the same change in these files. NVKE's suite also takes versions as tags today,
-so a plan's digest-valued versions describe a release and are not yet usable by that suite.
+version, or to that pin, needs the same change in these files. The `kind`, `clusterctl` and `nerdctl` versions come from the NVKE tree
+`nvke-root` names, so point it at a tree checked out at the release's NVKE commit.
 
 ```sh
 nvkr validate --plan \

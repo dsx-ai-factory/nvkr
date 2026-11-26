@@ -46,7 +46,21 @@ func release() validationplan.Release {
 			Name: o.name, Kind: o.kind, Platform: o.platform,
 			Reference: "registry.example.test/nvkr/" + o.name + "@" + digest(o.c),
 			Digest:    digest(o.c),
+			Version:   "v0.23.0",
 		})
+	}
+	// A node image is built from components at different source tags, so it has
+	// no version of its own, and its operating system image component carries the
+	// NVKE tag. The arm64 output takes that component under another name.
+	for i := range r.Outputs {
+		switch r.Outputs[i].Name {
+		case "nvke-node-image-amd64":
+			r.Outputs[i].Version = ""
+			r.Outputs[i].ComponentVersions = map[string]string{"nvke-node-image-amd64": "v0.23.0", "nvke-cni-ovn": "v2.4.2"}
+		case "nvke-node-image-arm64":
+			r.Outputs[i].Version = ""
+			r.Outputs[i].ComponentVersions = map[string]string{"nvke-node-image": "v0.23.0", "nvke-cni-ovn": "v2.4.2"}
+		}
 	}
 	return r
 }
@@ -127,7 +141,7 @@ func TestPlanMakesOneTargetPerStream(t *testing.T) {
 		}
 		for name, c := range map[string]string{"controller": "a", "cli-arm64": "d"} {
 			got := target.Inputs.Components[name]
-			if got.Origin != validationplan.OriginRelease || got.Version != digest(c) || !strings.HasSuffix(got.Reference, "@"+digest(c)) {
+			if got.Origin != validationplan.OriginRelease || got.Version != "v0.23.0" || !strings.HasSuffix(got.Reference, "@"+digest(c)) {
 				t.Errorf("target %s component %s = %+v, want the release output %s", target.ID, name, got, digest(c))
 			}
 		}
@@ -144,7 +158,7 @@ func TestPlanMakesOneTargetPerStream(t *testing.T) {
 	}
 }
 
-func TestPlanResolvesReleaseComponentsToTheirDigests(t *testing.T) {
+func TestPlanResolvesReleaseComponentsToTheirSourceTagsAndReferences(t *testing.T) {
 	result, err := Planner{}.Plan(context.Background(), input(t, release(), nil))
 	if err != nil {
 		t.Fatal(err)
@@ -155,8 +169,8 @@ func TestPlanResolvesReleaseComponentsToTheirDigests(t *testing.T) {
 	}
 	for name, c := range map[string]string{"controller": "a", "capi-provisioned": "b", "cli-amd64": "c", "cli-arm64": "d"} {
 		got := find(t, plan, name)
-		if got.Version != digest(c) {
-			t.Errorf("%s version = %q, want %q", name, got.Version, digest(c))
+		if got.Version != "v0.23.0" {
+			t.Errorf("%s version = %q, want the source tag", name, got.Version)
 		}
 		if !strings.HasSuffix(got.URL, "@"+digest(c)) {
 			t.Errorf("%s url = %q, want the output reference", name, got.URL)
@@ -350,9 +364,58 @@ func TestServedImageIsNotVouchedForByTheRelease(t *testing.T) {
 			t.Errorf("target %s os-image-amd64 = %+v, want the served URL as resolved", target.ID, served1)
 		}
 		unserved := target.Inputs.Components["os-image-arm64"]
-		if unserved.Origin != validationplan.OriginRelease || !strings.HasSuffix(unserved.Reference, "@"+digest("f")) || unserved.Version != "" {
-			t.Errorf("target %s os-image-arm64 = %+v, want the release reference and no version", target.ID, unserved)
+		if unserved.Origin != validationplan.OriginRelease || !strings.HasSuffix(unserved.Reference, "@"+digest("f")) || unserved.Version != "v0.23.0" {
+			t.Errorf("target %s os-image-arm64 = %+v, want the release reference and the NVKE tag", target.ID, unserved)
 		}
+	}
+}
+
+func TestNodeImagesTakeTheTagOfTheirOperatingSystemImageComponent(t *testing.T) {
+	result, err := Planner{}.Plan(context.Background(), input(t, release(), nil))
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, target := range result.Targets {
+		for _, name := range []string{"os-image-amd64", "os-image-arm64"} {
+			got := target.Inputs.Components[name]
+			if got.Version != "v0.23.0" || got.Origin != validationplan.OriginRelease || !strings.Contains(got.Reference, "@sha256:") {
+				t.Errorf("target %s %s = %+v, want the NVKE tag with its digest-pinned reference", target.ID, name, got)
+			}
+		}
+	}
+}
+
+func TestNodeImageKeepsItsTagWhenServedAtAURL(t *testing.T) {
+	served := "https://images.example.test/node-amd64.qcow2"
+	result, err := Planner{}.Plan(context.Background(), input(t, release(), map[string]string{VarOverrides: "os-image-amd64=" + served}))
+	if err != nil {
+		t.Fatal(err)
+	}
+	got := result.Targets[0].Inputs.Components["os-image-amd64"]
+	if got.URL != served || got.Version != "v0.23.0" {
+		t.Fatalf("os-image-amd64 = %+v, want the served URL and the NVKE tag", got)
+	}
+}
+
+func TestNodeImageWithNoTaggedOperatingSystemComponentFailsClosed(t *testing.T) {
+	untagged := release()
+	for i := range untagged.Outputs {
+		if untagged.Outputs[i].Name == "nvke-node-image-arm64" {
+			untagged.Outputs[i].ComponentVersions = map[string]string{"nvke-cni-ovn": "v2.4.2"}
+		}
+	}
+	_, err := Planner{}.Plan(context.Background(), input(t, untagged, nil))
+	if err == nil || codeOf(t, err) != e.CodeUsage || !strings.Contains(err.Error(), "nvke-node-image") {
+		t.Fatalf("err = %v, want a refusal naming the missing component", err)
+	}
+}
+
+func TestPlanRefusesAReleaseOutputWithNoSingleSourceVersion(t *testing.T) {
+	untagged := release()
+	untagged.Outputs[0].Version = ""
+	_, err := Planner{}.Plan(context.Background(), input(t, untagged, nil))
+	if err == nil || codeOf(t, err) != e.CodeUsage || !strings.Contains(err.Error(), "no single source version") {
+		t.Fatalf("err = %v, want a refusal naming the missing version", err)
 	}
 }
 

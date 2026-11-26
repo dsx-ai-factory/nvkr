@@ -375,33 +375,24 @@ func TestPlannerPlansAreNotPartOfThePlanEncoding(t *testing.T) {
 	}
 }
 
-// fakeReceipt stands in for the lifecycle receipt.
-type fakeReceipt struct {
-	description lifecycle.ArtifactCheckDescription
-	descErr     error
-	closeErr    error
-	closed      int
+// described builds a release whose Plan names one source at v1.2.3 that built
+// every output's component.
+func described(release string, outputs ...lifecycle.PublishedOutput) lifecycle.ReleaseBuild {
+	source := lifecycle.PlanSource{Repo: "https://example.test/src", Tag: "v1.2.3"}
+	for _, o := range outputs {
+		source.Components = append(source.Components, o.Components...)
+	}
+	return lifecycle.ReleaseBuild{
+		Plan:    lifecycle.ReleasePlanDescription{Release: release, Sources: []lifecycle.PlanSource{source}},
+		Outputs: outputs,
+	}
 }
 
-func (f *fakeReceipt) Description() (lifecycle.ArtifactCheckDescription, error) {
-	return f.description, f.descErr
-}
-
-func (f *fakeReceipt) Close() error {
-	f.closed++
-	return f.closeErr
-}
-
-func description(subject string, outputs ...lifecycle.ArtifactCheckOutput) lifecycle.ArtifactCheckDescription {
-	d := lifecycle.ArtifactCheckDescription{Outputs: outputs}
-	d.Inputs.ReleaseSubject = subject
-	return d
-}
-
-func output(name, c string) lifecycle.ArtifactCheckOutput {
-	return lifecycle.ArtifactCheckOutput{
+func output(name, c string) lifecycle.PublishedOutput {
+	return lifecycle.PublishedOutput{
 		Name: name, Kind: lifecycle.OutputOCI,
-		Reference: "registry.example.test/nvkr/" + name + "@" + digest(c), Subject: digest(c),
+		Reference: "registry.example.test/nvkr/" + name + "@" + digest(c), Digest: digest(c),
+		Components: []string{"c-" + name},
 	}
 }
 
@@ -409,75 +400,111 @@ func generateReq(dir string) GenerateRequest {
 	return GenerateRequest{Reference: reference, Policy: "policy.yaml", PlannersDir: dir}
 }
 
-func TestGenerateAuthenticatesThenPlansFromTheDescription(t *testing.T) {
-	receipt := &fakeReceipt{description: description(reference, output("nvkectl", "c"), output("nvke-controller", "a"))}
-	var checked []string
-	check := func(_ context.Context, ref, policy string, _ lifecycle.QualificationRuntimeOptions) (authenticated, error) {
-		checked = append(checked, ref, policy)
-		return receipt, nil
+func TestGenerateReadsTheReleaseThenPlansFromTheDescription(t *testing.T) {
+	var read []string
+	fast := func(_ context.Context, ref, policy string, _ lifecycle.QualificationRuntimeOptions) (lifecycle.ReleaseBuild, error) {
+		read = append(read, ref, policy)
+		return described(reference, output("nvkectl", "c"), output("nvke-controller", "a")), nil
 	}
 	planner := &fakePlanner{targets: []Target{e2eTarget("fake", "e2e/a")}}
-	plan, err := generate(context.Background(), generateReq(writePlanners(t, oneE2E)), map[string]Planner{"fake": planner}, lifecycle.QualificationRuntimeOptions{}, check)
+	plan, err := generate(context.Background(), generateReq(writePlanners(t, oneE2E)), map[string]Planner{"fake": planner}, lifecycle.QualificationRuntimeOptions{}, fast)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if strings.Join(checked, ",") != reference+",policy.yaml" {
-		t.Fatalf("checked %v", checked)
+	if strings.Join(read, ",") != reference+",policy.yaml" {
+		t.Fatalf("read %v", read)
 	}
-	if len(planner.got.Release.Outputs) != 2 || planner.got.Release.Outputs[0].Name != "nvkectl" || planner.got.Release.Outputs[0].Digest != digest("c") {
-		t.Fatalf("release outputs = %+v, want the authenticated ones", planner.got.Release.Outputs)
+	got := planner.got.Release.Outputs
+	if len(got) != 2 || got[0].Name != "nvkectl" || got[0].Digest != digest("c") || got[0].Version != "v1.2.3" {
+		t.Fatalf("release outputs = %+v, want the described ones with their versions", got)
 	}
 	if plan.Release.Reference != reference {
 		t.Fatalf("release = %s", plan.Release.Reference)
 	}
-	if receipt.closed != 1 {
-		t.Fatalf("receipt closed %d times, want once", receipt.closed)
+}
+
+func TestOutputVersionIsTheTagOfTheOneSourceThatBuiltIt(t *testing.T) {
+	sources := []lifecycle.PlanSource{
+		{Repo: "nvke", Tag: "v0.23.0", Components: []string{"controller", "capi"}},
+		{Repo: "ovn", Tag: "v2.4.2", Components: []string{"cni"}},
+	}
+	tests := []struct {
+		name       string
+		components []string
+		want       string
+	}{
+		{"one source", []string{"controller"}, "v0.23.0"},
+		{"two components of one source", []string{"controller", "capi"}, "v0.23.0"},
+		{"components of two sources at different tags", []string{"controller", "cni"}, ""},
+		{"a component built from no source", []string{"tool"}, ""},
+		{"one built from source and one not", []string{"controller", "tool"}, "v0.23.0"},
+		{"no components", nil, ""},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			if got := outputVersion(tc.components, sources); got != tc.want {
+				t.Fatalf("version = %q, want %q", got, tc.want)
+			}
+		})
+	}
+}
+
+func TestComponentVersionsMapEachTaggedSourceComponentToItsTag(t *testing.T) {
+	sources := []lifecycle.PlanSource{
+		{Repo: "nvke", Tag: "v0.23.0", Components: []string{"os-image"}},
+		{Repo: "ovn", Tag: "v2.4.2", Components: []string{"cni"}},
+		{Repo: "untagged", Components: []string{"loose"}},
+	}
+	got := componentVersions([]string{"os-image", "cni", "loose", "tool"}, sources)
+	if len(got) != 2 || got["os-image"] != "v0.23.0" || got["cni"] != "v2.4.2" {
+		t.Fatalf("versions = %v, want only the components built from tagged sources", got)
+	}
+	if componentVersions([]string{"tool"}, sources) != nil {
+		t.Fatal("a component built from no source got a version")
 	}
 }
 
 func TestGenerateFailsClosed(t *testing.T) {
 	other := "registry.example.test/nvkr/releases@" + digest("9")
 	bad := output("nvkectl", "c")
-	bad.Subject = "not-a-digest"
+	bad.Digest = "not-a-digest"
+	noReference := output("nvkectl", "c")
+	noReference.Reference = ""
 
 	tests := []struct {
 		name    string
 		req     func(t *testing.T) GenerateRequest
-		receipt *fakeReceipt
-		checkE  error
+		read    lifecycle.ReleaseBuild
+		readE   error
 		want    e.Code
 		reached bool
 	}{
-		{"the check fails", func(t *testing.T) GenerateRequest { return generateReq(writePlanners(t, oneE2E)) }, nil, e.New(e.CodeVerifyFailed, "no"), e.CodeVerifyFailed, true},
-		{"a different release subject", func(t *testing.T) GenerateRequest { return generateReq(writePlanners(t, oneE2E)) }, &fakeReceipt{description: description(other, output("a", "a"))}, nil, e.CodeVerifyFailed, true},
-		{"no release subject", func(t *testing.T) GenerateRequest { return generateReq(writePlanners(t, oneE2E)) }, &fakeReceipt{description: description("", output("a", "a"))}, nil, e.CodeProvenanceMissing, true},
-		{"an output with no digest", func(t *testing.T) GenerateRequest { return generateReq(writePlanners(t, oneE2E)) }, &fakeReceipt{description: description(reference, bad)}, nil, e.CodeProvenanceMissing, true},
-		{"the description fails", func(t *testing.T) GenerateRequest { return generateReq(writePlanners(t, oneE2E)) }, &fakeReceipt{descErr: e.New(e.CodeGateUnmet, "closed")}, nil, e.CodeGateUnmet, true},
-		{"the receipt will not close", func(t *testing.T) GenerateRequest { return generateReq(writePlanners(t, oneE2E)) }, &fakeReceipt{description: description(reference, output("a", "a")), closeErr: errors.New("held")}, nil, e.CodeGateUnmet, true},
+		{"the read fails", func(t *testing.T) GenerateRequest { return generateReq(writePlanners(t, oneE2E)) }, lifecycle.ReleaseBuild{}, e.New(e.CodeVerifyFailed, "no"), e.CodeVerifyFailed, true},
+		{"a different release", func(t *testing.T) GenerateRequest { return generateReq(writePlanners(t, oneE2E)) }, described(other, output("a", "a")), nil, e.CodeVerifyFailed, true},
+		{"no release", func(t *testing.T) GenerateRequest { return generateReq(writePlanners(t, oneE2E)) }, described("", output("a", "a")), nil, e.CodeProvenanceMissing, true},
+		{"an output with no digest", func(t *testing.T) GenerateRequest { return generateReq(writePlanners(t, oneE2E)) }, described(reference, bad), nil, e.CodeProvenanceMissing, true},
+		{"an output with no reference", func(t *testing.T) GenerateRequest { return generateReq(writePlanners(t, oneE2E)) }, described(reference, noReference), nil, e.CodeProvenanceMissing, true},
 		{"a reference that is a URL", func(t *testing.T) GenerateRequest {
 			r := generateReq(writePlanners(t, oneE2E))
 			r.Reference = "https://registry.example.test/x@" + digest("1")
 			return r
-		}, nil, nil, e.CodeUnverifiedRef, false},
+		}, lifecycle.ReleaseBuild{}, nil, e.CodeUnverifiedRef, false},
 		{"no policy", func(t *testing.T) GenerateRequest {
 			r := generateReq(writePlanners(t, oneE2E))
 			r.Policy = ""
 			return r
-		}, nil, nil, e.CodeUsage, false},
-		{"a planners directory with no configuration", func(t *testing.T) GenerateRequest { return generateReq(t.TempDir()) }, nil, nil, e.CodeUsage, false},
+		}, lifecycle.ReleaseBuild{}, nil, e.CodeUsage, false},
+		{"a planners directory with no configuration", func(t *testing.T) GenerateRequest { return generateReq(t.TempDir()) }, lifecycle.ReleaseBuild{}, nil, e.CodeUsage, false},
 	}
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
 			reached := false
-			check := func(context.Context, string, string, lifecycle.QualificationRuntimeOptions) (authenticated, error) {
+			fast := func(context.Context, string, string, lifecycle.QualificationRuntimeOptions) (lifecycle.ReleaseBuild, error) {
 				reached = true
-				if tc.checkE != nil {
-					return nil, tc.checkE
-				}
-				return tc.receipt, nil
+				return tc.read, tc.readE
 			}
 			planner := &fakePlanner{targets: []Target{e2eTarget("fake", "e2e/a")}}
-			plan, err := generate(context.Background(), tc.req(t), map[string]Planner{"fake": planner}, lifecycle.QualificationRuntimeOptions{}, check)
+			plan, err := generate(context.Background(), tc.req(t), map[string]Planner{"fake": planner}, lifecycle.QualificationRuntimeOptions{}, fast)
 			if err == nil {
 				t.Fatalf("a plan was made: %+v", plan)
 			}
@@ -488,10 +515,7 @@ func TestGenerateFailsClosed(t *testing.T) {
 				t.Fatal("a failure returned a plan")
 			}
 			if reached != tc.reached {
-				t.Fatalf("check reached = %v, want %v: admission must precede registry work", reached, tc.reached)
-			}
-			if tc.receipt != nil && tc.receipt.closed != 1 {
-				t.Fatalf("receipt closed %d times, want once", tc.receipt.closed)
+				t.Fatalf("read reached = %v, want %v: admission must precede registry work", reached, tc.reached)
 			}
 		})
 	}

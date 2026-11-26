@@ -19,8 +19,9 @@ import (
 // Strategy names a registry uses for components the authenticated release
 // supplies.
 const (
-	// StrategyVersion resolves a version to the digest of one output of the
-	// release, or to the release's own digest when no output is named.
+	// StrategyVersion resolves a version to the version of one output of the
+	// release, which is the tag of the source that built it, or to the
+	// release's own digest when no output is named.
 	StrategyVersion = "nvkrReleaseVersion"
 
 	// StrategyLocation resolves a location to the reference of one output.
@@ -32,8 +33,17 @@ const (
 	StrategyDeclared = "nvkrDeclared"
 )
 
-// withOutput is the only key either strategy takes. It names a release output.
-const withOutput = "output"
+const (
+	// withOutput names a release output. Both strategies take it.
+	withOutput = "output"
+
+	// withVersionComponent names the component of the output whose source tag is
+	// the version the suite takes for it. Only the location strategy takes it,
+	// for an output such as a node image whose components come from sources at
+	// different tags. A location answers no version, so the planner reads the
+	// tag from the release itself.
+	withVersionComponent = "versionComponent"
+)
 
 // strategies returns the two strategies, built over one authenticated release.
 func strategies(release validationplan.Release) qualification.Strategies {
@@ -60,20 +70,39 @@ func strategies(release validationplan.Release) qualification.Strategies {
 		},
 		Location: map[string]qualification.LocationFactory{
 			StrategyLocation: func(with map[string]string, _ resolve.Options) (resolve.Resolver, error) {
-				output, err := outputOf(with)
+				output, component, err := locationWith(with)
 				if err != nil {
 					return nil, err
 				}
 				if output == "" {
 					return nil, fmt.Errorf("strategy %s needs %q in with", StrategyLocation, withOutput)
 				}
-				if _, err := release.Output(output); err != nil {
+				found, err := release.Output(output)
+				if err != nil {
 					return nil, err
+				}
+				if component != "" && found.ComponentVersions[component] == "" {
+					return nil, fmt.Errorf("output %q has no component %q built from a tagged source", output, component)
 				}
 				return locationResolver{release: release, output: output}, nil
 			},
 		},
 	}
+}
+
+// locationWith reads the keys the location strategy takes and rejects any other.
+func locationWith(with map[string]string) (output, versionComponent string, err error) {
+	var unknown []string
+	for k := range with {
+		if k != withOutput && k != withVersionComponent {
+			unknown = append(unknown, k)
+		}
+	}
+	if len(unknown) > 0 {
+		sort.Strings(unknown)
+		return "", "", fmt.Errorf("strategy %s takes only %q and %q in with, not %s", StrategyLocation, withOutput, withVersionComponent, strings.Join(unknown, ", "))
+	}
+	return with[withOutput], with[withVersionComponent], nil
 }
 
 // outputOf rejects any key but withOutput, so a misspelling cannot read as an
@@ -122,7 +151,10 @@ func (r versionResolver) Resolve(inputs map[string]string) (map[string]string, e
 	if err != nil {
 		return nil, err
 	}
-	return map[string]string{resolve.ResultVersionKey: output.Digest}, nil
+	if output.Version == "" {
+		return nil, fmt.Errorf("output %q has no single source version, so the suite has no version to take for it", r.output)
+	}
+	return map[string]string{resolve.ResultVersionKey: output.Version}, nil
 }
 
 // locationResolver answers where an output of the release is. An override

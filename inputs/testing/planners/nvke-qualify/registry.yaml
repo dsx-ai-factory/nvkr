@@ -57,12 +57,16 @@ spec:
         version:  {strategy: nvkrReleaseVersion,  with: {output: nvkectl-linux-arm64}}
         location: {strategy: nvkrReleaseLocation, with: {output: nvkectl-linux-arm64}}
 
+    # A node image is built from components at different source tags, so its
+    # version is the tag of its operating system image component, which NVKE
+    # builds and tags. The arm64 output takes that component under a different
+    # name.
     - name: os-image-amd64
       resolve:
-        location: {strategy: nvkrReleaseLocation, with: {output: nvke-node-image-amd64}}
+        location: {strategy: nvkrReleaseLocation, with: {output: nvke-node-image-amd64, versionComponent: nvke-node-image-amd64}}
     - name: os-image-arm64
       resolve:
-        location: {strategy: nvkrReleaseLocation, with: {output: nvke-node-image-arm64}}
+        location: {strategy: nvkrReleaseLocation, with: {output: nvke-node-image-arm64, versionComponent: nvke-node-image}}
 
     # The bootloader is declared because nothing derives it, so it has a
     # location and no version.
