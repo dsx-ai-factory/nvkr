@@ -81,15 +81,55 @@ func TestValidatePlanWritesAFileWithOut(t *testing.T) {
 	app := planCLI(func(context.Context, validationplan.GenerateRequest, lifecycle.QualificationRuntimeOptions) (*validationplan.Plan, error) {
 		return samplePlan(), nil
 	}, &output)
-	if err := app.RunContext(t.Context(), planArgs("--out", out)); err != nil {
+	if err := app.RunContext(t.Context(), planArgs("--plan-out", out)); err != nil {
 		t.Fatal(err)
 	}
 	if output.Len() != 0 {
-		t.Fatalf("standard output = %q, want nothing when --out is given", output.String())
+		t.Fatalf("standard output = %q, want nothing when --plan-out is given", output.String())
 	}
 	raw, err := os.ReadFile(out)
 	if err != nil || !strings.Contains(string(raw), `"schemaVersion":"nvkr.dev/validation-plan/v1"`) {
 		t.Fatalf("file = %q, %v", raw, err)
+	}
+}
+
+func TestValidatePlanWritesEachPlannersPlanBesideThePlan(t *testing.T) {
+	dir := filepath.Join(t.TempDir(), "planner-out")
+	out := filepath.Join(t.TempDir(), "plan.json")
+	own, err := validationplan.NewPlannerPlan("p", map[string]string{"b": "2", "a": "1"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	var output bytes.Buffer
+	app := planCLI(func(context.Context, validationplan.GenerateRequest, lifecycle.QualificationRuntimeOptions) (*validationplan.Plan, error) {
+		plan := samplePlan()
+		plan.PlannerPlans = []validationplan.PlannerPlan{own}
+		return plan, nil
+	}, &output)
+	if err := app.RunContext(t.Context(), planArgs("--planner-out", dir, "--plan-out", out)); err != nil {
+		t.Fatal(err)
+	}
+	raw, err := os.ReadFile(filepath.Join(dir, "p.json"))
+	if err != nil || string(raw) != `{"a":"1","b":"2"}`+"\n" {
+		t.Fatalf("planner plan file = %q, %v", raw, err)
+	}
+	planRaw, err := os.ReadFile(out)
+	if err != nil || strings.Contains(string(planRaw), `"plans"`) || strings.Contains(string(planRaw), `"a":"1"`) {
+		t.Fatalf("the plan carries the planner plan: %q, %v", planRaw, err)
+	}
+}
+
+func TestValidatePlanWritesNoPlannerPlansWhenPlanningFails(t *testing.T) {
+	dir := filepath.Join(t.TempDir(), "planner-out")
+	var output bytes.Buffer
+	app := planCLI(func(context.Context, validationplan.GenerateRequest, lifecycle.QualificationRuntimeOptions) (*validationplan.Plan, error) {
+		return nil, e.New(e.CodeVerifyFailed, "release did not authenticate")
+	}, &output)
+	if err := app.RunContext(t.Context(), planArgs("--planner-out", dir)); cliErrorCode(err) != e.CodeVerifyFailed {
+		t.Fatalf("error = %v, want the planner's code", err)
+	}
+	if _, statErr := os.Stat(dir); !os.IsNotExist(statErr) {
+		t.Fatalf("a failed plan left a directory: %v", statErr)
 	}
 }
 
@@ -104,13 +144,15 @@ func TestValidatePlanAdmitsBeforeWork(t *testing.T) {
 		{"a validation profile", planArgs("--config", "profile.json")},
 		{"a workspace", planArgs("--workspace", "w")},
 		{"a check name", append(planArgs(), "cluster-conformance")},
-		{"an empty out", planArgs("--out", " ")},
+		{"an empty plan-out", planArgs("--plan-out", " ")},
+		{"an empty planner output directory", planArgs("--planner-out", " ")},
+		{"--planner-out without --plan", []string{"nvkr", "validate", "--config", "profile.json", "--planner-out", "x"}},
 		{"a planner var with no planner", planArgs("--planner-var", "k=v")},
 		{"a planner var with no value", planArgs("--planner-var", "p.k=")},
 		{"a planner var with no equals", planArgs("--planner-var", "p.k")},
 		{"a planner var given twice", planArgs("--planner-var", "p.k=1", "--planner-var", "p.k=2")},
 		{"a plan flag without --plan", []string{"nvkr", "validate", "--config", "profile.json", "--reference", planTestReference}},
-		{"--out without --plan", []string{"nvkr", "validate", "--config", "profile.json", "--out", "x"}},
+		{"--plan-out without --plan", []string{"nvkr", "validate", "--config", "profile.json", "--plan-out", "x"}},
 	}
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
@@ -134,7 +176,7 @@ func TestValidatePlanWritesNothingWhenPlanningFails(t *testing.T) {
 	app := planCLI(func(context.Context, validationplan.GenerateRequest, lifecycle.QualificationRuntimeOptions) (*validationplan.Plan, error) {
 		return nil, e.New(e.CodeVerifyFailed, "release did not authenticate")
 	}, &output)
-	err := app.RunContext(t.Context(), planArgs("--out", out))
+	err := app.RunContext(t.Context(), planArgs("--plan-out", out))
 	if cliErrorCode(err) != e.CodeVerifyFailed {
 		t.Fatalf("error = %v, want the planner's code", err)
 	}

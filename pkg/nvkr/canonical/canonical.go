@@ -80,7 +80,7 @@ const (
 	KindToolSmokeWorker         = "nvkr.tool-smoke-worker"        // authenticated native worker observations
 	KindQualificationEvidence   = "nvkr.qualification-evidence"   // independent pipeline artifact checks (ADR-16)
 	KindReleaseManifest         = "nvkr.release-manifest"         // qualification-backed release membership (ADR-16 §5)
-	KindPlannerPlan             = "nvkr.planner-plan/v1"          // a planner's own plan embedded in a validation plan, lane none
+	KindPlannerPlan             = "nvkr.planner-plan/v1"          // a planner's own plan written beside a validation plan, lane none
 	// Internal capability bindings are registered too. They are not wire schemas,
 	// but their domain tags are just as security-sensitive as object identities:
 	// a typo must fail instead of silently minting a different receipt family.

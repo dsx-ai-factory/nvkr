@@ -336,8 +336,8 @@ authority and is distinct from the build Plan.
 _Avoid_: Run plan, qualification plan, test verdict
 
 **Target**:
-One entry of a validation plan, run as its own workflow job. Its inputs name release outputs and never carry a
-path or a digest.
+One entry of a validation plan, run as its own workflow job. Its inputs list every component the executor is
+given, each resolved to a version, a digest-pinned reference or a served URL, and an origin.
 _Avoid_: Profile, stream, check
 
 **Planner**:

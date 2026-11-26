@@ -83,15 +83,15 @@ func TestShippedInputsBuildAPlan(t *testing.T) {
 	if plan.QualificationAuthority != validationplan.AuthorityNone {
 		t.Fatalf("authority = %q", plan.QualificationAuthority)
 	}
-	if len(plan.Targets) != 2 || len(plan.Plans) != 1 {
-		t.Fatalf("targets = %d, plans = %d, want 2 and 1", len(plan.Targets), len(plan.Plans))
+	if len(plan.Targets) != 2 || len(plan.PlannerPlans) != 1 {
+		t.Fatalf("targets = %d, plans = %d, want 2 and 1", len(plan.Targets), len(plan.PlannerPlans))
 	}
 	for _, target := range plan.Targets {
 		if target.Executor != validationplan.ExecutorNVKEE2EGoTest {
 			t.Errorf("%s executor = %q", target.ID, target.Executor)
 		}
-		if target.Source.PlanDigest != plan.Plans[0].Digest {
-			t.Errorf("%s does not point at the embedded plan", target.ID)
+		if target.Source.PlanDigest != plan.PlannerPlans[0].Digest {
+			t.Errorf("%s does not point at the planner plan", target.ID)
 		}
 	}
 

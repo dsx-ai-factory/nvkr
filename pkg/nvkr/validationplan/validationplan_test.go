@@ -76,7 +76,7 @@ func (f *fakePlanner) Plan(_ context.Context, in Input) (Result, error) {
 func e2eTarget(planner, id string) Target {
 	return Target{
 		ID:     id,
-		Inputs: Inputs{Validator: "nvke/e2e", TestEnv: "env", Outputs: map[string]string{"cli": "nvkectl"}},
+		Inputs: Inputs{Suite: "nvke/e2e", TestEnv: "env", Components: map[string]Component{"cli": {Reference: "r/nvkectl@sha256:aa", Origin: OriginRelease}}},
 		Source: Source{Planner: planner},
 	}
 }
@@ -84,7 +84,7 @@ func e2eTarget(planner, id string) Target {
 func validatorTarget(planner, id string) Target {
 	return Target{
 		ID:     id,
-		Inputs: Inputs{Validator: "nvke/nvkectl/cli", Platform: "linux/amd64", Outputs: map[string]string{"executable": "nvkectl"}},
+		Inputs: Inputs{Suite: "nvke/nvkectl/cli", Platform: "linux/amd64", Components: map[string]Component{"executable": {Reference: "r/nvkectl@sha256:aa", Origin: OriginRelease}}},
 		Source: Source{Planner: planner},
 	}
 }
@@ -117,8 +117,8 @@ func TestBuildJoinsSortsAndAssignsExecutors(t *testing.T) {
 	if plan.QualificationAuthority != AuthorityNone || plan.SchemaVersion != SchemaVersion || plan.Release.Reference != reference {
 		t.Fatalf("header = %+v", plan)
 	}
-	if len(plan.Plans) != 1 || plan.Plans[0].Planner != "b-fake" {
-		t.Fatalf("plans = %+v", plan.Plans)
+	if len(plan.PlannerPlans) != 1 || plan.PlannerPlans[0].Planner != "b-fake" {
+		t.Fatalf("plans = %+v", plan.PlannerPlans)
 	}
 	if want := filepath.Join(dir, "b", "planner.json"); b.got.Config != want {
 		t.Errorf("planner config = %q, want %q", b.got.Config, want)
@@ -181,7 +181,7 @@ func TestBuildFailsClosed(t *testing.T) {
 		{"an uncoded planner failure", oneE2E, &fakePlanner{err: errors.New("boom")}, nil, false, e.CodeInternal},
 		{"a target attributed to another planner", oneE2E, &fakePlanner{targets: []Target{e2eTarget("other", "e2e/a")}}, nil, false, e.CodeInternal},
 		{"an embedded plan attributed to another planner", oneE2E, &fakePlanner{targets: []Target{e2eTarget("fake", "e2e/a")}, plans: []PlannerPlan{wrongPlan}}, nil, false, e.CodeInternal},
-		{"a target missing an input its executor requires", oneE2E, &fakePlanner{targets: []Target{{ID: "e2e/a", Source: Source{Planner: "fake"}, Inputs: Inputs{Validator: "nvke/e2e"}}}}, nil, false, e.CodeUsage},
+		{"a target missing an input its executor requires", oneE2E, &fakePlanner{targets: []Target{{ID: "e2e/a", Source: Source{Planner: "fake"}, Inputs: Inputs{Suite: "nvke/e2e"}}}}, nil, false, e.CodeUsage},
 		{"two targets with one id", oneE2E, &fakePlanner{targets: []Target{e2eTarget("fake", "e2e/a"), e2eTarget("fake", "e2e/a")}}, nil, false, e.CodeUsage},
 	}
 	for _, tc := range tests {
@@ -291,9 +291,9 @@ func TestPlanValidate(t *testing.T) {
 	valid := func() Plan {
 		return Plan{
 			SchemaVersion: SchemaVersion, QualificationAuthority: AuthorityNone,
-			Release: ReleaseRef{Reference: reference},
-			Targets: []Target{{ID: "e2e/a", Executor: "x", Source: Source{Planner: "p"}}},
-			Plans:   []PlannerPlan{embedded},
+			Release:      ReleaseRef{Reference: reference},
+			Targets:      []Target{{ID: "e2e/a", Executor: "x", Source: Source{Planner: "p"}}},
+			PlannerPlans: []PlannerPlan{embedded},
 		}
 	}
 	if err := valid().Validate(); err != nil {
@@ -310,8 +310,17 @@ func TestPlanValidate(t *testing.T) {
 		{"a target with no id", func(p *Plan) { p.Targets[0].ID = "" }, e.CodeUsage},
 		{"a target with no executor", func(p *Plan) { p.Targets[0].Executor = "" }, e.CodeUsage},
 		{"a target with no planner", func(p *Plan) { p.Targets[0].Source.Planner = "" }, e.CodeUsage},
-		{"an embedded plan that is not a digest", func(p *Plan) { p.Plans[0].Digest = "sha256:short" }, e.CodeUsage},
-		{"two plans from one planner", func(p *Plan) { p.Plans = append(p.Plans, embedded) }, e.CodeUsage},
+		{"a component with no origin", func(p *Plan) {
+			p.Targets[0].Inputs.Components = map[string]Component{"c": {Version: "1"}}
+		}, e.CodeUsage},
+		{"a component with an unknown origin", func(p *Plan) {
+			p.Targets[0].Inputs.Components = map[string]Component{"c": {Version: "1", Origin: "guess"}}
+		}, e.CodeUsage},
+		{"a component that carries nothing", func(p *Plan) {
+			p.Targets[0].Inputs.Components = map[string]Component{"c": {Origin: OriginRelease}}
+		}, e.CodeUsage},
+		{"a planner plan that is not a digest", func(p *Plan) { p.PlannerPlans[0].Digest = "sha256:short" }, e.CodeUsage},
+		{"two plans from one planner", func(p *Plan) { p.PlannerPlans = append(p.PlannerPlans, embedded) }, e.CodeUsage},
 	}
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
@@ -337,6 +346,32 @@ func TestNewPlannerPlanBindsItsDigest(t *testing.T) {
 	}
 	if pp.Digest != want || string(pp.Plan) != `{"a":"1","b":"2"}` {
 		t.Fatalf("plan = %+v", pp)
+	}
+}
+
+func TestPlannerPlansAreNotPartOfThePlanEncoding(t *testing.T) {
+	pp, err := NewPlannerPlan("p", map[string]string{"k": "v"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	plan := Plan{
+		SchemaVersion: SchemaVersion, QualificationAuthority: AuthorityNone,
+		Release:      ReleaseRef{Reference: reference},
+		Targets:      []Target{{ID: "e2e/a", Executor: "x", Source: Source{Planner: "p", PlanDigest: pp.Digest}}},
+		PlannerPlans: []PlannerPlan{pp},
+	}
+	raw, err := plan.Encode()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if strings.Contains(string(raw), `"k":"v"`) || strings.Contains(string(raw), "plans") {
+		t.Fatalf("the plan carries the planner plan: %s", raw)
+	}
+	if !strings.Contains(string(raw), pp.Digest) {
+		t.Fatalf("the target does not name the planner plan's digest: %s", raw)
+	}
+	if pp.FileName() != "p.json" || string(pp.Encode()) != `{"k":"v"}`+"\n" {
+		t.Fatalf("file = %q %q", pp.FileName(), pp.Encode())
 	}
 }
 

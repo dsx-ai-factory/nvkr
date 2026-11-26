@@ -174,7 +174,7 @@ pipeline-attested build/evidence qualification; it does not reuse a reserved qua
 | Development qualification evidence | `nvkr.dev/development-qualification-evidence/v1` | `nvkr.qualification-evidence` | `https://nvkr.dev/development-qualification-evidence/v1` |
 | Qualification policy | `nvkr.dev/qualification-policy/v1` | `nvkr.qualification-policy` | Independently selected configuration; no evidence predicate |
 | Native smoke worker | `nvkr.dev/tool-smoke-worker/v1` | `nvkr.tool-smoke-worker` | Detached signed document; no qualification attachment |
-| Planner plan embedded in a validation plan | `nvkr.dev/validation-plan/v1` (the `plans` entries) | `nvkr.planner-plan/v1` | None. A descriptive record in lane none, never signed or attached |
+| Planner plan written beside a validation plan | the planner's own file, named by each target's `source.planDigest` in `nvkr.dev/validation-plan/v1` | `nvkr.planner-plan/v1` | None. A descriptive record in lane none, never signed or attached |
 
 The document binds the authenticated originating repository, Run, attempt, commit, workflow/ref and build
 invocation; the separately authenticated qualification invocation; gate version; Definition, Environment,

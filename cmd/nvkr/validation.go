@@ -8,6 +8,8 @@ import (
 	"encoding/json"
 	"errors"
 	"io"
+	"os"
+	"path/filepath"
 	"strings"
 
 	client "github.com/dsx-ai-factory/nvkr/client/v1"
@@ -42,7 +44,7 @@ func cmdValidateWithRunner(run validationRunner) *cli.Command {
 }
 
 // planOnlyFlags are the flags that mean something only with --plan.
-var planOnlyFlags = []string{"reference", "policy", "local-run", "planners", "planner-var", "out"}
+var planOnlyFlags = []string{"reference", "policy", "local-run", "planners", "planner-var", "planner-out", "plan-out"}
 
 func cmdValidateWithRunners(run validationRunner, plan validationPlanner) *cli.Command {
 	return cmdValidateWithPlanners(run, plan, generateLocalValidationPlan)
@@ -58,7 +60,8 @@ func cmdValidateWithPlanners(run validationRunner, plan validationPlanner, local
 		&cli.StringFlag{Name: "local-run", Usage: "with --plan, a complete local Run directory to plan for in place of --reference and --policy. Its outputs have no registry location, so the plan is for local testing only"},
 		&cli.StringFlag{Name: "planners", Usage: "with --plan, the directory holding config.yaml and each planner's files"},
 		&cli.StringSliceFlag{Name: "planner-var", Usage: "with --plan, a run-scoped value for one planner as planner.key=value, repeatable"},
-		&cli.StringFlag{Name: "out", Usage: "with --plan, write the plan here instead of standard output"},
+		&cli.StringFlag{Name: "planner-out", Usage: "with --plan, write each planner's own plan to <planner>.json in this directory, which the plan's targets name by digest"},
+		&cli.StringFlag{Name: "plan-out", Usage: "with --plan, write the plan here instead of standard output"},
 	}, Action: func(c *cli.Context) error {
 		if c.Bool("plan") {
 			return runValidationPlan(c, plan, local)
@@ -129,8 +132,11 @@ func runValidationPlan(c *cli.Context, plan validationPlanner, local localValida
 			}
 		}
 	}
-	if c.IsSet("out") && strings.TrimSpace(c.String("out")) == "" {
-		return e.New(e.CodeUsage, "validate --plan --out requires a path")
+	if c.IsSet("plan-out") && strings.TrimSpace(c.String("plan-out")) == "" {
+		return e.New(e.CodeUsage, "validate --plan --plan-out requires a path")
+	}
+	if c.IsSet("planner-out") && strings.TrimSpace(c.String("planner-out")) == "" {
+		return e.New(e.CodeUsage, "validate --plan --planner-out requires a path")
 	}
 	vars, err := parsePlannerVars(c.StringSlice("planner-var"))
 	if err != nil {
@@ -158,7 +164,19 @@ func runValidationPlan(c *cli.Context, plan validationPlanner, local localValida
 	if err != nil {
 		return err
 	}
-	if out := c.String("out"); out != "" {
+	// The planner plans go first, so a written plan never names a file that is
+	// missing.
+	if dir := c.String("planner-out"); dir != "" {
+		if err := os.MkdirAll(dir, 0o755); err != nil {
+			return e.Wrap(e.CodeInternal, err, "creating %s", dir)
+		}
+		for _, own := range result.PlannerPlans {
+			if err := writeAtomic(c.Context, filepath.Join(dir, own.FileName()), own.Encode(), 0o644); err != nil {
+				return err
+			}
+		}
+	}
+	if out := c.String("plan-out"); out != "" {
 		return writeAtomic(c.Context, out, raw, 0o644)
 	}
 	n, err := c.App.Writer.Write(raw)

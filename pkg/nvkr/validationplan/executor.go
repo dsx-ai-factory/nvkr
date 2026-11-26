@@ -22,8 +22,8 @@ const (
 // executorInputs lists, for each known executor, the inputs a target must
 // carry for the executor to run it.
 var executorInputs = map[string][]string{
-	ExecutorValidators:    {"validator", "platform", "outputs"},
-	ExecutorNVKEE2EGoTest: {"validator", "testEnv", "outputs"},
+	ExecutorValidators:    {"suite", "platform", "components"},
+	ExecutorNVKEE2EGoTest: {"suite", "testEnv", "components"},
 }
 
 func executorKnown(name string) bool {
@@ -40,14 +40,14 @@ func checkInputs(t Target) error {
 	for _, key := range required {
 		var present bool
 		switch key {
-		case "validator":
-			present = t.Inputs.Validator != ""
+		case "suite":
+			present = t.Inputs.Suite != ""
 		case "platform":
 			present = t.Inputs.Platform != ""
 		case "testEnv":
 			present = t.Inputs.TestEnv != ""
-		case "outputs":
-			present = len(t.Inputs.Outputs) > 0
+		case "components":
+			present = len(t.Inputs.Components) > 0
 		}
 		if !present {
 			return e.New(e.CodeUsage, "target %q lacks %q, which executor %q requires", t.ID, key, t.Executor)

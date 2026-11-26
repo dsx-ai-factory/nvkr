@@ -185,17 +185,26 @@ nvkr validate --plan \
   --planners inputs/testing/planners \
   --planner-var nvke-qualify.nvke-root=./nvke-source \
   --planner-var nvke-qualify.overrides=os-image-amd64=https://images.example.test/node-amd64.qcow2 \
-  --out validation-plan.json
+  --plan-out validation-plan.json
 ```
 
 The plan is a list of targets sorted by id. Each target names the executor that runs it and the inputs that
-executor takes, so independent workflow jobs can run the targets in parallel. A target's inputs name release
-outputs and never carry a path or a digest. The executor selects them from the authenticated release.
+executor takes, so independent workflow jobs can run the targets in parallel. A target's inputs list every
+component the executor is given, each with the version, the digest-pinned registry reference or served URL
+that applies to it, and an origin: `release` for a value read from the authenticated release, `declared` for a
+version a reviewer wrote down, and `resolved` for a value the planner's own strategies produced, which the
+release does not vouch for. The executor pulls by digest and never reads the release again.
 
 `--plan` takes no check name, `--config` or `--workspace`, and the plan flags are refused without `--plan`.
 `--planner-var` is `planner.key=value`. Only that planner receives it, and each planner rejects a variable it
 does not take and owns the form of its values. Any failure returns a coded
 error and writes nothing. The same release and inputs produce byte-identical output.
+
+Each planner also makes a plan in its own format. `--planner-out <dir>` writes it to
+`<dir>/<planner>.json` in canonical encoding, and each target's `source.planDigest` names its typed digest
+(`nvkr.planner-plan/v1`), which is recomputed by decoding the file and canonicalizing the value and is not a hash
+of the file's bytes. The validation plan does not carry these plans, and an executor takes everything it needs
+from its target. The planner plans are written before the plan, so a written plan never names a missing file.
 
 A planners directory holds `config.yaml` and each planner's own files. Each entry pairs a built-in planner
 with the executor that runs its targets and the planner's own configuration. Planners are a closed set

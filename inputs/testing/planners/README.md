@@ -7,7 +7,7 @@ A plan is descriptive and carries no qualification authority. See the
 | File | Purpose |
 |---|---|
 | `config.yaml` | The planners to run. Each entry pairs a built-in planner with the executor that runs its targets and the planner's own configuration |
-| `nvke-qualify/planner.json` | The subject, scope and validator the `nvke-qualify` planner plans for |
+| `nvke-qualify/planner.json` | The subject, scope and suite the `nvke-qualify` planner plans for |
 | `nvke-qualify/subject.yaml` | NVKE-schema document: which components and dependencies the end-to-end suite is given |
 | `nvke-qualify/policy.yaml` | NVKE-schema document: the streams and the scopes over them |
 | `nvke-qualify/registry.yaml` | NVKE-schema document: how each component resolves to a version and a location |

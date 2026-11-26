@@ -1,5 +1,5 @@
 {
   "subject": "nvkr",
   "scope": "full",
-  "validator": "nvke/e2e"
+  "suite": "nvke/e2e"
 }

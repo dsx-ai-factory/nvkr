@@ -15,6 +15,8 @@ import (
 	"context"
 	"os"
 	"path/filepath"
+	"strconv"
+	"strings"
 
 	"github.com/dsx-ai-factory/nvke/release/pkg/qualification"
 	"github.com/dsx-ai-factory/nvke/release/pkg/resolve"
@@ -95,24 +97,22 @@ func (Planner) Plan(ctx context.Context, in validationplan.Input) (validationpla
 	if err != nil {
 		return validationplan.Result{}, err
 	}
-	outputs, err := releaseOutputs(registry)
-	if err != nil {
-		return validationplan.Result{}, err
-	}
 
 	combination := plan.Combinations[0]
 	targets := make([]validationplan.Target, 0, len(combination.Streams))
 	for _, stream := range combination.Streams {
-		copied := make(map[string]string, len(outputs))
-		for k, v := range outputs {
-			copied[k] = v
+		components, err := streamComponents(combination, stream)
+		if err != nil {
+			return validationplan.Result{}, err
 		}
 		targets = append(targets, validationplan.Target{
 			ID: targetPrefix + stream.Name,
 			Inputs: validationplan.Inputs{
-				Validator: cfg.Validator,
-				TestEnv:   stream.Name,
-				Outputs:   copied,
+				Suite:        cfg.Suite,
+				TestEnv:      stream.Name,
+				Capabilities: cloneCapabilities(stream.Capabilities),
+				TestParams:   testParams(stream.Parameters),
+				Components:   components,
 			},
 			Source: validationplan.Source{Planner: Name, PlanDigest: embedded.Digest, Combination: combination.ID},
 		})
@@ -146,32 +146,85 @@ func splitVars(vars map[string]string) (root string, overrides map[string]string
 	return root, overrides, nil
 }
 
-// releaseOutputs maps each registry component the release supplies to the
-// output that supplies it, in the terms a target's inputs use.
-func releaseOutputs(registry *qualification.Registry) (map[string]string, error) {
-	outputs := map[string]string{}
-	for _, component := range registry.Spec.Components {
-		for _, rule := range []struct {
-			strategy string
-			rule     *qualification.Rule
-		}{
-			{StrategyVersion, component.Resolve.Version},
-			{StrategyLocation, component.Resolve.Location},
-		} {
-			if rule.rule == nil || rule.rule.Strategy != rule.strategy || rule.rule.With[withOutput] == "" {
-				continue
+// cloneCapabilities copies the stream's capabilities, so no two targets share
+// a map.
+func cloneCapabilities(in map[string]string) map[string]string {
+	if len(in) == 0 {
+		return nil
+	}
+	out := make(map[string]string, len(in))
+	for k, v := range in {
+		out[k] = v
+	}
+	return out
+}
+
+// testParams states the stream's run settings by NVKE's own names. A setting
+// the policy leaves unset is absent, which leaves the run as it is.
+func testParams(p qualification.Parameters) map[string]string {
+	out := map[string]string{}
+	if p.Environment != "" {
+		out["environment"] = p.Environment
+	}
+	if p.TenantWorkers != 0 {
+		out["tenantWorkers"] = strconv.Itoa(p.TenantWorkers)
+	}
+	if p.SuiteTimeoutMinutes != 0 {
+		out["suiteTimeoutMinutes"] = strconv.Itoa(p.SuiteTimeoutMinutes)
+	}
+	if p.TestGridGroup != "" {
+		out["testGridGroup"] = p.TestGridGroup
+	}
+	if len(out) == 0 {
+		return nil
+	}
+	return out
+}
+
+// streamComponents lists everything one stream's suite is given: the
+// combination's components, the dependencies shared by every stream, and the
+// ones that depend on this stream. It fails closed on a stream that gets
+// nothing from the release, and on a name that appears twice.
+func streamComponents(combination qualification.Combination, stream qualification.Stream) (map[string]validationplan.Component, error) {
+	components := map[string]validationplan.Component{}
+	fromRelease := false
+	for _, list := range [][]qualification.ComponentVersion{combination.Components, combination.Dependencies, stream.Dependencies} {
+		for _, v := range list {
+			if _, dup := components[v.Name]; dup {
+				return nil, e.New(e.CodeInvalidCatalog, "%s resolved component %q more than once for stream %q", Name, v.Name, stream.Name)
 			}
-			output := rule.rule.With[withOutput]
-			if previous, ok := outputs[component.Name]; ok && previous != output {
-				return nil, e.New(e.CodeInvalidCatalog, "registry component %q takes its version from output %q and its location from %q", component.Name, previous, output)
-			}
-			outputs[component.Name] = output
+			c := component(v)
+			fromRelease = fromRelease || c.Origin == validationplan.OriginRelease
+			components[v.Name] = c
 		}
 	}
-	if len(outputs) == 0 {
-		return nil, e.New(e.CodeInvalidCatalog, "the %s registry names no release output", Name)
+	if !fromRelease {
+		return nil, e.New(e.CodeInvalidCatalog, "stream %q takes nothing from the release", stream.Name)
 	}
-	return outputs, nil
+	return components, nil
+}
+
+// component converts one resolved value. An https location can only come from
+// an override, which names where a person served a copy, so the release does
+// not vouch for it. A release reference carries the digest the pull checks.
+func component(v qualification.ComponentVersion) validationplan.Component {
+	c := validationplan.Component{Version: v.Version, Origin: validationplan.OriginResolved}
+	servedElsewhere := false
+	switch {
+	case strings.HasPrefix(v.URL, "https://"):
+		c.URL = v.URL
+		servedElsewhere = true
+	case v.URL != "":
+		c.Reference = v.URL
+	}
+	switch {
+	case servedElsewhere:
+	case v.VersionStrategy == StrategyVersion || v.LocationStrategy == StrategyLocation:
+		c.Origin = validationplan.OriginRelease
+	case v.VersionStrategy == StrategyDeclared:
+		c.Origin = validationplan.OriginDeclared
+	}
+	return c
 }
 
 var _ validationplan.Planner = Planner{}

@@ -31,8 +31,8 @@ type Config struct {
 	// Scope selects the streams to plan.
 	Scope string `json:"scope"`
 
-	// Validator names the suite each target runs.
-	Validator string `json:"validator"`
+	// Suite names the suite each target runs.
+	Suite string `json:"suite"`
 
 	// SubjectSpec, Policy and Registry are file names beside the configuration.
 	SubjectSpec string `json:"subjectSpec,omitempty"`
@@ -56,7 +56,7 @@ func loadConfig(path string) (Config, files, error) {
 	if decoder.More() {
 		return Config{}, files{}, e.New(e.CodeUsage, "the %s planner configuration requires exactly one document", Name)
 	}
-	for field, value := range map[string]string{"subject": cfg.Subject, "scope": cfg.Scope, "validator": cfg.Validator} {
+	for field, value := range map[string]string{"subject": cfg.Subject, "scope": cfg.Scope, "suite": cfg.Suite} {
 		if value == "" {
 			return Config{}, files{}, e.New(e.CodeUsage, "the %s planner configuration requires %q", Name, field)
 		}

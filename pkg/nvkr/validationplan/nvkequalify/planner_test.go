@@ -114,7 +114,7 @@ func TestPlanMakesOneTargetPerStream(t *testing.T) {
 		t.Fatal(err)
 	}
 	if len(result.Plans) != 1 || result.Plans[0].Planner != Name {
-		t.Fatalf("plans = %+v, want one embedded %s plan", result.Plans, Name)
+		t.Fatalf("plans = %+v, want one %s plan", result.Plans, Name)
 	}
 	var ids []string
 	for _, target := range result.Targets {
@@ -122,11 +122,20 @@ func TestPlanMakesOneTargetPerStream(t *testing.T) {
 		if target.Source.Planner != Name || target.Source.PlanDigest != result.Plans[0].Digest {
 			t.Errorf("target %s source = %+v", target.ID, target.Source)
 		}
-		if target.Inputs.Validator != "nvke/e2e" || target.Inputs.TestEnv == "" {
+		if target.Inputs.Suite != "nvke/e2e" || target.Inputs.TestEnv == "" {
 			t.Errorf("target %s inputs = %+v", target.ID, target.Inputs)
 		}
-		if target.Inputs.Outputs["controller"] != "nvke-controller" || target.Inputs.Outputs["cli-arm64"] != "nvkectl-linux-arm64" {
-			t.Errorf("target %s outputs = %v", target.ID, target.Inputs.Outputs)
+		for name, c := range map[string]string{"controller": "a", "cli-arm64": "d"} {
+			got := target.Inputs.Components[name]
+			if got.Origin != validationplan.OriginRelease || got.Version != digest(c) || !strings.HasSuffix(got.Reference, "@"+digest(c)) {
+				t.Errorf("target %s component %s = %+v, want the release output %s", target.ID, name, got, digest(c))
+			}
+		}
+		if got := target.Inputs.Components["cni-ovn"]; got.Origin != validationplan.OriginDeclared || got.Version != "2.4.2" {
+			t.Errorf("target %s cni-ovn = %+v, want the declared version", target.ID, got)
+		}
+		if got := target.Inputs.Components["kind"]; got.Origin != validationplan.OriginResolved || got.Version != "v0.31.0" {
+			t.Errorf("target %s kind = %+v, want the NVKE pin", target.ID, got)
 		}
 	}
 	want := []string{"e2e/forge-gb200-amd64-ubuntu-26.04-kube-1.36", "e2e/forge-gb200-arm64-ubuntu-26.04-kube-1.36"}
@@ -190,7 +199,7 @@ func TestPlanRecordsTheExactDeclaredKubeAndOVNVersions(t *testing.T) {
 	}
 }
 
-func TestPlanEmbedsADigestBoundPlan(t *testing.T) {
+func TestPlanKeepsADigestBoundPlan(t *testing.T) {
 	result, err := Planner{}.Plan(context.Background(), input(t, release(), nil))
 	if err != nil {
 		t.Fatal(err)
@@ -209,7 +218,7 @@ func TestPlanEmbedsADigestBoundPlan(t *testing.T) {
 		t.Fatal(err)
 	}
 	if string(raw) != string(pp.Plan) {
-		t.Fatal("the embedded plan is not in canonical encoding")
+		t.Fatal("the planner plan is not in canonical encoding")
 	}
 }
 
@@ -265,6 +274,85 @@ func TestPlanServedImageOverridesTheLocation(t *testing.T) {
 	}
 	if len(plan.Overrides) != 1 || plan.Overrides[0] != "os-image-amd64" {
 		t.Errorf("overrides = %v, want os-image-amd64 recorded", plan.Overrides)
+	}
+}
+
+func TestPlanCopiesEachStreamsCapabilitiesAndParameters(t *testing.T) {
+	// A copy of the shipped inputs whose first stream names run settings.
+	dir := t.TempDir()
+	shipped := filepath.Dir(authoredConfig)
+	for _, name := range []string{"planner.json", "subject.yaml", "registry.yaml", "policy.yaml"} {
+		raw, err := os.ReadFile(filepath.Join(shipped, name))
+		if err != nil {
+			t.Fatal(err)
+		}
+		if name == "policy.yaml" {
+			text := strings.Replace(string(raw),
+				`kube: "1.36"}`+"\n    - name: forge-gb200-arm64",
+				`kube: "1.36"}`+"\n      parameters: {environment: forge-nightly, tenantWorkers: 2, suiteTimeoutMinutes: 90, testGridGroup: nvkr-nightly}\n    - name: forge-gb200-arm64", 1)
+			if text == string(raw) {
+				t.Fatal("the policy fixture did not take the parameters")
+			}
+			raw = []byte(text)
+		}
+		if err := os.WriteFile(filepath.Join(dir, name), raw, 0o644); err != nil {
+			t.Fatal(err)
+		}
+	}
+	in := input(t, release(), nil)
+	in.Config = filepath.Join(dir, "planner.json")
+	result, err := Planner{}.Plan(context.Background(), in)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, target := range result.Targets {
+		switch target.Inputs.TestEnv {
+		case "forge-gb200-amd64-ubuntu-26.04-kube-1.36":
+			want := map[string]string{"environment": "forge-nightly", "tenantWorkers": "2", "suiteTimeoutMinutes": "90", "testGridGroup": "nvkr-nightly"}
+			if len(target.Inputs.TestParams) != len(want) {
+				t.Fatalf("testParams = %v, want %v", target.Inputs.TestParams, want)
+			}
+			for k, v := range want {
+				if target.Inputs.TestParams[k] != v {
+					t.Errorf("testParams[%s] = %q, want %q", k, target.Inputs.TestParams[k], v)
+				}
+			}
+			if target.Inputs.Capabilities["arch"] != "amd64" || target.Inputs.Capabilities["provider"] != "forge" || target.Inputs.Capabilities["kube"] != "1.36" {
+				t.Errorf("capabilities = %v", target.Inputs.Capabilities)
+			}
+		case "forge-gb200-arm64-ubuntu-26.04-kube-1.36":
+			if target.Inputs.TestParams != nil {
+				t.Errorf("a stream with no parameters carries testParams %v", target.Inputs.TestParams)
+			}
+			if target.Inputs.Capabilities["arch"] != "arm64" {
+				t.Errorf("capabilities = %v", target.Inputs.Capabilities)
+			}
+		default:
+			t.Errorf("unexpected stream %q", target.Inputs.TestEnv)
+		}
+	}
+	// No two targets share a capabilities map.
+	result.Targets[0].Inputs.Capabilities["arch"] = "changed"
+	if result.Targets[1].Inputs.Capabilities["arch"] == "changed" {
+		t.Error("two targets share one capabilities map")
+	}
+}
+
+func TestServedImageIsNotVouchedForByTheRelease(t *testing.T) {
+	served := "https://images.example.test/node-amd64.qcow2"
+	result, err := Planner{}.Plan(context.Background(), input(t, release(), map[string]string{VarOverrides: "os-image-amd64=" + served}))
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, target := range result.Targets {
+		served1 := target.Inputs.Components["os-image-amd64"]
+		if served1.URL != served || served1.Reference != "" || served1.Origin != validationplan.OriginResolved {
+			t.Errorf("target %s os-image-amd64 = %+v, want the served URL as resolved", target.ID, served1)
+		}
+		unserved := target.Inputs.Components["os-image-arm64"]
+		if unserved.Origin != validationplan.OriginRelease || !strings.HasSuffix(unserved.Reference, "@"+digest("f")) || unserved.Version != "" {
+			t.Errorf("target %s os-image-arm64 = %+v, want the release reference and no version", target.ID, unserved)
+		}
 	}
 }
 

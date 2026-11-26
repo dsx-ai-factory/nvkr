@@ -91,15 +91,15 @@ func Build(ctx context.Context, req Request, planners map[string]Planner) (*Plan
 			}
 			plan.Targets = append(plan.Targets, target)
 		}
-		for _, embedded := range result.Plans {
-			if embedded.Planner != entry.Name {
-				return nil, e.New(e.CodeInternal, "planner %q embedded a plan attributed to %q", entry.Name, embedded.Planner)
+		for _, own := range result.Plans {
+			if own.Planner != entry.Name {
+				return nil, e.New(e.CodeInternal, "planner %q returned a plan attributed to %q", entry.Name, own.Planner)
 			}
-			plan.Plans = append(plan.Plans, embedded)
+			plan.PlannerPlans = append(plan.PlannerPlans, own)
 		}
 	}
 	sort.Slice(plan.Targets, func(i, j int) bool { return plan.Targets[i].ID < plan.Targets[j].ID })
-	sort.Slice(plan.Plans, func(i, j int) bool { return plan.Plans[i].Planner < plan.Plans[j].Planner })
+	sort.Slice(plan.PlannerPlans, func(i, j int) bool { return plan.PlannerPlans[i].Planner < plan.PlannerPlans[j].Planner })
 	if err := plan.Validate(); err != nil {
 		return nil, err
 	}
