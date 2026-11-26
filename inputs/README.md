@@ -13,7 +13,7 @@ inputs/
   catalogs/      # Shared producer owners, including explicit version/packaging variants
   environments/  # Execution, credentials, signing and publication policy
   policies/      # Verification policy and maintained generation selections
-  testing/       # Retained downstream test inputs; maintained hosted nightly configuration lives in demos/
+  testing/       # Retained downstream test inputs, the validator catalog and the validation planners; maintained hosted nightly configuration lives in demos/
   experiments/   # Producers outside the maintained release catalog
 ```
 

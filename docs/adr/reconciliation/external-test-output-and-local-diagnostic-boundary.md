@@ -67,3 +67,11 @@ externally unverified. Existing validation-vector v3 and qualification-evidence 
 owns diagnostic execution and passive external qualification; [ADR-18 §3](../0018-pipeline-ir-and-ci-adapter-emission.md#3-helper-owned-isolation-and-narrowly-admitted-native-arc-disks)
 owns the host isolation posture. The [operator reference](../../external-test-output-contract.md)
 owns prerequisites, selection and capture limits. These contracts establish no organizational ratification.
+
+`validate --plan` is implemented and contract-tested only, in lane **none (descriptive)**. `validationplan`
+builds a target list from an authenticated release and a closed set of built-in planners, and emits no
+receipt. Fixture-based tests cover admission, determinism, fail-closed planning and the NVKE planner against
+the shipped inputs. No real published release has been planned. No executor consumes a plan, and the NVKE
+end-to-end suite does not yet accept a digest as a component version, so a plan's digest-valued versions are
+descriptions that suite cannot use. Planning records exact `kube` and `cni-ovn` versions that authored inputs declare,
+because the release does not carry them as outputs, and nothing checks those declarations against the node image.

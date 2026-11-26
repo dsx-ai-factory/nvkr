@@ -1,0 +1,49 @@
+# SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# SPDX-License-Identifier: Apache-2.0
+
+# What NVKE's end-to-end suite is given when an NVKR release is validated. The
+# subject is nvkr, and its version is the digest of the release.
+#
+# components are the parts supplied by the release. Each takes the digest of
+# the release output the registry names for it.
+#
+# dependencies are the other values a run needs. The node images and the
+# command-line binaries come from the release, one per architecture. The
+# bootloader is versioned apart from the image and declared here because
+# nothing derives it. kind, clusterctl and nerdctl are tools the test harness
+# runs, and the NVKE tree pins them.
+#
+# kube and cni-ovn are declared and not resolved. The release carries neither as
+# an output, so the plan records what is written here and in the registry, and
+# nothing checks it against the node image. The Kubernetes version is looked up
+# from the minor of the stream, and the OVN version is the value below.
+
+apiVersion: nvke.nvidia.com/v1alpha1
+kind: Qualification
+metadata:
+  name: nvkr
+  description: What is given to NVKE's end-to-end suite when an NVKR release is validated.
+spec:
+  subject: nvkr
+
+  components:
+    - {name: controller,       selectors: [latest]}
+    - {name: capi-provisioned, selectors: [latest]}
+
+  dependencies:
+    # The Kubernetes minor of the stream the target runs in, which the registry
+    # turns into an exact version.
+    - {name: kube, constraintFrom: {capability: kube}}
+    # The OVN version to validate. Quote a version, because YAML reads an
+    # unquoted one as a number.
+    - {name: cni-ovn, value: "2.4.2"}
+
+    - {name: cli-amd64}
+    - {name: cli-arm64}
+    - {name: os-image-amd64}
+    - {name: os-image-arm64}
+    - {name: os-image-bootloader-amd64, value: nke-isos/qcow/efi/x86_64/2026-06-25/1782410681/qcow-imager.efi}
+    - {name: os-image-bootloader-arm64, value: nke-isos/qcow/efi/aarch64/2026-06-25/1782410719/qcow-imager.efi}
+    - {name: kind}
+    - {name: clusterctl}
+    - {name: nerdctl}

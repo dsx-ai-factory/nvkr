@@ -328,6 +328,26 @@ of authenticated catalog-produced executable outputs. Its source and tools polic
 qualification-policy format for artifact authentication; the profile does not replace those policies.
 Top-level `validate` runs diagnostics, whereas `definition validate` checks static authored-input shape.
 Outputs remain descriptive and cannot authorize qualification or promotion.
+
+**Validation plan**:
+A descriptive list of targets for one authenticated release, produced by `validate --plan` from the planners an
+authored directory lists. Each target names an executor and the inputs it takes. A plan carries no qualification
+authority and is distinct from the build Plan.
+_Avoid_: Run plan, qualification plan, test verdict
+
+**Target**:
+One entry of a validation plan, run as its own workflow job. Its inputs list every component the executor is
+given, each resolved to a version, a digest-pinned reference or a served URL, and an origin.
+_Avoid_: Profile, stream, check
+
+**Planner**:
+A compiled, built-in implementation that turns an authenticated release and its own configuration into targets.
+It runs nothing and claims no authority. The set is closed and is not a plugin mechanism.
+_Avoid_: Adapter, strategy, validator
+
+**Executor**:
+The workflow job that runs a target's inputs. It is named by a planners entry and is not NVKR code.
+_Avoid_: Planner, harness
 _Avoid_: Recipe, test dispatcher framework, verification policy
 
 **Validator catalog**:
