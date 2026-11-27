@@ -34,6 +34,13 @@ type fakeRun struct {
 	producers      map[string]*factory.CLIArtifactTestInputs
 	producerErr    error
 	closes         int
+	// payload is the executable member streamed to the executor.
+	payload    []byte
+	memberErr  error
+	members    []string
+	operations int
+	// afterOperation is the held Run's recheck result after an operation.
+	afterOperation error
 }
 
 func (r *fakeRun) Description() (lifecycle.LocalDiagnosticDescription, error) {

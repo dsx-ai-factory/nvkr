@@ -24,6 +24,15 @@ command:
   - GO=go
   - GO_TEST_FLAGS=-count=1 -timeout=15m -json
 environment:
+  # The executor mounts source read-only at /src and a writable /cache shared by
+  # acquisition and the offline test; Go state and HOME must point there or at /tmp.
+  CGO_ENABLED: "0"
+  GOCACHE: /cache/go-build
+  GOFLAGS: -mod=readonly -modcacherw
+  GOPATH: /cache/go
+  GOTOOLCHAIN: local
+  GOWORK: "off"
+  HOME: /tmp
   NVKECTL: ${inputs.executable.path}
   NVKECTL_EXPECTED_VERSION: ${inputs.executable.version}
 requires:

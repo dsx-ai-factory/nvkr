@@ -106,6 +106,9 @@ func TestPrepareAdmitsEnvironmentAndExecutorRequirements(t *testing.T) {
 		{"unsupported-platform", "local", "platforms: [linux/amd64, linux/arm64]", "platforms: [linux/amd64, darwin/arm64]", e.CodeEngineCapability},
 		{"unsupported-format", "local", "format: executable", "format: oci", e.CodeEngineCapability},
 		{"unsupported-component", "local", "component: nvkectl", "component: kubectl", e.CodeEngineCapability},
+		// The executor stages each input as /inputs/<role>/<output>.
+		{"unstageable-output-name", "local", "output: nvkectl", "output: bin/nvkectl", e.CodeEngineCapability},
+		{"unstageable-output-dots", "local", "output: nvkectl", "output: ..", e.CodeEngineCapability},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			root := selectionFixture(t)

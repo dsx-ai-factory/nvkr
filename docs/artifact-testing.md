@@ -43,6 +43,7 @@ acquisition:             # optional dependency preparation
   command: [go, mod, download]
 command: [make, --no-print-directory, test-artifact, ...]
 environment:             # literals or ${inputs.<role>.path|version}
+  GOCACHE: /cache/go-build   # the shipped suites also set GOPATH, GOFLAGS, HOME, ...
   NVKECTL: ${inputs.executable.path}
   NVKECTL_EXPECTED_VERSION: ${inputs.executable.version}
 requires:
@@ -59,7 +60,7 @@ the Run's build metadata. Each reference is replaced as plain text before the co
 argument. Any other `${` text, including a literal `${`, fails loading. The catalog directory
 may be given in any spelling (`./dir`, `dir/`); a symlinked catalog root is refused.
 
-Registrations are not yet executed. The `pkg/nvkr/validation` package resolves selections
+No command executes registrations yet. The `pkg/nvkr/validation` package resolves selections
 (exact suite IDs or parent paths such as `nvke/nvkectl`, in argument order without duplicates),
 admits them against the built-in `local` test environment, and binds each input role to exactly
 one named output of a completed local Run. All inputs of one suite must be built for the same
@@ -71,10 +72,43 @@ root. Before building, the compiled Plan must contain every selected input as an
 declared component, all on one declared platform, and must not come from a composite Definition, whose
 Runs cannot be bound yet. A failed build binds nothing. If the build completes but binding
 refuses, the attempt is kept, the error names its directory, and it can be bound later.
-Admission does not yet check `acquisition` or its network access; the executor that runs
-`acquisition` and `command` will enforce them, and is follow-up work. No command exposes this
-yet. `validators run --profile` below still uses the earlier indexed
-catalog under `inputs/testing/validators/` until it is migrated.
+
+The package then executes one bound suite at a time, holding the Run open for the whole suite:
+
+1. Stream each input's executable from the held Run into a private workspace as a read-only
+   file, and require its bytes to be the bound build subject. Each input's output name must be
+   one lowercase file name of letters, digits and hyphens; admission refuses any other before
+   work starts.
+2. Import the exact test origin (repository, commit and tree) with the existing local source
+   policy, and require `workingDirectory` to exist in it.
+3. Run `acquisition.command`, if declared, with network access and without any input
+   mounted, bounded by a fixed 30 minutes.
+4. Run `command` with no network, bounded by the registration's `timeout`, with each input
+   mounted read-only at `/inputs/<role>/<output>`.
+5. Rehash every staged input, then remove the workspace.
+
+Both commands run in the bound image as the invoking user's UID and GID, not the image's default
+user, from `/src/<workingDirectory>`. Execution refuses to start when NVKR runs as root
+(`engine-capability`): without user-namespace remapping, root in the container would be root on the
+host if the container were ever escaped. Run NVKR as an unprivileged user. Both commands run with
+a read-only root filesystem, all capabilities dropped, no new privileges and the same
+`environment`. The executor mounts the test origin read-only at `/src`, a
+private writable `/cache` shared by both commands, and a private `/tmp`; it adds no environment
+variables of its own. A registration therefore points tool state, such as Go's caches and `HOME`,
+at `/cache` or `/tmp`, as the shipped suites do.
+
+The verdict comes from the process outcome only. Exit status 0 is passed and any other exit status
+is failed. A command the container runtime could not launch (runtime status 125–127), a timeout,
+a cancellation, a setup failure or input bytes that changed during the run are an execution
+error. Raw output is passed through unchanged. Unlike the profile route below, the result checks
+for missing, empty, skipped or incomplete Go test results are not applied, so a suite that
+exits 0 having skipped its tests passes. Workspace cleanup is recorded separately and never
+replaces a suite failure; container removal uses the existing reaper and is best effort.
+Execution is contract-tested with mocked source import and container runs only; no suite has
+been run through it against a real Run.
+
+`validators run --profile` below still uses the earlier indexed catalog under
+`inputs/testing/validators/` until it is migrated.
 
 ```sh
 GOTOOLCHAIN=local go build -o bin/nvkr ./cmd/nvkr
